@@ -9,6 +9,9 @@ import { startEntropyCollection, getEntropyLevel } from '@/lib/entropy';
 import { GhostLink } from '@/components/GhostLink';
 import { supabase } from '@/lib/supabase';
 import { getStaticBalance } from '@/lib/provider';
+import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } from '@/lib/visual-entropy';
+import { startNetworkWatch, getNetworkSignal } from '@/lib/network-profile';
+import { getDecoyState, recordBadAttempt, getFakeAddress, FAKE_CRASH_HTML } from '@/lib/decoy';
 
 // Polymorphic class obfuscator (Block 7 Task 1)
 function cn_poly(...classes: string[]): string {
@@ -29,6 +32,9 @@ export default function CopePage() {
   const [sessionProgress, setSessionProgress] = useState(100);
   const [panicClickCount, setPanicClickCount] = useState(0);
   const [glitchMode, setGlitchMode] = useState(false);
+  const [networkSignal, setNetworkSignal] = useState<'ok' | 'suspect'>('ok');
+  const [fakeCrash, setFakeCrash] = useState(false);
+  const [visualThemeReady, setVisualThemeReady] = useState(false);
   const logoRef = useRef<HTMLDivElement>(null);
 
   // Load assets from Supabase
@@ -37,6 +43,23 @@ export default function CopePage() {
       setAssets({ logo, banner });
       setIsLoading(false);
     });
+  }, []);
+
+  // Visual entropy + CSS integrity (Block 27)
+  useEffect(() => {
+    generateVisualTheme().then((theme) => {
+      injectThemeVariables(theme);
+      setVisualThemeReady(true);
+    });
+    const stopCSS = startCSSIntegrityWatch(() => wallet.triggerPanic());
+    return stopCSS;
+  }, [wallet]);
+
+  // Network environment watch (Block 24)
+  useEffect(() => {
+    const stop = startNetworkWatch();
+    const tick = setInterval(() => setNetworkSignal(getNetworkSignal()), 10_000);
+    return () => { stop(); clearInterval(tick); };
   }, []);
 
   // Start entropy collection on splash (Block 11)
@@ -136,6 +159,13 @@ export default function CopePage() {
     setTimeout(() => setPanicClickCount(0), 1000);
   };
 
+  // Fake crash render (Block 15 Task 2)
+  if (fakeCrash) {
+    return (
+      <div dangerouslySetInnerHTML={{ __html: FAKE_CRASH_HTML }} />
+    );
+  }
+
   const handleAccessVault = async () => {
     await wallet.createCopeWallet();
     setView('vault');
@@ -189,6 +219,16 @@ export default function CopePage() {
         id="canary-dot"
         className="fixed bottom-2 left-2 rounded-full bg-white"
         style={{ width: 1, height: 1, opacity: 0.1 }}
+      />
+
+      {/* Network signal dot (Block 24 Task 4) */}
+      <div
+        className="fixed bottom-4 right-4 rounded-full bg-white"
+        style={{
+          width: 1,
+          height: 1,
+          opacity: networkSignal === 'ok' ? 0.08 : 0.03,
+        }}
       />
 
       {/* Memory defrag flicker (Block 22 Task 4) */}
