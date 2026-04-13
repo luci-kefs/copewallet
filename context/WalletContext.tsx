@@ -1,0 +1,362 @@
+'use client';
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
+import { ethers } from 'ethers';
+import {
+  encryptData,
+  decryptData,
+  startKeyRotation,
+  stopKeyRotation,
+  rotateKeys,
+  getCurrentKey,
+} from '@/lib/crypto';
+import { buildSuperEntropySeed } from '@/lib/entropy';
+import { scatterStore, ScatteredStore, wipeScatteredStore, startHeapNoise, stopHeapNoise } from '@/lib/memory-vault';
+import { getHardwareUUID, startEnvironmentWatch } from '@/lib/fingerprint';
+
+// Block 35: Two explicit operating modes
+export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
+
+interface WalletState {
+  // Obfuscated real state (Block 5)
+  _u_ap: string | null;          // activeAddress
+  _v_enc: string | null;         // encryptedVault (mnemonic)
+  _k_enc: string | null;         // encryptedVault (private key)
+  isUnlocked: boolean;
+  mode: WalletMode;
+  isPulseActive: boolean;        // key rotation pulse (Block 9)
+  isBlurred: boolean;            // anti-prying blur (Block 4)
+  isGhostLocked: boolean;        // anomaly detection lock (Block 8)
+  sessionStartedAt: number | null;
+  devToolsDetected: number;      // graduated counter (Block 34)
+}
+
+// Decoy honeypot variables (Block 5 Task 1)
+let _seedData = '';
+let _pvt_key_vault = '';
+let _wallet_backup = '';
+const _updateDecoys = () => {
+  _seedData = Math.random().toString(36).repeat(4);
+  _pvt_key_vault = Math.random().toString(36).repeat(4);
+  _wallet_backup = Math.random().toString(36).repeat(4);
+};
+
+interface WalletContextType extends WalletState {
+  createCopeWallet: () => Promise<void>;
+  importCopeWallet: (mnemonic: string) => Promise<void>;
+  wipeCopeWallet: () => void;
+  triggerPanic: () => void;
+  rotateVaultKeys: () => void;
+  getMnemonic: () => string | null;
+  activeAddress: string | null;
+  scatteredKeyStore: ScatteredStore | null;
+}
+
+const WalletContext = createContext<WalletContextType | null>(null);
+
+const INITIAL_STATE: WalletState = {
+  _u_ap: null,
+  _v_enc: null,
+  _k_enc: null,
+  isUnlocked: false,
+  mode: 'EPHEMERAL',
+  isPulseActive: false,
+  isBlurred: false,
+  isGhostLocked: false,
+  sessionStartedAt: null,
+  devToolsDetected: 0,
+};
+
+export function WalletProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<WalletState>(INITIAL_STATE);
+  const scatteredKeyRef = useRef<ScatteredStore | null>(null);
+  const mnemonicShownRef = useRef(false);
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // GHOST: no storage ops permitted below this line (EPHEMERAL mode boundary)
+
+  const wipeCopeWallet = useCallback(() => {
+    // Wipe scattered key store
+    if (scatteredKeyRef.current) {
+      wipeScatteredStore(scatteredKeyRef.current);
+      scatteredKeyRef.current = null;
+    }
+    mnemonicShownRef.current = false;
+    setState(INITIAL_STATE);
+    stopKeyRotation();
+    stopHeapNoise();
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    if (sessionTimer.current) clearTimeout(sessionTimer.current);
+    // Update decoys to noise
+    _updateDecoys();
+  }, []);
+
+  const triggerPanic = useCallback(() => {
+    wipeCopeWallet();
+    // Clear all caches
+    if ('caches' in window) {
+      caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
+    }
+    // Redirect to external link
+    const ext = process.env.NEXT_PUBLIC_EXTERNAL_LINK || 'https://www.google.com';
+    window.location.replace(ext);
+  }, [wipeCopeWallet]);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    inactivityTimer.current = setTimeout(() => {
+      wipeCopeWallet();
+    }, 5 * 60 * 1000); // 5 minutes
+  }, [wipeCopeWallet]);
+
+  const createCopeWallet = useCallback(async () => {
+    try {
+      const entropySeed = await buildSuperEntropySeed();
+      // Use entropy seed as extra randomness for wallet creation
+      const entropyHex = '0x' + Array.from(entropySeed.slice(0, 32))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      const wallet = ethers.Wallet.createRandom(entropyHex);
+      const mnemonic = wallet.mnemonic?.phrase ?? '';
+      const privateKey = wallet.privateKey;
+      const address = wallet.address;
+
+      const hwId = await getHardwareUUID();
+      const combinedKey = getCurrentKey() + hwId;
+
+      const encMnemonic = encryptData(mnemonic, combinedKey);
+      const encPrivKey = encryptData(privateKey, combinedKey);
+
+      // Scatter private key in memory
+      scatteredKeyRef.current = scatterStore(privateKey);
+
+      setState((prev) => ({
+        ...prev,
+        _u_ap: address,
+        _v_enc: encMnemonic,
+        _k_enc: encPrivKey,
+        isUnlocked: true,
+        sessionStartedAt: Date.now(),
+      }));
+
+      startHeapNoise();
+      startKeyRotation((oldKey, newKey) => {
+        setState((prev) => {
+          if (!prev._v_enc || !prev._k_enc) return prev;
+          const hwUUID = hwId;
+          const oldCombined = oldKey + hwUUID;
+          const newCombined = newKey + hwUUID;
+          const rawMnemonic = decryptData(prev._v_enc, oldCombined);
+          const rawPrivKey = decryptData(prev._k_enc, oldCombined);
+          return {
+            ...prev,
+            _v_enc: encryptData(rawMnemonic, newCombined),
+            _k_enc: encryptData(rawPrivKey, newCombined),
+            isPulseActive: true,
+          };
+        });
+        setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 500);
+      });
+
+      resetInactivityTimer();
+      // 30-minute hard session limit (Block 6)
+      sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
+    } catch (err) {
+      console.error('Vault creation failed');
+    }
+  }, [resetInactivityTimer, wipeCopeWallet]);
+
+  const importCopeWallet = useCallback(async (mnemonic: string) => {
+    try {
+      const wallet = ethers.Wallet.fromPhrase(mnemonic.trim());
+      const privateKey = wallet.privateKey;
+      const address = wallet.address;
+
+      const hwId = await getHardwareUUID();
+      const combinedKey = getCurrentKey() + hwId;
+
+      scatteredKeyRef.current = scatterStore(privateKey);
+
+      setState((prev) => ({
+        ...prev,
+        _u_ap: address,
+        _v_enc: encryptData(mnemonic, combinedKey),
+        _k_enc: encryptData(privateKey, combinedKey),
+        isUnlocked: true,
+        sessionStartedAt: Date.now(),
+      }));
+
+      startHeapNoise();
+      resetInactivityTimer();
+      sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
+    } catch {
+      throw new Error('Invalid mnemonic');
+    }
+  }, [resetInactivityTimer, wipeCopeWallet]);
+
+  const rotateVaultKeys = useCallback(() => {
+    rotateKeys((oldKey, newKey) => {
+      setState((prev) => {
+        if (!prev._v_enc || !prev._k_enc) return prev;
+        const raw1 = decryptData(prev._v_enc, oldKey);
+        const raw2 = decryptData(prev._k_enc, oldKey);
+        return {
+          ...prev,
+          _v_enc: encryptData(raw1, newKey),
+          _k_enc: encryptData(raw2, newKey),
+          isPulseActive: true,
+        };
+      });
+      setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 300);
+    });
+  }, []);
+
+  const getMnemonic = useCallback((): string | null => {
+    if (!state._v_enc || mnemonicShownRef.current) return null;
+    mnemonicShownRef.current = true; // burn after reading (Block 6)
+    try {
+      return decryptData(state._v_enc);
+    } catch {
+      return null;
+    }
+  }, [state._v_enc]);
+
+  // Anti-Persistence: wipe on unload (Block 2)
+  useEffect(() => {
+    const handler = () => wipeCopeWallet();
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [wipeCopeWallet]);
+
+  // Anti-Prying: blur on tab switch (Block 4)
+  useEffect(() => {
+    const handler = () => {
+      if (document.hidden) {
+        setState((p) => ({ ...p, isBlurred: true }));
+        document.title = 'By Aethilm';
+      } else {
+        setState((p) => ({ ...p, isBlurred: false }));
+        document.title = 'Cope Wallet';
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, []);
+
+  // Activity listeners for inactivity timer (Block 4 + 6)
+  useEffect(() => {
+    if (!state.isUnlocked) return;
+    const events = ['mousemove', 'keydown', 'click', 'touchstart'];
+    const handler = () => resetInactivityTimer();
+    events.forEach((e) => window.addEventListener(e, handler));
+    return () => events.forEach((e) => window.removeEventListener(e, handler));
+  }, [state.isUnlocked, resetInactivityTimer]);
+
+  // Decoy updater (Block 5)
+  useEffect(() => {
+    const id = setInterval(_updateDecoys, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Environment watch (Block 16)
+  useEffect(() => {
+    const stop = startEnvironmentWatch(() => {
+      setState((p) => ({ ...p, isGhostLocked: true }));
+    });
+    return stop;
+  }, []);
+
+  // Canary trap — window._aethilm_canary (Block 20)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let _canary = 'aethilm_sovereign';
+    const canaryProxy = new Proxy(
+      { value: _canary },
+      {
+        set: () => {
+          wipeCopeWallet();
+          return false;
+        },
+        deleteProperty: () => {
+          wipeCopeWallet();
+          return false;
+        },
+      }
+    );
+    (window as unknown as Record<string, unknown>)['_aethilm_canary'] = canaryProxy;
+  }, [wipeCopeWallet]);
+
+  // Honey input trap (Block 20)
+  useEffect(() => {
+    const trap = document.createElement('input');
+    trap.setAttribute('name', 'wallet_seed_backup');
+    trap.setAttribute('aria-hidden', 'true');
+    trap.setAttribute('tabindex', '-1');
+    trap.style.cssText = 'position:fixed;width:0;height:0;opacity:0;pointer-events:none;';
+    trap.addEventListener('input', () => wipeCopeWallet());
+    trap.addEventListener('change', () => wipeCopeWallet());
+    document.body.appendChild(trap);
+    return () => { try { document.body.removeChild(trap); } catch {} };
+  }, [wipeCopeWallet]);
+
+  // Branding self-heal via MutationObserver (Block 7 Task 4)
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of Array.from(mutation.removedNodes)) {
+          const el = node as HTMLElement;
+          if (el.dataset?.aethilm === 'brand') {
+            wipeCopeWallet();
+          }
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [wipeCopeWallet]);
+
+  // Console honey-trap (Block 12 Task 4)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    Object.defineProperty(window, 'wallet', {
+      get: () => {
+        triggerPanic();
+        return { error: 'Build Integrity Failure: 0xAE7H1LM' };
+      },
+      configurable: false,
+    });
+  }, [triggerPanic]);
+
+  return (
+    <WalletContext.Provider
+      value={{
+        ...state,
+        activeAddress: state._u_ap,
+        createCopeWallet,
+        importCopeWallet,
+        wipeCopeWallet,
+        triggerPanic,
+        rotateVaultKeys,
+        getMnemonic,
+        scatteredKeyStore: scatteredKeyRef.current,
+      }}
+    >
+      {children}
+    </WalletContext.Provider>
+  );
+}
+
+export function useWallet(): WalletContextType {
+  const ctx = useContext(WalletContext);
+  if (!ctx) throw new Error('useWallet must be used within WalletProvider');
+  return ctx;
+}
