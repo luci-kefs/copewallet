@@ -17,6 +17,7 @@ import { startNetworkWatch } from '@/lib/network-profile';
 import { embedInPNG, extractFromPNG } from '@/lib/steganography';
 import { encryptData, decryptData, getCurrentKey } from '@/lib/crypto';
 import { getHardwareUUID } from '@/lib/fingerprint';
+import { loadSession } from '@/lib/session-lock';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
 
 type View = 'main' | 'fake_crash';
@@ -61,9 +62,23 @@ export default function CopePage() {
     return stop;
   }, []);
 
-  // Auto-generate wallet on first load
+  // Auto-generate wallet on first load — or restore from session lock
   useEffect(() => {
-    if (!wallet.isUnlocked) wallet.createCopeWallet();
+    (async () => {
+      const saved = loadSession();
+      if (saved) {
+        try {
+          const hwId = await getHardwareUUID();
+          const mnemonic = decryptData(saved, hwId);
+          if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
+            await wallet.importCopeWallet(mnemonic);
+            wallet.markSessionRestored();
+            return;
+          }
+        } catch {}
+      }
+      wallet.createCopeWallet();
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -136,6 +151,7 @@ export default function CopePage() {
   };
 
   const handleInitNewVault = () => {
+    wallet.disableSessionLock();
     wallet.wipeCopeWallet();
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
@@ -278,7 +294,7 @@ export default function CopePage() {
 
               {/* Wipe session */}
               {wallet.isUnlocked && (
-                <button onClick={() => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 100); }}
+                <button onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 100); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontSize: 9, display: 'flex', alignItems: 'center', gap: 3, padding: '2px 0', letterSpacing: '0.06em' }}>
                   <Lock size={8} /> Wipe &amp; Reset Session
                 </button>

@@ -539,9 +539,24 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hideBalance, setHideBalance] = useState(false);
+  const [sessionToggling, setSessionToggling] = useState(false);
 
   const address = wallet.activeAddress;
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-5)}` : '—';
+
+  const handleSessionToggle = async () => {
+    if (sessionToggling) return;
+    setSessionToggling(true);
+    try {
+      if (wallet.isSessionLocked) {
+        wallet.disableSessionLock();
+      } else {
+        await wallet.enableSessionLock();
+      }
+    } finally {
+      setSessionToggling(false);
+    }
+  };
 
   // Load token balances
   const loadTokens = useCallback(async () => {
@@ -608,7 +623,7 @@ export function WalletDashboard() {
     { label: 'Send', icon: <Send size={18} />, onClick: () => setShowSend(true) },
     { label: copied ? 'Copied!' : 'Copy Addr', icon: copied ? <Check size={18} /> : <Copy size={18} />, onClick: handleCopy },
     { label: 'History', icon: <History size={18} />, onClick: () => setActiveTab('transactions'), active: activeTab === 'transactions' },
-    { label: 'New Session', icon: <RefreshCw size={18} />, onClick: () => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); } },
+    { label: 'New Session', icon: <RefreshCw size={18} />, onClick: () => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); } },
   ];
 
   if (!wallet.isUnlocked) {
@@ -658,6 +673,29 @@ export function WalletDashboard() {
           <p style={{ color: '#9ca3af', fontSize: 8, margin: '3px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
             {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile — wipes on close'}
           </p>
+          {/* Session lock toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 8, paddingTop: 7, borderTop: '1px solid #f3f4f6' }}>
+            <span style={{ color: '#6b7280', fontSize: 9, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+              Keep session on refresh
+            </span>
+            <button
+              onClick={handleSessionToggle}
+              disabled={sessionToggling || !wallet.isUnlocked}
+              aria-label="Toggle session lock"
+              style={{
+                width: 34, height: 18, borderRadius: 9,
+                background: wallet.isSessionLocked ? '#16a34a' : '#d1d5db',
+                border: 'none', cursor: sessionToggling || !wallet.isUnlocked ? 'not-allowed' : 'pointer',
+                position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0,
+                opacity: !wallet.isUnlocked ? 0.4 : 1,
+              }}>
+              <div style={{
+                position: 'absolute', top: 2, left: wallet.isSessionLocked ? 18 : 2,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+          </div>
         </motion.div>
 
         {/* ── Floating Dock ── */}

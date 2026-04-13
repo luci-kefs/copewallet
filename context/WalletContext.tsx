@@ -36,6 +36,7 @@ import {
   loadPersistedVault,
   nukePersistedVault,
 } from '@/lib/persistent-vault';
+import { saveSession, clearSession } from '@/lib/session-lock';
 
 // Block 35: Two explicit operating modes
 export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
@@ -54,6 +55,7 @@ interface WalletState {
   devToolsDetected: number;      // graduated counter (Block 34)
   isBreachLocked: boolean;       // logic bomb lockout (Block 10)
   hasPersisted: boolean;         // persistent vault exists (Block 18)
+  isSessionLocked: boolean;      // localStorage session persistence (Block 36)
 }
 
 // Decoy honeypot variables (Block 5 Task 1)
@@ -78,6 +80,9 @@ interface WalletContextType extends WalletState {
   scatteredKeyStore: ScatteredStore | null;
   enablePersistentMode: (passphrase: string) => Promise<void>;
   unlockPersistentVault: (passphrase: string) => Promise<void>;
+  enableSessionLock: () => Promise<void>;
+  disableSessionLock: () => void;
+  markSessionRestored: () => void;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -95,6 +100,7 @@ const INITIAL_STATE: WalletState = {
   devToolsDetected: 0,
   isBreachLocked: false,
   hasPersisted: false,
+  isSessionLocked: false,
 };
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -278,6 +284,27 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await importCopeWallet(mnemonic);
   }, [importCopeWallet]);
 
+  // Block 36: localStorage session lock (device-bound, no passphrase)
+  const enableSessionLock = useCallback(async () => {
+    if (!state._v_enc) return;
+    const hwId = await getHardwareUUID();
+    const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
+    if (!mnemonic) return;
+    // Encrypt with hwId only — no passphrase, device-bound
+    const payload = encryptData(mnemonic, hwId);
+    saveSession(payload);
+    setState((p) => ({ ...p, isSessionLocked: true }));
+  }, [state._v_enc]);
+
+  const disableSessionLock = useCallback(() => {
+    clearSession();
+    setState((p) => ({ ...p, isSessionLocked: false }));
+  }, []);
+
+  const markSessionRestored = useCallback(() => {
+    setState((p) => ({ ...p, isSessionLocked: true }));
+  }, []);
+
   // Check for persisted vault on mount (Block 18 Task 3)
   useEffect(() => {
     hasPersistedVault().then((has) => {
@@ -431,6 +458,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         scatteredKeyStore: scatteredKeyRef.current,
         enablePersistentMode,
         unlockPersistentVault,
+        enableSessionLock,
+        disableSessionLock,
+        markSessionRestored,
       }}
     >
       {children}
