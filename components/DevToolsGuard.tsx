@@ -25,10 +25,10 @@ export function DevToolsGuard({ onLevel1, onLevel2, onLevel3 }: DevToolsGuardPro
       let detected = false;
 
       // Size-delta detection: undocked/docked DevTools changes window dimensions
-      // Threshold raised to 200px to avoid false positives on unusual resolutions
+      // Threshold at 300px to avoid false positives on HiDPI/browser chrome
       const widthDelta = window.outerWidth - window.innerWidth;
       const heightDelta = window.outerHeight - window.innerHeight;
-      if (widthDelta > 200 || heightDelta > 200) {
+      if (widthDelta > 300 || heightDelta > 300) {
         detected = true;
       }
 

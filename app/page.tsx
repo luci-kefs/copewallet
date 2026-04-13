@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } from '@/lib/visual-entropy';
 import { startNetworkWatch } from '@/lib/network-profile';
 import { embedInPNG, extractFromPNG } from '@/lib/steganography';
-import { encryptData, getCurrentKey } from '@/lib/crypto';
+import { encryptData, decryptData, getCurrentKey } from '@/lib/crypto';
 import { getHardwareUUID } from '@/lib/fingerprint';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
 
@@ -50,7 +50,8 @@ export default function CopePage() {
 
   useEffect(() => {
     generateVisualTheme().then((theme) => injectThemeVariables(theme));
-    return startCSSIntegrityWatch(() => wallet.triggerPanic());
+    // CSS integrity tamper → wipe only, no redirect (redirect reserved for kill-switch)
+    return startCSSIntegrityWatch(() => wallet.wipeCopeWallet());
   }, [wallet]);
 
   useEffect(() => { return startNetworkWatch(); }, []);
@@ -127,7 +128,9 @@ export default function CopePage() {
       if (!mnemonic) throw new Error('Vault empty');
       await wallet.enablePersistentMode(passphrase);
       const hwId = await getHardwareUUID();
-      const encPayload = encryptData(mnemonic, getCurrentKey() + hwId + passphrase);
+      // Use stable key (hwId + passphrase only — no rotating session key)
+      // so the PNG can be decrypted on any session or device with same passphrase+hwId
+      const encPayload = encryptData(mnemonic, hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
     } catch { setPersistError('Operation failed. Try again.'); }
@@ -143,14 +146,23 @@ export default function CopePage() {
 
   const handleFileDrop = async (file: File) => {
     if (!file.name.endsWith('.png') && file.type !== 'image/png') { setAccessError('Invalid file type — PNG only'); return; }
+    if (!passphrase) { setAccessError('Enter your vault passphrase first'); return; }
     setIsProcessing(true); setAccessError('');
     try {
-      await extractFromPNG(file); // verify magic bytes
-      await wallet.unlockPersistentVault(passphrase);
+      // Extract encrypted payload from PNG, decrypt with stable key (hwId + passphrase)
+      const encPayload = await extractFromPNG(file);
+      const hwId = await getHardwareUUID();
+      const mnemonic = decryptData(encPayload, hwId + passphrase);
+      if (!mnemonic || mnemonic.split(' ').length < 12) throw new Error('wrong_passphrase');
+      await wallet.importCopeWallet(mnemonic);
       setRightPanel('success');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
-      setAccessError(msg.includes('mnemonic') || msg.includes('phrase') ? 'Wrong passphrase or corrupted key' : 'Invalid Key PNG');
+      if (msg === 'wrong_passphrase' || msg.includes('Invalid')) {
+        setAccessError('Wrong passphrase or invalid Key PNG');
+      } else {
+        setAccessError('Could not read vault. Wrong passphrase?');
+      }
     }
     finally { setIsProcessing(false); }
   };
@@ -189,6 +201,19 @@ export default function CopePage() {
       {/* ── LEFT — WALLET DASHBOARD ── */}
       <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <WalletDashboard />
+        {/* Temporary zone warning */}
+        <div style={{ padding: '0 12px 12px', marginTop: 'auto' }}>
+          <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 14, padding: '9px 14px', display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+            <div>
+              <p style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, margin: '0 0 2px', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Temporary Session</p>
+              <p style={{ color: '#92400e', fontSize: 9, margin: 0, lineHeight: 1.5, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+                This wallet exists only in RAM. Refreshing or closing this tab will permanently wipe it.
+                Save it using the <strong style={{ color: '#d97706' }}>Secure Vault →</strong>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── RIGHT — SECURE VAULT ── */}
@@ -198,14 +223,22 @@ export default function CopePage() {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
             <div>
-              <h2 style={{ color: '#f9fafb', fontSize: 16, fontWeight: 700, margin: 0 }}>Secure Vault</h2>
-              <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0' }}>Your private key guardian</p>
+              <h2 style={{ color: '#f9fafb', fontSize: 16, fontWeight: 800, margin: 0, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Secure Vault</h2>
+              <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Your private key guardian</p>
             </div>
             <div ref={logoRef} data-aethilm="brand" onClick={handleLogoPanic} style={{ cursor: 'pointer' }}>
               {isLoading ? <div style={{ width: 28, height: 28 }} /> :
                logoUrl && !logoError
                 ? <Image src={logoUrl} alt="Cope Wallet" width={28} height={28} style={{ objectFit: 'contain' }} onError={() => setLogoError(true)} />
                 : <Shield size={24} style={{ color: '#4b5563' }} />}
+            </div>
+          </div>
+          {/* Permanent zone note */}
+          <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 12, padding: '7px 12px', marginBottom: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, flexShrink: 0 }}>🔐</span>
+            <div>
+              <p style={{ color: '#22c55e', fontSize: 10, fontWeight: 700, margin: 0, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Permanent Zone</p>
+              <p style={{ color: '#166534', fontSize: 9, margin: 0, lineHeight: 1.4, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Persist your session here to keep your wallet across refreshes.</p>
             </div>
           </div>
 

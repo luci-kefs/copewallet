@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
-  QrCode, Send, Copy, History, RefreshCw, Check, X,
+  Send, Copy, History, RefreshCw, Check, X,
   ExternalLink, ArrowUpRight, ArrowDownLeft, Eye, EyeOff,
   Zap, ChevronRight, Wifi, WifiOff, AlertCircle, Link,
 } from 'lucide-react';
@@ -22,19 +23,44 @@ import { CardSpotlight } from '@/components/CardSpotlight';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
+// ─── Chain SVG Paths ─────────────────────────────────────────────────────────
+const CHAIN_SVG_PATHS: Record<string, React.ReactNode> = {
+  ETH:   <><polygon points="12,2 20,13 12,16 4,13" fill="currentColor" opacity="0.85"/><polygon points="12,16 20,13 12,22 4,13" fill="currentColor"/></>,
+  BASE:  <><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.15"/><path d="M12 6c-3.3 0-6 2.7-6 6s2.7 6 6 6c3 0 5.5-2.1 5.9-5h-5.9V11h8c.1.6.1 1 .1 1 0 4.4-3.6 8-8 8S4 16.4 4 12 7.6 4 12 4c2.1 0 4 .8 5.5 2.1l-2.1 2.1C14.4 7.3 13.3 6 12 6z" fill="currentColor"/></>,
+  ARB:   <><path d="M12 2 L22 18 L18 18 L14 10 L16 18 L12 18 L8 10 L10 18 L6 18 Z" fill="currentColor"/></>,
+  OP:    <><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2"/><circle cx="12" cy="12" r="5" fill="currentColor"/></>,
+  MATIC: <><path d="M12 2 L22 7 L22 17 L12 22 L2 17 L2 7 Z" fill="currentColor" opacity="0.2" stroke="currentColor" strokeWidth="1.5"/><text x="12" y="16" textAnchor="middle" fill="currentColor" fontSize="7" fontWeight="900">POL</text></>,
+  ZK:    <><path d="M4 7h12l-8 10h12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>,
+  LINEA: <><line x1="4" y1="8" x2="20" y2="8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="4" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="4" y1="16" x2="12" y2="16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></>,
+  SCR:   <><path d="M17 4H9a5 5 0 0 0 0 10h6a3 3 0 0 1 0 6H7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/></>,
+  BLAST: <><path d="M13 2 L6 13 L11 13 L9 22 L18 9 L13 9 Z" fill="currentColor"/></>,
+  BNB:   <><path d="M12 2 L14.5 4.5 L12 7 L9.5 4.5 Z M7 7 L9.5 9.5 L7 12 L4.5 9.5 Z M17 7 L19.5 9.5 L17 12 L14.5 9.5 Z M9.5 9.5 L12 12 L14.5 9.5 L12 7 Z M7 12 L9.5 14.5 L12 12 L9.5 9.5 Z M14.5 9.5 L17 12 L14.5 14.5 L12 12 Z M9.5 14.5 L12 17 L14.5 14.5 L12 12 Z M12 17 L14.5 19.5 L12 22 L9.5 19.5 Z" fill="currentColor"/></>,
+  AVAX:  <><path d="M9 18 L12 13 L15 18 Z" fill="currentColor"/><path d="M4 18 L10 7 L13 12 L8 18 Z" fill="currentColor" opacity="0.7"/><path d="M14 18 L16 14 L20 18 Z" fill="currentColor" opacity="0.5"/></>,
+  FTM:   <><path d="M12 2 L8 8 L12 11 L16 8 Z M8 8 L4 12 L8 16 L12 11 Z M16 8 L20 12 L16 16 L12 11 Z M8 16 L12 11 L16 16 L12 22 Z" fill="currentColor" opacity="0.9"/></>,
+  GNO:   <><circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.15" stroke="currentColor" strokeWidth="1.5"/><path d="M9 9 L15 15 M15 9 L9 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></>,
+};
+
 // ─── Chain SVG Icon ───────────────────────────────────────────────────────────
 function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
+  const svgPath = CHAIN_SVG_PATHS[chain.shortName];
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: `${chain.color}1a`,
+      background: `${chain.color}18`,
       border: `1.5px solid ${chain.color}55`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0,
+      flexShrink: 0, overflow: 'hidden',
     }}>
-      <span style={{ color: chain.color, fontSize: size * 0.32, fontWeight: 700, lineHeight: 1 }}>
-        {chain.shortName.slice(0, 3)}
-      </span>
+      {svgPath ? (
+        <svg viewBox="0 0 24 24" width={size * 0.56} height={size * 0.56}
+          style={{ color: chain.color }}>
+          {svgPath}
+        </svg>
+      ) : (
+        <span style={{ color: chain.color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+          {chain.shortName.slice(0, 3)}
+        </span>
+      )}
     </div>
   );
 }
@@ -199,24 +225,32 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
 
 // ─── QR Modal ─────────────────────────────────────────────────────────────────
 function QRModal({ address, onClose }: { address: string; onClose: () => void }) {
-  // Simple QR placeholder — shows address in large mono text
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(address).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: 16, width: 320, maxWidth: '92vw', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: 22, width: 300, maxWidth: '92vw', padding: '22px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, boxShadow: '0 32px 80px rgba(0,0,0,0.9)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Receive</span>
-          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={16} /></button>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 800, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Receive</span>
+          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, padding: 7, cursor: 'pointer', display: 'flex' }}><X size={14} /></button>
         </div>
-        {/* QR placeholder grid */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 16, width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <QrCode size={140} style={{ color: '#000' }} />
+        <div style={{ background: '#fff', borderRadius: 16, padding: 14 }}>
+          <QRCodeSVG value={address} size={180} level="M" />
         </div>
-        <p style={{ color: '#9ca3af', fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>
+        <p style={{ color: '#9ca3af', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0, padding: '0 4px' }}>
           {address}
         </p>
-        <p style={{ color: '#6b7280', fontSize: 9, textAlign: 'center' }}>
-          Send only compatible assets to this address
+        <button onClick={copy}
+          style={{ background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '7px 16px', fontSize: 10, color: copied ? '#22c55e' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+          {copied ? <><Check size={11} /> Copied!</> : <><Copy size={11} /> Copy Address</>}
+        </button>
+        <p style={{ color: '#374151', fontSize: 9, textAlign: 'center', margin: 0 }}>
+          Send only EVM-compatible assets to this address
         </p>
       </div>
     </div>
@@ -552,11 +586,11 @@ export function WalletDashboard() {
   const featuredChains = CHAINS.slice(0, 4);
 
   const dockItems = [
-    { label: 'Connect', icon: <QrCode size={18} />, onClick: () => setShowQR(true), color: '#059669' },
+    { label: 'QR / Receive', icon: <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="5" y="5" width="3" height="3" fill="currentColor"/><rect x="16" y="5" width="3" height="3" fill="currentColor"/><rect x="5" y="16" width="3" height="3" fill="currentColor"/><path d="M14 14h3v3m0 4v-4h4M14 21h4"/></svg>, onClick: () => setShowQR(true), color: '#059669' },
     { label: 'Send', icon: <Send size={18} />, onClick: () => setShowSend(true) },
-    { label: copied ? 'Copied!' : 'Copy', icon: copied ? <Check size={18} /> : <Copy size={18} />, onClick: handleCopy },
+    { label: copied ? 'Copied!' : 'Copy Addr', icon: copied ? <Check size={18} /> : <Copy size={18} />, onClick: handleCopy },
     { label: 'History', icon: <History size={18} />, onClick: () => setActiveTab('transactions'), active: activeTab === 'transactions' },
-    { label: 'New', icon: <RefreshCw size={18} />, onClick: () => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); } },
+    { label: 'New Session', icon: <RefreshCw size={18} />, onClick: () => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); } },
   ];
 
   if (!wallet.isUnlocked) {
@@ -589,21 +623,21 @@ export function WalletDashboard() {
         {/* ── Header ── */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
           style={{ textAlign: 'center', paddingBottom: 2 }}>
-          <h2 style={{ color: '#f9fafb', fontSize: 15, fontWeight: 700, margin: 0 }}>New Session</h2>
-          <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0' }}>Volatile wallet — RAM only</p>
+          <h2 style={{ color: '#f9fafb', fontSize: 15, fontWeight: 800, margin: 0, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>New Session</h2>
+          <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Volatile wallet — RAM only</p>
         </motion.div>
 
         {/* ── Address Card (white) ── */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
-          style={{ background: '#fff', borderRadius: 14, padding: '10px 16px', textAlign: 'center' }}>
+          style={{ background: '#fff', borderRadius: 18, padding: '10px 16px', textAlign: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-            <span style={{ color: '#374151', fontSize: 11, fontWeight: 500 }}>{selectedChain.name} Wallet</span>
-            <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 8, padding: '1px 7px', borderRadius: 20, fontWeight: 600 }}>GasLess / EIP-7702</span>
+            <span style={{ color: '#374151', fontSize: 11, fontWeight: 700, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>{selectedChain.name} Wallet</span>
+            <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 8, padding: '2px 8px', borderRadius: 20, fontWeight: 700, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>GasLess / EIP-7702</span>
           </div>
-          <p style={{ color: '#1e3a8a', fontSize: 14, fontWeight: 700, letterSpacing: '0.03em', margin: 0, fontFamily: 'monospace', cursor: 'pointer' }} onClick={handleCopy}>
+          <p style={{ color: '#1e3a8a', fontSize: 13, fontWeight: 800, letterSpacing: '0.04em', margin: 0, fontFamily: 'monospace', cursor: 'pointer' }} onClick={handleCopy}>
             {shortAddr}
           </p>
-          <p style={{ color: '#9ca3af', fontSize: 8, margin: '3px 0 0' }}>
+          <p style={{ color: '#9ca3af', fontSize: 8, margin: '3px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
             {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile — wipes on close'}
           </p>
         </motion.div>
