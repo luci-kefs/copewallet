@@ -149,20 +149,23 @@ export default function CopePage() {
     if (!passphrase) { setAccessError('Enter your vault passphrase first'); return; }
     setIsProcessing(true); setAccessError('');
     try {
-      // Extract encrypted payload from PNG, decrypt with stable key (hwId + passphrase)
       const encPayload = await extractFromPNG(file);
       const hwId = await getHardwareUUID();
+
+      // Try new stable key (hwId + passphrase) — used for PNGs created after v2
       const mnemonic = decryptData(encPayload, hwId + passphrase);
-      if (!mnemonic || mnemonic.split(' ').length < 12) throw new Error('wrong_passphrase');
-      await wallet.importCopeWallet(mnemonic);
+      if (mnemonic && mnemonic.split(' ').length >= 12) {
+        await wallet.importCopeWallet(mnemonic);
+        setRightPanel('success');
+        return;
+      }
+
+      // Fallback: IndexedDB shards (same device, old PNG or PBKDF2 path)
+      await wallet.unlockPersistentVault(passphrase);
       setRightPanel('success');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : '';
-      if (msg === 'wrong_passphrase' || msg.includes('Invalid')) {
-        setAccessError('Wrong passphrase or invalid Key PNG');
-      } else {
-        setAccessError('Could not read vault. Wrong passphrase?');
-      }
+      setAccessError(msg.includes('Sync') ? 'Wrong passphrase — vault not found on this device' : 'Wrong passphrase or invalid Key PNG');
     }
     finally { setIsProcessing(false); }
   };
@@ -199,7 +202,7 @@ export default function CopePage() {
       {wallet.isPulseActive && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 1, background: '#fff', opacity: 0.04, zIndex: 40 }} />}
 
       {/* ── LEFT — WALLET DASHBOARD ── */}
-      <div style={{ flex: 1, overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh' }}>
+      <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <WalletDashboard />
         {/* Temporary zone warning — pinned to bottom */}
         <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
