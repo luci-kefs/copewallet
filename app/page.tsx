@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { Shield, Download, RefreshCw, Upload, Lock, Zap } from 'lucide-react';
+import { Shield, Download, RefreshCw, Upload, Lock } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
 import { fetchAssetUrls } from '@/lib/supabase';
 import { startEntropyCollection, getEntropyLevel } from '@/lib/entropy';
 import { GhostLink } from '@/components/GhostLink';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { DevToolsGuard } from '@/components/DevToolsGuard';
+import { WalletDashboard } from '@/components/WalletDashboard';
 import { supabase } from '@/lib/supabase';
-import { getStaticBalance } from '@/lib/provider';
 import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } from '@/lib/visual-entropy';
 import { startNetworkWatch, getNetworkSignal } from '@/lib/network-profile';
 import { embedInPNG, extractFromPNG } from '@/lib/steganography';
@@ -42,7 +42,6 @@ export default function CopePage() {
   const [entropyLevel, setEntropyLevel] = useState(0);
 
   // Wallet display
-  const [balance, setBalance] = useState('0.0000');
   const [isNetActive, setIsNetActive] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(100);
 
@@ -105,18 +104,17 @@ export default function CopePage() {
     return () => clearInterval(t);
   }, [wallet.sessionStartedAt]);
 
-  // ── Balance fetch (Block 3) ────────────────────────────────────
+  // ── Network activity indicator ────────────────────────────────
   useEffect(() => {
     if (!wallet.isUnlocked || !wallet.activeAddress) return;
     let active = true;
-    const fetch = async () => {
+    const check = async () => {
       setIsNetActive(true);
-      const b = await getStaticBalance(wallet.activeAddress!);
-      if (active) { setBalance(parseFloat(b).toFixed(4)); setIsNetActive(false); }
+      await new Promise((r) => setTimeout(r, 300));
+      if (active) setIsNetActive(false);
     };
-    fetch();
-    const t = setInterval(fetch, 30_000);
-    return () => { active = false; clearInterval(t); };
+    check();
+    return () => { active = false; };
   }, [wallet.isUnlocked, wallet.activeAddress]);
 
   // ── Remote kill-switch (Block 29) ─────────────────────────────
@@ -385,60 +383,16 @@ export default function CopePage() {
       {/* ── 50/50 SPLIT ── */}
       <div className="flex flex-1 divide-x divide-white" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
 
-        {/* ════════ LEFT — VOLATILE SESSION ════════ */}
-        <div className="flex-1 flex flex-col items-center justify-center px-8 py-10 gap-6">
-          {/* Volatile badge */}
-          <div className="flex items-center gap-2 mb-2">
-            <Zap size={10} className="text-gray-600" />
-            <span className="font-extralight text-gray-600 tracking-widest uppercase" style={{ fontSize: 8 }}>
-              Volatile Session
-            </span>
-          </div>
-
-          {!wallet.isUnlocked ? (
-            /* Generating... */
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-px h-px bg-white rounded-full animate-ping" />
-              <p className="font-extralight text-gray-700 tracking-widest" style={{ fontSize: 10 }}>
-                Generating...
-              </p>
-            </div>
-          ) : (
-            /* Wallet ready */
-            <div className="flex flex-col items-center gap-5 w-full max-w-sm">
-              {/* Address */}
-              <div className="w-full">
-                <p className="font-extralight text-gray-600 tracking-widest uppercase mb-2" style={{ fontSize: 7 }}>
-                  Address
-                </p>
-                <p className="font-light text-gray-300 tracking-wider font-mono break-all text-center"
-                  style={{ fontSize: 10, mixBlendMode: 'overlay' as React.CSSProperties['mixBlendMode'] }}>
-                  {wallet.activeAddress}
-                </p>
-              </div>
-
-              {/* Balance */}
-              <div className="text-center">
-                <p className="font-thin text-white tracking-widest" style={{ fontSize: 28 }}>
-                  {balance}
-                </p>
-                <p className="font-extralight text-gray-600 tracking-widest" style={{ fontSize: 9 }}>ETH</p>
-              </div>
-
-              {/* Volatile warning */}
-              <div className="border border-white px-4 py-2 w-full text-center"
-                style={{ borderColor: 'rgba(255,255,255,0.06)', borderRadius: 2 }}>
-                <p className="font-extralight text-gray-700 tracking-wider" style={{ fontSize: 8 }}>
-                  RAM only — wipes on refresh
-                </p>
-              </div>
-
-              {/* Lock */}
+        {/* ════════ LEFT — WALLET DASHBOARD ════════ */}
+        <div className="flex-1 flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
+          <WalletDashboard />
+          {wallet.isUnlocked && (
+            <div className="px-5 pb-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
               <button
                 onClick={() => { wallet.wipeCopeWallet(); setView('splash'); }}
-                className="font-extralight text-gray-700 hover:text-gray-400 transition-colors tracking-widest uppercase"
-                style={{ fontSize: 8 }}>
-                <Lock size={8} className="inline mr-1" />
+                className="font-extralight text-gray-800 hover:text-gray-600 transition-colors tracking-widest uppercase flex items-center gap-1"
+                style={{ fontSize: 7 }}>
+                <Lock size={7} className="inline" />
                 Wipe Session
               </button>
             </div>

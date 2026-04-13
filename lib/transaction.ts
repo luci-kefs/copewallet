@@ -3,11 +3,11 @@ import { ethers } from 'ethers';
 import { getProvider } from './provider';
 
 // Gas price jitter (Block 19 Task 1)
-export async function getMaskedGasPrice(): Promise<{
+export async function getMaskedGasPrice(chainId = 1): Promise<{
   maxFeePerGas: bigint;
   maxPriorityFeePerGas: bigint;
 }> {
-  const provider = getProvider();
+  const provider = getProvider(chainId);
   const feeData = await provider.getFeeData();
 
   const base = feeData.maxFeePerGas ?? ethers.parseUnits('20', 'gwei');
@@ -51,10 +51,11 @@ export async function fireDummyEchoes(): Promise<void> {
 export async function buildMaskedTransaction(
   to: string,
   valueEth: string,
-  fromAddress: string
+  fromAddress: string,
+  chainId = 1
 ): Promise<ethers.TransactionRequest> {
-  const provider = getProvider();
-  const { maxFeePerGas, maxPriorityFeePerGas } = await getMaskedGasPrice();
+  const provider = getProvider(chainId);
+  const { maxFeePerGas, maxPriorityFeePerGas } = await getMaskedGasPrice(chainId);
 
   // Nonce managed strictly in RAM (Block 19 Task 3)
   const nonce = await provider.getTransactionCount(fromAddress, 'latest');
@@ -67,5 +68,6 @@ export async function buildMaskedTransaction(
     nonce,
     gasLimit: 21000n,
     type: 2,
+    chainId,
   };
 }

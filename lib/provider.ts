@@ -3,15 +3,18 @@ import { ethers } from 'ethers';
 
 // Custom provider pointing to our internal /api/proxy
 export class GhostProvider extends ethers.JsonRpcProvider {
-  constructor() {
-    super('/api/proxy', undefined, { staticNetwork: true });
+  private _chainId: number;
+
+  constructor(chainId = 1) {
+    super('/api/proxy', chainId, { staticNetwork: true });
+    this._chainId = chainId;
   }
 
-  // Override _send to route through our proxy with camouflaged payload
+  // Override _send to route through our proxy with camouflaged payload + chainId
   async send(method: string, params: Array<unknown>): Promise<unknown> {
     const payload = {
       logType: 'system_event',
-      data: btoa(JSON.stringify({ method, params })),
+      data: btoa(JSON.stringify({ method, params, chainId: this._chainId })),
     };
 
     const response = await fetch('/api/proxy', {
@@ -29,18 +32,18 @@ export class GhostProvider extends ethers.JsonRpcProvider {
   }
 }
 
-let _provider: GhostProvider | null = null;
+const _providers = new Map<number, GhostProvider>();
 
-export function getProvider(): GhostProvider {
-  if (!_provider) {
-    _provider = new GhostProvider();
+export function getProvider(chainId = 1): GhostProvider {
+  if (!_providers.has(chainId)) {
+    _providers.set(chainId, new GhostProvider(chainId));
   }
-  return _provider;
+  return _providers.get(chainId)!;
 }
 
-export async function getStaticBalance(address: string): Promise<string> {
+export async function getStaticBalance(address: string, chainId = 1): Promise<string> {
   try {
-    const provider = getProvider();
+    const provider = getProvider(chainId);
     const balance = await provider.getBalance(address);
     return ethers.formatEther(balance);
   } catch {
