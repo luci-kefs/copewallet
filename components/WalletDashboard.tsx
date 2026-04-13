@@ -80,8 +80,9 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
   onSelect: (c: Chain) => void;
   onClose: () => void;
 }) {
-  const smart = CHAINS.filter(c => c.isAlchemy);
-  const eoa = CHAINS.filter(c => !c.isAlchemy);
+  const smart = CHAINS.filter(c => c.isAlchemy && !c.isTestnet);
+  const eoa = CHAINS.filter(c => !c.isAlchemy && !c.isTestnet);
+  const testnets = CHAINS.filter(c => c.isTestnet);
 
   const ChainCard = ({ c }: { c: Chain }) => (
     <button
@@ -103,9 +104,11 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
       <ChainIcon chain={c} size={34} />
       <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 700 }}>{c.symbol}</span>
       <span style={{ color: '#9ca3af', fontSize: 9 }}>{c.name}</span>
-      {c.isAlchemy
-        ? <span style={{ background: '#1e40af33', color: '#93c5fd', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>7702</span>
-        : <span style={{ background: '#374151', color: '#9ca3af', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>EOA</span>
+      {c.isTestnet
+        ? <span style={{ background: '#4c1d9533', color: '#a78bfa', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>TESTNET</span>
+        : c.isAlchemy
+          ? <span style={{ background: '#1e40af33', color: '#93c5fd', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>7702</span>
+          : <span style={{ background: '#374151', color: '#9ca3af', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>EOA</span>
       }
     </button>
   );
@@ -138,7 +141,13 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             {eoa.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#4b5563', fontSize: 9, textAlign: 'center', marginTop: 16 }}>
+          <p style={{ color: '#6b7280', fontSize: 9, letterSpacing: '0.12em', fontWeight: 600, marginBottom: 10, marginTop: 4 }}>
+            TESTNETS (FREE)
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+            {testnets.map(c => <ChainCard key={c.id} c={c} />)}
+          </div>
+          <p style={{ color: '#4b5563', fontSize: 9, textAlign: 'center' }}>
             {CHAINS.length} networks
           </p>
         </div>
@@ -685,8 +694,11 @@ export function WalletDashboard() {
                 }}>
                 <ChainIcon chain={c} size={28} />
                 <span style={{ color: '#e5e7eb', fontSize: 9, fontWeight: 700 }}>{c.name}</span>
-                <span style={{ color: c.color, fontSize: 7, fontWeight: 600 }}>Gasless</span>
-                <span style={{ color: '#374151', fontSize: 6 }}>EIP-7702</span>
+                {c.isTestnet
+                  ? <span style={{ background: '#4c1d9533', color: '#a78bfa', fontSize: 6, padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>TESTNET</span>
+                  : <span style={{ color: c.color, fontSize: 7, fontWeight: 600 }}>Gasless</span>
+                }
+                <span style={{ color: '#374151', fontSize: 6 }}>{c.isTestnet ? 'Free ETH' : 'EIP-7702'}</span>
               </motion.button>
             ))}
           </div>

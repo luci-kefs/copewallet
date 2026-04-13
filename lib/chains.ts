@@ -10,6 +10,7 @@ export interface Chain {
   color: string;
   isAlchemy: boolean;
   logoUrl?: string; // CoinGecko image (already in CSP img-src allowlist)
+  isTestnet?: boolean;
 }
 
 // CoinGecko coin image URLs — stable, covered by img-src CSP
@@ -40,6 +41,10 @@ export const CHAINS: Chain[] = [
   { id: 8217,  name: 'Klaytn',        shortName: 'KLAY',   symbol: 'KLAY',  rpcEnvKey: 'PRIVATE_RPC_URL_KLAYTN',   explorerUrl: 'https://scope.klaytn.com',       coingeckoId: 'klay-token',         color: '#FF6A00', isAlchemy: false, logoUrl: `${CG}/9417/small/klay-token.png`                           },
   { id: 122,   name: 'Fuse',          shortName: 'FUSE',   symbol: 'FUSE',  rpcEnvKey: 'PRIVATE_RPC_URL_FUSE',     explorerUrl: 'https://explorer.fuse.io',       coingeckoId: 'fuse-network-token', color: '#B5F13B', isAlchemy: false, logoUrl: `${CG}/10347/small/fuse-logo-wordmark.png`                  },
   { id: 9001,  name: 'Evmos',         shortName: 'EVMOS',  symbol: 'EVMOS', rpcEnvKey: 'PRIVATE_RPC_URL_EVMOS',    explorerUrl: 'https://evm.evmos.org',          coingeckoId: 'evmos',              color: '#ED4E33', isAlchemy: false, logoUrl: `${CG}/20293/small/evmos.png`                               },
+  // ── Testnets ──────────────────────────────────────────────────────────────
+  { id: 11155111, name: 'Sepolia',     shortName: 'SEP',    symbol: 'ETH',   rpcEnvKey: 'PRIVATE_RPC_URL_SEPOLIA',   explorerUrl: 'https://sepolia.etherscan.io',   coingeckoId: 'ethereum',           color: '#9B59B6', isAlchemy: true,  isTestnet: true, logoUrl: `${CG}/279/small/ethereum.png`          },
+  { id: 84532,    name: 'Base Sepolia',shortName: 'BSEP',   symbol: 'ETH',   rpcEnvKey: 'PRIVATE_RPC_URL_BASE_SEP',  explorerUrl: 'https://sepolia.basescan.org',   coingeckoId: 'ethereum',           color: '#5B6EF5', isAlchemy: true,  isTestnet: true, logoUrl: `${CG}/11090/small/base-symbol.png`     },
+  { id: 421614,   name: 'Arb Sepolia', shortName: 'ASEP',   symbol: 'ETH',   rpcEnvKey: 'PRIVATE_RPC_URL_ARB_SEP',   explorerUrl: 'https://sepolia.arbiscan.io',    coingeckoId: 'ethereum',           color: '#3DB5E6', isAlchemy: true,  isTestnet: true, logoUrl: `${CG}/16547/small/arb.jpg`             },
 ];
 
 export const DEFAULT_CHAIN = CHAINS[0]; // Ethereum
