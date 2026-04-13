@@ -22,36 +22,28 @@ export function DevToolsGuard({ onLevel1, onLevel2, onLevel3 }: DevToolsGuardPro
     }
 
     const check = () => {
-      let detected = false;
-
-      // Size-delta detection: undocked/docked DevTools changes window dimensions
-      // Threshold at 300px to avoid false positives on HiDPI/browser chrome
+      // Size-delta detection: DevTools docked side/bottom adds significant space
+      // Require BOTH axes to exceed threshold to avoid false positives on
+      // Windows HiDPI, snapped windows, or unusual browser chrome sizes
       const widthDelta = window.outerWidth - window.innerWidth;
       const heightDelta = window.outerHeight - window.innerHeight;
-      if (widthDelta > 300 || heightDelta > 300) {
-        detected = true;
-      }
+      const detected = widthDelta > 400 && heightDelta > 100;
 
       if (!detected) {
-        // Gradually decay count when not detected
         if (detectionCount.current > 0) detectionCount.current--;
         return;
       }
 
       detectionCount.current++;
 
-      // Level 1 — count ≥ 5 (~7.5s continuous): disable Send only
-      if (detectionCount.current >= 5 && level.current < 1) {
+      // Level 1 — count ≥ 8 (~12s): disable Send only
+      if (detectionCount.current >= 8 && level.current < 1) {
         level.current = 1;
         onLevel1();
       }
-      // Level 2 — count ≥ 20 (~30s continuous): loading trap
-      if (detectionCount.current >= 20 && level.current < 2) {
-        level.current = 2;
-        onLevel2();
-      }
-      // Level 3 — count ≥ 40 (~60s continuous): wipe (no redirect)
-      if (detectionCount.current >= 40 && level.current < 3) {
+      // Level 2 skipped — loading trap causes false UX disruption
+      // Level 3 — count ≥ 50 (~75s continuous): wipe session
+      if (detectionCount.current >= 50 && level.current < 3) {
         level.current = 3;
         onLevel3();
       }

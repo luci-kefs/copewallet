@@ -67,30 +67,28 @@ export default function CopePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Kill-switch (Block 29) — one-shot, no retry
+  // Kill-switch (Block 29) — polling only, no persistent WebSocket
   useEffect(() => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) return;
-    let ch: ReturnType<typeof supabase.channel> | null = null;
-    let done = false;
-    try {
-      ch = supabase.channel('vault-status')
-        .on('postgres_changes' as any,
-          { event: 'UPDATE', schema: 'public', table: 'vault_status', filter: 'id=eq.1' },
-          (payload: any) => {
-            if (payload?.new?.is_killed) {
-              wallet.wipeCopeWallet();
-              window.location.replace(process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? 'https://google.com');
-            }
-          })
-        .subscribe((status: string) => {
-          if (!done && (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED')) {
-            done = true;
-            if (ch) { supabase.removeChannel(ch); ch = null; }
-          }
-        });
-    } catch {}
-    return () => { if (ch) supabase.removeChannel(ch); };
+    let cancelled = false;
+    // Single one-shot REST check — no realtime WebSocket spam
+    fetch(`${supabaseUrl}/rest/v1/vault_status?id=eq.1&select=is_killed`, {
+      headers: {
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''}`,
+      },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (Array.isArray(data) && data[0]?.is_killed) {
+          wallet.wipeCopeWallet();
+          window.location.replace(process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? 'https://google.com');
+        }
+      })
+      .catch(() => {}); // ignore network errors silently
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -149,24 +147,29 @@ export default function CopePage() {
     if (!passphrase) { setAccessError('Enter your vault passphrase first'); return; }
     setIsProcessing(true); setAccessError('');
     try {
-      const encPayload = await extractFromPNG(file);
       const hwId = await getHardwareUUID();
 
-      // Try new stable key (hwId + passphrase) — used for PNGs created after v2
-      const mnemonic = decryptData(encPayload, hwId + passphrase);
-      if (mnemonic && mnemonic.split(' ').length >= 12) {
-        await wallet.importCopeWallet(mnemonic);
+      // Attempt 1: decrypt mnemonic directly from PNG (new key: hwId + passphrase)
+      try {
+        const encPayload = await extractFromPNG(file);
+        const mnemonic = decryptData(encPayload, hwId + passphrase);
+        if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
+          await wallet.importCopeWallet(mnemonic);
+          setRightPanel('success');
+          return;
+        }
+      } catch { /* try next method */ }
+
+      // Attempt 2: IndexedDB shards — same device, PBKDF2 path (old PNGs / re-persist)
+      try {
+        await wallet.unlockPersistentVault(passphrase);
         setRightPanel('success');
         return;
-      }
+      } catch { /* try next method */ }
 
-      // Fallback: IndexedDB shards (same device, old PNG or PBKDF2 path)
-      await wallet.unlockPersistentVault(passphrase);
-      setRightPanel('success');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '';
-      setAccessError(msg.includes('Sync') ? 'Wrong passphrase — vault not found on this device' : 'Wrong passphrase or invalid Key PNG');
-    }
+      // Both failed
+      setAccessError('Wrong passphrase or invalid Key PNG');
+    } catch { setAccessError('Could not read the file'); }
     finally { setIsProcessing(false); }
   };
 

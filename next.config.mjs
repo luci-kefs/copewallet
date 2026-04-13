@@ -25,7 +25,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co wss://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com",
+              "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com",
               "img-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://assets.coingecko.com https://coin-images.coingecko.com data: blob:",
               "font-src 'self'",
               "frame-ancestors 'none'",
