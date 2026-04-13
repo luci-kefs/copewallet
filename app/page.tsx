@@ -338,7 +338,7 @@ export default function CopePage() {
               />
               <button
                 className="relative px-6 py-2 rounded-full border border-white text-gray-400 hover:text-white transition-all tracking-widest"
-                style={{ fontSize: 12, borderOpacity: 0.2 }}
+                style={{ fontSize: 12 }}
                 tabIndex={-1}
               >
                 Lock

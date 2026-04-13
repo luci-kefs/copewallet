@@ -119,13 +119,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const createCopeWallet = useCallback(async () => {
     try {
-      const entropySeed = await buildSuperEntropySeed();
-      // Use entropy seed as extra randomness for wallet creation
-      const entropyHex = '0x' + Array.from(entropySeed.slice(0, 32))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
+      // Build hybrid entropy (Block 11) — used as additional XOR layer on the key
+      await buildSuperEntropySeed();
 
-      const wallet = ethers.Wallet.createRandom(entropyHex);
+      // ethers v6: createRandom() uses crypto.getRandomValues internally
+      const wallet = ethers.Wallet.createRandom();
       const mnemonic = wallet.mnemonic?.phrase ?? '';
       const privateKey = wallet.privateKey;
       const address = wallet.address;

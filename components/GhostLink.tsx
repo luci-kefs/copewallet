@@ -7,10 +7,11 @@ interface GhostLinkProps {
   href: string;
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
   onNavigate?: () => void;
 }
 
-export function GhostLink({ href, children, className, onNavigate }: GhostLinkProps) {
+export function GhostLink({ href, children, className, style, onNavigate }: GhostLinkProps) {
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     if (onNavigate) onNavigate();
@@ -26,6 +27,7 @@ export function GhostLink({ href, children, className, onNavigate }: GhostLinkPr
       rel="noopener noreferrer"
       target="_blank"
       className={className}
+      style={style}
     >
       {children}
     </a>
