@@ -336,88 +336,66 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <div style={{ background: 'transparent', minHeight: '100%', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
         {/* ── Header ── */}
-        <motion.div
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          style={{ textAlign: 'center', paddingBottom: 4 }}
-        >
-          <h2 style={{ color: '#f9fafb', fontSize: 18, fontWeight: 700, margin: 0 }}>New Session</h2>
-          <p style={{ color: '#6b7280', fontSize: 11, margin: '3px 0 0' }}>Volatile wallet — RAM only</p>
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+          style={{ textAlign: 'center', paddingBottom: 2 }}>
+          <h2 style={{ color: '#f9fafb', fontSize: 15, fontWeight: 700, margin: 0 }}>New Session</h2>
+          <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0' }}>Volatile wallet — RAM only</p>
         </motion.div>
 
         {/* ── Address Card (white) ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.05 }}
-          style={{ background: '#fff', borderRadius: 16, padding: '14px 18px', textAlign: 'center' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 6, flexWrap: 'wrap' }}>
-            <span style={{ color: '#374151', fontSize: 12, fontWeight: 500 }}>
-              {selectedChain.name} Wallet
-            </span>
-            <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 9, padding: '2px 9px', borderRadius: 20, fontWeight: 600 }}>
-              GasLess / EIP-7702
-            </span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
+          style={{ background: '#fff', borderRadius: 14, padding: '10px 16px', textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+            <span style={{ color: '#374151', fontSize: 11, fontWeight: 500 }}>{selectedChain.name} Wallet</span>
+            <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 8, padding: '1px 7px', borderRadius: 20, fontWeight: 600 }}>GasLess / EIP-7702</span>
           </div>
-          <p style={{ color: '#1e3a8a', fontSize: 17, fontWeight: 700, letterSpacing: '0.03em', margin: 0, fontFamily: 'monospace', cursor: 'pointer' }}
-            onClick={handleCopy}>
+          <p style={{ color: '#1e3a8a', fontSize: 14, fontWeight: 700, letterSpacing: '0.03em', margin: 0, fontFamily: 'monospace', cursor: 'pointer' }} onClick={handleCopy}>
             {shortAddr}
           </p>
-          <p style={{ color: '#9ca3af', fontSize: 9, margin: '4px 0 0' }}>
-            {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile mode — wipes on close'}
+          <p style={{ color: '#9ca3af', fontSize: 8, margin: '3px 0 0' }}>
+            {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile — wipes on close'}
           </p>
         </motion.div>
 
-        {/* ── Floating Dock (action buttons) ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.1 }}
-        >
+        {/* ── Floating Dock ── */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
           <FloatingDock items={dockItems} />
         </motion.div>
 
         {/* ── Networks (dark card) ── */}
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.15 }}
-          style={{ background: '#141414', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.06)' }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+          style={{ background: '#0d0d0d', borderRadius: 14, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ color: '#f9fafb', fontSize: 13, fontWeight: 600 }}>More Networks</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ color: '#f9fafb', fontSize: 12, fontWeight: 600 }}>More Networks</span>
             <button
               onClick={() => setShowNetworks(true)}
               style={{ color: '#6b7280', background: 'none', border: 'none', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
               See List <ChevronRight size={12} />
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, marginBottom: 8 }}>
             {featuredChains.map((c, i) => (
-              <motion.button
-                key={c.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.18 + i * 0.04 }}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
+              <motion.button key={c.id}
+                initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.18 + i * 0.04 }}
+                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
                 onClick={() => setSelectedChain(c)}
                 style={{
                   background: selectedChain.id === c.id ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
-                  border: selectedChain.id === c.id ? `1px solid ${c.color}66` : '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: 10, padding: '10px 6px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  cursor: 'pointer',
+                  border: selectedChain.id === c.id ? `1px solid ${c.color}55` : '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 8, padding: '7px 4px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer',
                 }}>
-                <ChainIcon chain={c} size={36} />
-                <span style={{ color: '#e5e7eb', fontSize: 10, fontWeight: 700 }}>{c.name}</span>
-                <span style={{ color: c.color, fontSize: 8, fontWeight: 600 }}>Gasless</span>
-                <span style={{ color: '#4b5563', fontSize: 7 }}>EIP-7702</span>
+                <ChainIcon chain={c} size={28} />
+                <span style={{ color: '#e5e7eb', fontSize: 9, fontWeight: 700 }}>{c.name}</span>
+                <span style={{ color: c.color, fontSize: 7, fontWeight: 600 }}>Gasless</span>
+                <span style={{ color: '#374151', fontSize: 6 }}>EIP-7702</span>
               </motion.button>
             ))}
           </div>
@@ -433,58 +411,58 @@ export function WalletDashboard() {
           style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}
         >
           {/* Tab bar */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid #f3f4f6' }}>
             {(['balance', 'transactions', 'lightning'] as Tab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  background: 'none', border: 'none', padding: '13px 0', marginRight: 18,
-                  fontSize: 12, fontWeight: activeTab === tab ? 700 : 400,
+                  background: 'none', border: 'none', padding: '9px 0', marginRight: 14,
+                  fontSize: 11, fontWeight: activeTab === tab ? 700 : 400,
                   color: activeTab === tab ? '#111827' : '#9ca3af',
                   borderBottom: activeTab === tab ? '2px solid #111827' : '2px solid transparent',
                   cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
                 }}>
-                {tab === 'balance' ? 'Balance' : tab === 'transactions' ? 'Transactions' : 'Lightning Nodes'}
+                {tab === 'balance' ? 'Balance' : tab === 'transactions' ? 'Txs' : '⚡ Lightning'}
               </button>
             ))}
             <button
               onClick={handleRefresh}
-              style={{ marginLeft: 'auto', background: '#f9fafb', border: 'none', borderRadius: 8, padding: 7, cursor: 'pointer', display: 'flex', color: '#374151' }}>
-              <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
+              style={{ marginLeft: 'auto', background: '#f9fafb', border: 'none', borderRadius: 7, padding: 5, cursor: 'pointer', display: 'flex', color: '#374151' }}>
+              <RefreshCw size={11} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
           </div>
 
           {/* BALANCE TAB */}
           {activeTab === 'balance' && (
-            <div style={{ padding: '14px 16px' }}>
+            <div style={{ padding: '10px 12px' }}>
               {/* Total balance row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <span style={{ color: '#6b7280', fontSize: 11 }}>Total Balance</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
+                    <span style={{ color: '#6b7280', fontSize: 9 }}>Total Balance</span>
                     <button
                       onClick={() => setHideBalance(!hideBalance)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', padding: 0 }}>
-                      {hideBalance ? <Eye size={12} /> : <EyeOff size={12} />}
+                      {hideBalance ? <Eye size={10} /> : <EyeOff size={10} />}
                     </button>
                   </div>
-                  <span style={{ color: '#111827', fontSize: 26, fontWeight: 800 }}>
+                  <span style={{ color: '#111827', fontSize: 22, fontWeight: 800 }}>
                     {hideBalance ? '••••' : formatUSD(totalUSD)}
                   </span>
                 </div>
-                <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 10, padding: '4px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, marginTop: 4 }}>
+                <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 9, padding: '3px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600, marginTop: 3 }}>
                   ↗ Live
                 </span>
               </div>
 
               {/* Token list */}
               {isLoadingTokens ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : tokens.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '16px 0', color: '#9ca3af', fontSize: 11 }}>
+                <div style={{ textAlign: 'center', padding: '12px 0', color: '#9ca3af', fontSize: 10 }}>
                   No assets on {selectedChain.name}
                 </div>
               ) : (
@@ -495,24 +473,24 @@ export function WalletDashboard() {
                     const usdVal = parseFloat(token.balance || '0') * price;
                     return (
                       <div key={`${token.contractAddress}-${i}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
                         {token.logo
-                          ? <img src={token.logo} alt={token.symbol} style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          ? <img src={token.logo} alt={token.symbol} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                           : (
-                            <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <span style={{ color: '#374151', fontSize: 10, fontWeight: 700 }}>{token.symbol.slice(0, 2)}</span>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ color: '#374151', fontSize: 9, fontWeight: 700 }}>{token.symbol.slice(0, 2)}</span>
                             </div>
                           )
                         }
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, color: '#111827', fontSize: 13, fontWeight: 600 }}>{token.symbol}</p>
-                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 10 }}>{token.name.toUpperCase()}</p>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, color: '#111827', fontSize: 11, fontWeight: 600 }}>{token.symbol}</p>
+                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>{token.name.toUpperCase()}</p>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <p style={{ margin: 0, color: '#111827', fontSize: 12, fontWeight: 600 }}>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <p style={{ margin: 0, color: '#111827', fontSize: 11, fontWeight: 600 }}>
                             {hideBalance ? '••••' : `${parseFloat(token.balance) < 0.000001 ? '< 0.000001' : token.balance} ${token.symbol}`}
                           </p>
-                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 10 }}>
+                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>
                             {price > 0 ? (hideBalance ? '••••' : formatUSD(usdVal)) : 'No price data'}
                           </p>
                         </div>
@@ -526,13 +504,13 @@ export function WalletDashboard() {
 
           {/* TRANSACTIONS TAB */}
           {activeTab === 'transactions' && (
-            <div style={{ padding: '8px 0' }}>
+            <div style={{ padding: '6px 0' }}>
               {isLoadingTxs ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
-                  <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : txs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 16px', color: '#9ca3af', fontSize: 11 }}>
+                <div style={{ textAlign: 'center', padding: '16px 12px', color: '#9ca3af', fontSize: 10 }}>
                   {selectedChain.isAlchemy ? `No transactions on ${selectedChain.name}` : 'TX history requires Alchemy RPC'}
                 </div>
               ) : (
@@ -541,20 +519,20 @@ export function WalletDashboard() {
                   const date = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
                   return (
                     <a key={tx.hash} href={`${selectedChain.explorerUrl}/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', textDecoration: 'none', borderBottom: '1px solid #f9fafb', transition: 'background 0.1s' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', textDecoration: 'none', borderBottom: '1px solid #f9fafb', transition: 'background 0.1s' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: isOut ? '#fef2f2' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {isOut ? <ArrowUpRight size={15} style={{ color: '#ef4444' }} /> : <ArrowDownLeft size={15} style={{ color: '#22c55e' }} />}
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: isOut ? '#fef2f2' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {isOut ? <ArrowUpRight size={12} style={{ color: '#ef4444' }} /> : <ArrowDownLeft size={12} style={{ color: '#22c55e' }} />}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, color: '#111827', fontSize: 12, fontWeight: 600 }}>{isOut ? 'Sent' : 'Received'}</p>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, color: '#111827', fontSize: 11, fontWeight: 600 }}>{isOut ? 'Sent' : 'Received'}</p>
                         <p style={{ margin: 0, color: '#9ca3af', fontSize: 9, fontFamily: 'monospace' }}>
                           {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)}
                         </p>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: isOut ? '#ef4444' : '#22c55e' }}>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: isOut ? '#ef4444' : '#22c55e' }}>
                           {isOut ? '-' : '+'}{tx.value} {tx.asset}
                         </p>
                         <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>{date}</p>
@@ -568,12 +546,12 @@ export function WalletDashboard() {
 
           {/* LIGHTNING TAB */}
           {activeTab === 'lightning' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '28px 16px' }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={22} style={{ color: '#ca8a04' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '18px 12px' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={16} style={{ color: '#ca8a04' }} />
               </div>
-              <p style={{ color: '#374151', fontSize: 13, fontWeight: 600, margin: 0 }}>Lightning Nodes</p>
-              <p style={{ color: '#9ca3af', fontSize: 11, textAlign: 'center', maxWidth: 200, margin: 0, lineHeight: 1.5 }}>
+              <p style={{ color: '#374151', fontSize: 11, fontWeight: 600, margin: 0 }}>Lightning Nodes</p>
+              <p style={{ color: '#9ca3af', fontSize: 10, textAlign: 'center', maxWidth: 180, margin: 0, lineHeight: 1.5 }}>
                 Lightning Network integration coming soon. Connect your node for instant payments.
               </p>
             </div>
