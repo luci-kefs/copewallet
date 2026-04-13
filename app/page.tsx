@@ -278,6 +278,7 @@ export default function CopePage() {
                     placeholder="Vault passphrase (min 8 chars)"
                     onValue={setPassphrase}
                     className="w-full"
+                    theme="light"
                   />
                 </div>
                 <div style={{ background: '#f9fafb', borderRadius: 10, padding: '4px 14px' }}>
@@ -286,6 +287,7 @@ export default function CopePage() {
                     placeholder="Confirm passphrase"
                     onValue={setPassphraseConfirm}
                     className="w-full"
+                    theme="light"
                   />
                 </div>
 
@@ -333,6 +335,7 @@ export default function CopePage() {
                     placeholder="Vault passphrase"
                     onValue={setPassphrase}
                     className="w-full"
+                    theme="light"
                   />
                 </div>
 
