@@ -192,7 +192,7 @@ export default function CopePage() {
       </div>
 
       {/* ── RIGHT — SECURE VAULT ── */}
-      <div style={{ width: 340, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#000' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#000' }}>
         <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 8, minHeight: '100%' }}>
 
           {/* Header */}

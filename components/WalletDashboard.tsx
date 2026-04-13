@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   QrCode, Send, Copy, History, RefreshCw, Check, X,
   ExternalLink, ArrowUpRight, ArrowDownLeft, Eye, EyeOff,
-  Zap, ChevronRight,
+  Zap, ChevronRight, Wifi, WifiOff, AlertCircle, Link,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
@@ -219,6 +219,254 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
           Send only compatible assets to this address
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── Lightning Tab ────────────────────────────────────────────────────────────
+type LnStatus = 'idle' | 'connecting' | 'connected' | 'error';
+type LnSubTab = 'receive' | 'send';
+
+interface WebLNNode { alias?: string; pubkey?: string; color?: string; }
+
+function LightningTab() {
+  const [status, setStatus] = useState<LnStatus>('idle');
+  const [nodeInfo, setNodeInfo] = useState<WebLNNode | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [subTab, setSubTab] = useState<LnSubTab>('receive');
+
+  // Receive
+  const [recvAmount, setRecvAmount] = useState('');
+  const [recvMemo, setRecvMemo] = useState('');
+  const [invoice, setInvoice] = useState('');
+  const [invoiceCopied, setInvoiceCopied] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genError, setGenError] = useState('');
+
+  // Send
+  const [payReq, setPayReq] = useState('');
+  const [payStatus, setPayStatus] = useState<'idle' | 'paying' | 'done' | 'error'>('idle');
+  const [payError, setPayError] = useState('');
+  const [payPreimage, setPayPreimage] = useState('');
+
+  const webln = typeof window !== 'undefined' ? (window as any).webln : null;
+  const hasWebLN = !!webln;
+
+  const connect = async () => {
+    if (!webln) return;
+    setStatus('connecting');
+    try {
+      await webln.enable();
+      const info = await webln.getInfo();
+      setNodeInfo(info?.node ?? {});
+      try {
+        const bal = await webln.getBalance?.();
+        if (bal?.balance != null) setBalance(bal.balance);
+      } catch {}
+      setStatus('connected');
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  const makeInvoice = async () => {
+    if (!webln || status !== 'connected') return;
+    const sats = parseInt(recvAmount, 10);
+    if (!sats || sats < 1) { setGenError('Enter a valid amount in sats'); return; }
+    setGenLoading(true); setGenError(''); setInvoice('');
+    try {
+      const result = await webln.makeInvoice({ amount: sats, defaultMemo: recvMemo || 'Cope Wallet' });
+      setInvoice(result.paymentRequest);
+    } catch (e: unknown) {
+      setGenError(e instanceof Error ? e.message : 'Invoice generation failed');
+    } finally { setGenLoading(false); }
+  };
+
+  const copyInvoice = async () => {
+    if (!invoice) return;
+    await navigator.clipboard.writeText(invoice).catch(() => {});
+    setInvoiceCopied(true);
+    setTimeout(() => setInvoiceCopied(false), 2000);
+  };
+
+  const payInvoice = async () => {
+    if (!webln || status !== 'connected' || !payReq.trim()) return;
+    setPayStatus('paying'); setPayError(''); setPayPreimage('');
+    try {
+      const result = await webln.sendPayment(payReq.trim());
+      setPayPreimage(result?.preimage ?? '');
+      setPayStatus('done');
+    } catch (e: unknown) {
+      setPayError(e instanceof Error ? e.message : 'Payment failed');
+      setPayStatus('error');
+    }
+  };
+
+  // ── No WebLN installed ──
+  if (!hasWebLN) {
+    return (
+      <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ background: '#fef9c3', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <AlertCircle size={14} style={{ color: '#ca8a04', flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <p style={{ color: '#92400e', fontSize: 11, fontWeight: 600, margin: '0 0 2px' }}>No Lightning provider detected</p>
+            <p style={{ color: '#92400e', fontSize: 10, margin: 0, lineHeight: 1.5 }}>
+              Install a WebLN-compatible browser extension to enable Lightning payments.
+            </p>
+          </div>
+        </div>
+        {[
+          { name: 'Alby', desc: 'Most popular — custodial & self-hosted nodes', badge: 'Recommended' },
+          { name: 'Zeus', desc: 'Connect your own LND / Core Lightning node', badge: 'Self-custody' },
+          { name: 'Mutiny Wallet', desc: 'Browser-native Lightning + on-chain wallet', badge: 'PWA' },
+        ].map(p => (
+          <div key={p.name} style={{ background: '#0d0d0d', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1c1c1c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Zap size={14} style={{ color: '#facc15' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: '#f3f4f6', fontSize: 11, fontWeight: 600 }}>{p.name}</span>
+                <span style={{ background: '#1e3a8a33', color: '#93c5fd', fontSize: 8, padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>{p.badge}</span>
+              </div>
+              <p style={{ color: '#6b7280', fontSize: 9, margin: '2px 0 0' }}>{p.desc}</p>
+            </div>
+            <Link size={12} style={{ color: '#374151', flexShrink: 0 }} />
+          </div>
+        ))}
+        <p style={{ color: '#374151', fontSize: 9, textAlign: 'center' }}>After installing, reload this page to activate Lightning.</p>
+      </div>
+    );
+  }
+
+  // ── Not connected yet ──
+  if (status === 'idle' || status === 'error') {
+    return (
+      <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {status === 'error' ? <WifiOff size={20} style={{ color: '#ca8a04' }} /> : <Zap size={20} style={{ color: '#ca8a04' }} />}
+        </div>
+        <p style={{ color: '#f3f4f6', fontSize: 12, fontWeight: 600, margin: 0 }}>Lightning Network</p>
+        <p style={{ color: '#6b7280', fontSize: 10, textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
+          {status === 'error' ? 'Connection failed. Make sure your node is online and try again.' : 'Connect your WebLN node to send and receive Lightning payments instantly.'}
+        </p>
+        <button onClick={connect}
+          style={{ background: '#facc15', color: '#000', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Wifi size={12} /> Connect Node
+        </button>
+      </div>
+    );
+  }
+
+  // ── Connecting ──
+  if (status === 'connecting') {
+    return (
+      <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(250,204,21,0.2)', borderTopColor: '#facc15' }} />
+        <p style={{ color: '#6b7280', fontSize: 10 }}>Requesting permission...</p>
+      </div>
+    );
+  }
+
+  // ── Connected ──
+  return (
+    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Node info card */}
+      <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '8px 12px', border: '1px solid rgba(250,204,21,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ color: '#f3f4f6', fontSize: 11, fontWeight: 600, margin: 0 }}>
+            {nodeInfo?.alias || 'Lightning Node'}
+          </p>
+          {nodeInfo?.pubkey && (
+            <p style={{ color: '#6b7280', fontSize: 8, fontFamily: 'monospace', margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {nodeInfo.pubkey.slice(0, 20)}...{nodeInfo.pubkey.slice(-8)}
+            </p>
+          )}
+        </div>
+        {balance != null && (
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <p style={{ color: '#facc15', fontSize: 12, fontWeight: 700, margin: 0 }}>{balance.toLocaleString()}</p>
+            <p style={{ color: '#6b7280', fontSize: 8, margin: 0 }}>sats</p>
+          </div>
+        )}
+      </div>
+
+      {/* Sub-tab bar */}
+      <div style={{ display: 'flex', gap: 4, background: '#0d0d0d', borderRadius: 8, padding: 3 }}>
+        {(['receive', 'send'] as LnSubTab[]).map(t => (
+          <button key={t} onClick={() => { setSubTab(t); setPayStatus('idle'); setInvoice(''); }}
+            style={{ flex: 1, background: subTab === t ? '#1c1c1c' : 'none', border: subTab === t ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent', borderRadius: 6, padding: '5px 0', fontSize: 10, fontWeight: subTab === t ? 600 : 400, color: subTab === t ? '#f3f4f6' : '#6b7280', cursor: 'pointer', textTransform: 'capitalize' }}>
+            {t === 'receive' ? '↓ Receive' : '↑ Send'}
+          </button>
+        ))}
+      </div>
+
+      {/* RECEIVE */}
+      {subTab === 'receive' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: '3px 10px' }}>
+            <GhostCapsule type="text" placeholder="Amount (sats)" onValue={setRecvAmount} className="w-full" theme="light" />
+          </div>
+          <div style={{ background: '#f9fafb', borderRadius: 8, padding: '3px 10px' }}>
+            <GhostCapsule type="text" placeholder="Memo (optional)" onValue={setRecvMemo} className="w-full" theme="light" />
+          </div>
+          {genError && <p style={{ color: '#ef4444', fontSize: 9, margin: 0 }}>{genError}</p>}
+          <button onClick={makeInvoice} disabled={genLoading}
+            style={{ background: genLoading ? '#374151' : '#facc15', color: genLoading ? '#9ca3af' : '#000', border: 'none', borderRadius: 8, padding: '8px', fontSize: 11, fontWeight: 700, cursor: genLoading ? 'not-allowed' : 'pointer' }}>
+            {genLoading ? 'Generating...' : 'Generate Invoice'}
+          </button>
+          {invoice && (
+            <div style={{ background: '#0d0d0d', borderRadius: 8, padding: '8px 10px', border: '1px solid rgba(250,204,21,0.2)' }}>
+              <p style={{ color: '#6b7280', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', margin: '0 0 6px', lineHeight: 1.4 }}>
+                {invoice.slice(0, 60)}...
+              </p>
+              <button onClick={copyInvoice}
+                style={{ background: invoiceCopied ? '#16a34a22' : 'rgba(255,255,255,0.06)', border: `1px solid ${invoiceCopied ? '#16a34a44' : 'rgba(255,255,255,0.08)'}`, borderRadius: 6, padding: '5px 10px', fontSize: 9, color: invoiceCopied ? '#22c55e' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                {invoiceCopied ? <><Check size={10} /> Copied!</> : <><Copy size={10} /> Copy Full Invoice</>}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SEND */}
+      {subTab === 'send' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {payStatus === 'done' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '10px 0' }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#16a34a22', border: '1px solid #16a34a44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Check size={18} style={{ color: '#22c55e' }} />
+              </div>
+              <p style={{ color: '#f3f4f6', fontSize: 12, fontWeight: 600, margin: 0 }}>Payment Sent!</p>
+              {payPreimage && (
+                <p style={{ color: '#6b7280', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0 }}>
+                  Preimage: {payPreimage.slice(0, 20)}...
+                </p>
+              )}
+              <button onClick={() => { setPayStatus('idle'); setPayReq(''); setPayPreimage(''); }}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 14px', fontSize: 10, color: '#9ca3af', cursor: 'pointer' }}>
+                Send Another
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ background: '#f9fafb', borderRadius: 8, padding: '3px 10px' }}>
+                <GhostCapsule type="text" placeholder="Paste BOLT11 invoice (lnbc...)" onValue={setPayReq} className="w-full" theme="light" />
+              </div>
+              {payError && <p style={{ color: '#ef4444', fontSize: 9, margin: 0 }}>{payError}</p>}
+              <button onClick={payInvoice} disabled={payStatus === 'paying' || !payReq.trim()}
+                style={{ background: payStatus === 'paying' ? '#374151' : '#facc15', color: payStatus === 'paying' ? '#9ca3af' : '#000', border: 'none', borderRadius: 8, padding: '8px', fontSize: 11, fontWeight: 700, cursor: payStatus === 'paying' || !payReq.trim() ? 'not-allowed' : 'pointer' }}>
+                {payStatus === 'paying' ? 'Sending...' : '⚡ Pay Invoice'}
+              </button>
+              <p style={{ color: '#374151', fontSize: 8, textAlign: 'center', margin: 0 }}>
+                Supports BOLT11 invoices • Powered by WebLN
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -545,17 +793,7 @@ export function WalletDashboard() {
           )}
 
           {/* LIGHTNING TAB */}
-          {activeTab === 'lightning' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '18px 12px' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={16} style={{ color: '#ca8a04' }} />
-              </div>
-              <p style={{ color: '#374151', fontSize: 11, fontWeight: 600, margin: 0 }}>Lightning Nodes</p>
-              <p style={{ color: '#9ca3af', fontSize: 10, textAlign: 'center', maxWidth: 180, margin: 0, lineHeight: 1.5 }}>
-                Lightning Network integration coming soon. Connect your node for instant payments.
-              </p>
-            </div>
-          )}
+          {activeTab === 'lightning' && <LightningTab />}
         </motion.div>
       </div>
     </>
