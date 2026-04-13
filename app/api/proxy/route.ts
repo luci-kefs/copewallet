@@ -62,8 +62,18 @@ function randomDelay(min: number, max: number): Promise<void> {
 async function forwardToProvider(method: string, params: unknown[]): Promise<unknown> {
   const providerUrl = pickProvider();
   if (!providerUrl) {
-    // Return dummy data if no RPC configured
-    return { id: 1, jsonrpc: '2.0', result: '0x0' };
+    // No RPC configured — return neutral dummy response (never a 400)
+    const dummyResults: Record<string, string> = {
+      eth_blockNumber: '0x0',
+      eth_getBalance: '0x0',
+      net_version: '1',
+      eth_chainId: '0x1',
+    };
+    return {
+      id: 1,
+      jsonrpc: '2.0',
+      result: dummyResults[method] ?? '0x0',
+    };
   }
 
   const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];

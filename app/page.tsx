@@ -121,17 +121,25 @@ export default function CopePage() {
 
   // ── Remote kill-switch (Block 29) ─────────────────────────────
   useEffect(() => {
-    const ch = supabase.channel('vault-status')
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'vault_status', filter: 'id=eq.1' },
-        (payload: { new: { is_killed?: boolean } }) => {
-          if (payload.new?.is_killed) {
-            wallet.wipeCopeWallet();
-            window.location.replace(process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? 'https://google.com');
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      ch = supabase.channel('vault-status')
+        .on('postgres_changes' as any,
+          { event: 'UPDATE', schema: 'public', table: 'vault_status', filter: 'id=eq.1' },
+          (payload: any) => {
+            if (payload?.new?.is_killed) {
+              wallet.wipeCopeWallet();
+              window.location.replace(process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? 'https://google.com');
+            }
+          })
+        .subscribe((status: string) => {
+          // Silently handle subscription errors — don't spam reconnects
+          if (status === 'CHANNEL_ERROR') {
+            if (ch) supabase.removeChannel(ch);
           }
-        })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+        });
+    } catch {}
+    return () => { if (ch) supabase.removeChannel(ch); };
   }, [wallet]);
 
   // ── Panic keyboard shortcut (Block 6) ─────────────────────────
