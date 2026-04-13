@@ -199,17 +199,16 @@ export default function CopePage() {
       {wallet.isPulseActive && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 1, background: '#fff', opacity: 0.04, zIndex: 40 }} />}
 
       {/* ── LEFT — WALLET DASHBOARD ── */}
-      <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ flex: 1, overflow: 'hidden', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh' }}>
         <WalletDashboard />
-        {/* Temporary zone warning */}
-        <div style={{ padding: '0 12px 12px', marginTop: 'auto' }}>
-          <div style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 14, padding: '9px 14px', display: 'flex', gap: 9, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+        {/* Temporary zone warning — pinned to bottom */}
+        <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
+          <div style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 12, padding: '7px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, flexShrink: 0 }}>⚠️</span>
             <div>
-              <p style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700, margin: '0 0 2px', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Temporary Session</p>
-              <p style={{ color: '#92400e', fontSize: 9, margin: 0, lineHeight: 1.5, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
-                This wallet exists only in RAM. Refreshing or closing this tab will permanently wipe it.
-                Save it using the <strong style={{ color: '#d97706' }}>Secure Vault →</strong>
+              <p style={{ color: '#fbbf24', fontSize: 10, fontWeight: 700, margin: '0 0 1px', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Temporary Session</p>
+              <p style={{ color: '#78350f', fontSize: 9, margin: 0, lineHeight: 1.4, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+                RAM only — refreshing wipes this wallet. Save it in <strong style={{ color: '#d97706' }}>Secure Vault →</strong>
               </p>
             </div>
           </div>
@@ -217,7 +216,7 @@ export default function CopePage() {
       </div>
 
       {/* ── RIGHT — SECURE VAULT ── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#000' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#000', height: '100vh' }}>
         <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 8, minHeight: '100%' }}>
 
           {/* Header */}

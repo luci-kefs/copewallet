@@ -79,52 +79,72 @@ export async function embedInPNG(secretText: string, filename = 'copewallet'): P
   link.click();
 }
 
-// Extract data from PNG
+// Extract data from PNG — Block 31
+// NOTE: header bytes extracted as raw Uint8Array (not via TextDecoder) to avoid
+// multi-byte UTF-8 collapsing bytes and causing Invalid DataView length errors.
 export async function extractFromPNG(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Invalid Key'));
     reader.onload = (e) => {
       const img = new window.Image();
+      img.onerror = () => reject(new Error('Invalid Key'));
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Invalid Key')); return; }
+          ctx.drawImage(img, 0, 0);
 
-        const data = ctx.getImageData(0, 0, img.width, img.height).data;
+          const pixelData = ctx.getImageData(0, 0, img.width, img.height).data;
+          const totalPixels = img.width * img.height;
 
-        // Extract enough bits for header
-        const headerBitCount = (4 + 4) * 8; // magic + length
-        const allBits: number[] = [];
+          // Pull all LSBs from R channel
+          const allBits: number[] = new Array(totalPixels);
+          for (let i = 0; i < totalPixels; i++) {
+            allBits[i] = pixelData[i * 4] & 1;
+          }
 
-        for (let i = 0; i < data.length / 4; i++) {
-          allBits.push(data[i * 4] & 1);
-        }
+          // Decode header as raw bytes — bypass TextDecoder to avoid UTF-8 issues
+          const HEADER_BYTES = 8; // 4 magic + 4 length
+          const headerBytes = new Uint8Array(HEADER_BYTES);
+          for (let i = 0; i < HEADER_BYTES; i++) {
+            let byte = 0;
+            for (let j = 0; j < 8; j++) {
+              byte = (byte << 1) | (allBits[i * 8 + j] ?? 0);
+            }
+            headerBytes[i] = byte;
+          }
 
-        const headerStr = bitsToString(allBits.slice(0, headerBitCount));
-        const headerBytes = new Uint8Array(headerStr.split('').map((c) => c.charCodeAt(0)));
+          // Verify magic bytes
+          for (let i = 0; i < 4; i++) {
+            if (headerBytes[i] !== MAGIC[i]) {
+              reject(new Error('Invalid Key'));
+              return;
+            }
+          }
 
-        // Verify magic bytes (Block 31 Task 3)
-        for (let i = 0; i < 4; i++) {
-          if (headerBytes[i] !== MAGIC[i]) {
+          const length = new DataView(headerBytes.buffer).getUint32(4, true);
+          if (length <= 0 || length > totalPixels - HEADER_BYTES) {
             reject(new Error('Invalid Key'));
             return;
           }
-        }
 
-        const length = new DataView(headerBytes.buffer, 4, 4).getUint32(0, true);
-        const payloadBits = allBits.slice(headerBitCount, headerBitCount + length * 8);
-        const payload = bitsToString(payloadBits);
+          const payloadBits = allBits.slice(HEADER_BYTES * 8, HEADER_BYTES * 8 + length * 8);
+          const payload = bitsToString(payloadBits);
 
-        try {
-          const parsed = JSON.parse(payload);
-          resolve(parsed.d);
-        } catch {
-          reject(new Error('Invalid Key'));
+          try {
+            const parsed = JSON.parse(payload);
+            resolve(parsed.d);
+          } catch {
+            reject(new Error('Invalid Key'));
+          }
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error('Invalid Key'));
         }
       };
-      img.onerror = () => reject(new Error('Invalid Key'));
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);

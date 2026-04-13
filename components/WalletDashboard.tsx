@@ -42,18 +42,27 @@ const CHAIN_SVG_PATHS: Record<string, React.ReactNode> = {
 
 // ─── Chain SVG Icon ───────────────────────────────────────────────────────────
 function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
+  const [imgErr, setImgErr] = useState(false);
   const svgPath = CHAIN_SVG_PATHS[chain.shortName];
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
       background: `${chain.color}18`,
-      border: `1.5px solid ${chain.color}55`,
+      border: `1.5px solid ${chain.color}44`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0, overflow: 'hidden',
     }}>
-      {svgPath ? (
-        <svg viewBox="0 0 24 24" width={size * 0.56} height={size * 0.56}
-          style={{ color: chain.color }}>
+      {chain.logoUrl && !imgErr ? (
+        <img
+          src={chain.logoUrl}
+          alt={chain.shortName}
+          width={size * 0.7}
+          height={size * 0.7}
+          style={{ borderRadius: '50%', objectFit: 'cover' }}
+          onError={() => setImgErr(true)}
+        />
+      ) : svgPath ? (
+        <svg viewBox="0 0 24 24" width={size * 0.56} height={size * 0.56} style={{ color: chain.color }}>
           {svgPath}
         </svg>
       ) : (
@@ -595,7 +604,7 @@ export function WalletDashboard() {
 
   if (!wallet.isUnlocked) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12 }}>
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
@@ -618,7 +627,7 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <div style={{ background: 'transparent', minHeight: '100%', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ background: 'transparent', flex: 1, minHeight: 0, padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
 
         {/* ── Header ── */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
@@ -690,7 +699,7 @@ export function WalletDashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.22 }}
-          style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}
+          style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
         >
           {/* Tab bar */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid #f3f4f6' }}>
@@ -717,7 +726,7 @@ export function WalletDashboard() {
 
           {/* BALANCE TAB */}
           {activeTab === 'balance' && (
-            <div style={{ padding: '10px 12px' }}>
+            <div style={{ padding: '10px 12px', flex: 1, overflowY: 'auto', minHeight: 0 }}>
               {/* Total balance row */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div>
@@ -786,7 +795,7 @@ export function WalletDashboard() {
 
           {/* TRANSACTIONS TAB */}
           {activeTab === 'transactions' && (
-            <div style={{ padding: '6px 0' }}>
+            <div style={{ padding: '6px 0', flex: 1, overflowY: 'auto', minHeight: 0 }}>
               {isLoadingTxs ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
                   <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
@@ -827,7 +836,11 @@ export function WalletDashboard() {
           )}
 
           {/* LIGHTNING TAB */}
-          {activeTab === 'lightning' && <LightningTab />}
+          {activeTab === 'lightning' && (
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              <LightningTab />
+            </div>
+          )}
         </motion.div>
       </div>
     </>
