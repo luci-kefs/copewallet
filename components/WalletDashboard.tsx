@@ -6,6 +6,7 @@ import {
   ExternalLink, ArrowUpRight, ArrowDownLeft, Eye, EyeOff,
   Zap, ChevronRight,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
 import { CHAINS, Chain } from '@/lib/chains';
 import { fetchTokenBalances, fetchTxHistory, TokenBalance, TxRecord } from '@/lib/tokens';
@@ -15,6 +16,9 @@ import { ephemeralSign } from '@/lib/signer';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
+import { FloatingDock } from '@/components/FloatingDock';
+import { ChainMarquee } from '@/components/ChainMarquee';
+import { CardSpotlight } from '@/components/CardSpotlight';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
@@ -299,12 +303,29 @@ export function WalletDashboard() {
   // Featured 4 chains for the quick row
   const featuredChains = CHAINS.slice(0, 4);
 
+  const dockItems = [
+    { label: 'Connect', icon: <QrCode size={18} />, onClick: () => setShowQR(true), color: '#059669' },
+    { label: 'Send', icon: <Send size={18} />, onClick: () => setShowSend(true) },
+    { label: copied ? 'Copied!' : 'Copy', icon: copied ? <Check size={18} /> : <Copy size={18} />, onClick: handleCopy },
+    { label: 'History', icon: <History size={18} />, onClick: () => setActiveTab('transactions'), active: activeTab === 'transactions' },
+    { label: 'New', icon: <RefreshCw size={18} />, onClick: () => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); } },
+  ];
+
   if (!wallet.isUnlocked) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: 'rgba(255,255,255,0.5)', animation: 'spin 1s linear infinite' }} />
-        <span style={{ color: '#6b7280', fontSize: 12 }}>Generating wallet...</span>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.08)', borderTopColor: 'rgba(255,255,255,0.5)' }}
+        />
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{ color: '#6b7280', fontSize: 12 }}
+        >
+          Generating wallet...
+        </motion.span>
       </div>
     );
   }
@@ -315,16 +336,26 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <div style={{ background: '#000', minHeight: '100%', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ background: 'transparent', minHeight: '100%', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
         {/* ── Header ── */}
-        <div style={{ textAlign: 'center', paddingBottom: 4 }}>
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{ textAlign: 'center', paddingBottom: 4 }}
+        >
           <h2 style={{ color: '#f9fafb', fontSize: 18, fontWeight: 700, margin: 0 }}>New Session</h2>
           <p style={{ color: '#6b7280', fontSize: 11, margin: '3px 0 0' }}>Volatile wallet — RAM only</p>
-        </div>
+        </motion.div>
 
         {/* ── Address Card (white) ── */}
-        <div style={{ background: '#fff', borderRadius: 16, padding: '14px 18px', textAlign: 'center' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.05 }}
+          style={{ background: '#fff', borderRadius: 16, padding: '14px 18px', textAlign: 'center' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 6, flexWrap: 'wrap' }}>
             <span style={{ color: '#374151', fontSize: 12, fontWeight: 500 }}>
               {selectedChain.name} Wallet
@@ -340,31 +371,25 @@ export function WalletDashboard() {
           <p style={{ color: '#9ca3af', fontSize: 9, margin: '4px 0 0' }}>
             {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile mode — wipes on close'}
           </p>
-        </div>
+        </motion.div>
 
-        {/* ── Action Buttons (dark card) ── */}
-        <div style={{ background: '#141414', borderRadius: 16, padding: '14px 8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-            <ActionBtn icon={<QrCode size={18} />} label="Connect" color="#059669" onClick={() => setShowQR(true)} />
-            <ActionBtn icon={<Send size={18} />} label="Send" onClick={() => setShowSend(true)} />
-            <ActionBtn icon={copied ? <Check size={18} /> : <Copy size={18} />} label={copied ? 'Copied!' : 'Copy'} onClick={handleCopy} />
-            <ActionBtn
-              icon={<History size={18} />}
-              label="History"
-              active={activeTab === 'transactions'}
-              onClick={() => setActiveTab('transactions')}
-            />
-            <ActionBtn
-              icon={<RefreshCw size={18} />}
-              label="New"
-              onClick={() => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
-            />
-          </div>
-        </div>
+        {/* ── Floating Dock (action buttons) ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.1 }}
+        >
+          <FloatingDock items={dockItems} />
+        </motion.div>
 
         {/* ── Networks (dark card) ── */}
-        <div style={{ background: '#141414', borderRadius: 16, padding: '14px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.15 }}
+          style={{ background: '#141414', borderRadius: 16, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span style={{ color: '#f9fafb', fontSize: 13, fontWeight: 600 }}>More Networks</span>
             <button
               onClick={() => setShowNetworks(true)}
@@ -372,29 +397,41 @@ export function WalletDashboard() {
               See List <ChevronRight size={12} />
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-            {featuredChains.map(c => (
-              <button
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 12 }}>
+            {featuredChains.map((c, i) => (
+              <motion.button
                 key={c.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.18 + i * 0.04 }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
                 onClick={() => setSelectedChain(c)}
                 style={{
                   background: selectedChain.id === c.id ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
                   border: selectedChain.id === c.id ? `1px solid ${c.color}66` : '1px solid rgba(255,255,255,0.06)',
                   borderRadius: 10, padding: '10px 6px',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  cursor: 'pointer', transition: 'all 0.15s',
+                  cursor: 'pointer',
                 }}>
                 <ChainIcon chain={c} size={36} />
                 <span style={{ color: '#e5e7eb', fontSize: 10, fontWeight: 700 }}>{c.name}</span>
                 <span style={{ color: c.color, fontSize: 8, fontWeight: 600 }}>Gasless</span>
                 <span style={{ color: '#4b5563', fontSize: 7 }}>EIP-7702</span>
-              </button>
+              </motion.button>
             ))}
           </div>
-        </div>
+          {/* Chain marquee ticker */}
+          <ChainMarquee />
+        </motion.div>
 
         {/* ── Balance / Transactions Card (white) ── */}
-        <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.22 }}
+          style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}
+        >
           {/* Tab bar */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid #f3f4f6' }}>
             {(['balance', 'transactions', 'lightning'] as Tab[]).map(tab => (
@@ -541,42 +578,8 @@ export function WalletDashboard() {
               </p>
             </div>
           )}
-        </div>
-
-        <style>{`
-          @keyframes spin { to { transform: rotate(360deg); } }
-        `}</style>
+        </motion.div>
       </div>
     </>
-  );
-}
-
-// ─── Action Button ────────────────────────────────────────────────────────────
-function ActionBtn({ icon, label, onClick, color, active = false }: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  color?: string;
-  active?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-        background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px',
-      }}>
-      <div style={{
-        width: 46, height: 46, borderRadius: '50%',
-        background: color ? `${color}22` : active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)',
-        border: color ? `1px solid ${color}44` : active ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.15s',
-        color: color ?? (active ? '#fff' : '#e5e7eb'),
-      }}>
-        {icon}
-      </div>
-      <span style={{ color: '#9ca3af', fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap' }}>{label}</span>
-    </button>
   );
 }

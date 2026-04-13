@@ -14,6 +14,7 @@
     "@supabase/supabase-js": "^2.103.0",
     "crypto-js": "^4.2.0",
     "ethers": "^6.16.0",
+    "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
     "lucide-react": "^1.8.0",
     "next": "14.2.35",

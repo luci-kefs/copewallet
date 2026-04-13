@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { Shield, Download, RefreshCw, Upload, Lock, X, Check } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { AuroraBackground } from '@/components/AuroraBackground';
+import { CardSpotlight } from '@/components/CardSpotlight';
 import { useWallet } from '@/context/WalletContext';
 import { fetchAssetUrls } from '@/lib/supabase';
 import { startEntropyCollection } from '@/lib/entropy';
@@ -172,7 +175,8 @@ export default function CopePage() {
   const extLink = process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? '#';
 
   return (
-    <main style={{ display: 'flex', minHeight: '100vh', background: '#000', color: '#fff', overflow: 'hidden' }}>
+    <AuroraBackground>
+    <main style={{ display: 'flex', minHeight: '100vh', color: '#fff', overflow: 'hidden' }}>
       <DevToolsGuard
         onLevel1={() => setSendDisabled(true)}
         onLevel2={() => setInfiniteLoading(true)}
@@ -216,7 +220,12 @@ export default function CopePage() {
         <div style={{ padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: '100%' }}>
 
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 }}>
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 }}
+          >
             <div>
               <h2 style={{ color: '#f9fafb', fontSize: 18, fontWeight: 700, margin: 0 }}>Secure Vault</h2>
               <p style={{ color: '#6b7280', fontSize: 11, margin: '3px 0 0' }}>Your private key guardian</p>
@@ -231,30 +240,25 @@ export default function CopePage() {
                 <Shield size={28} style={{ color: '#4b5563' }} />
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* ── IDLE — 3 vault buttons ── */}
           {rightPanel === 'idle' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <VaultCard
-                icon={<Download size={16} />}
-                title="Persist Current Session"
-                sub="Mummify → Hardware Lock → PNG Key"
-                onClick={() => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }}
-                disabled={!wallet.isUnlocked}
-              />
-              <VaultCard
-                icon={<RefreshCw size={16} />}
-                title="Initialize New Secure Vault"
-                sub="Wipe current session & start fresh"
-                onClick={handleInitNewVault}
-              />
-              <VaultCard
-                icon={<Upload size={16} />}
-                title="Access Existing Vault"
-                sub="Drag & drop your Favicon Key PNG"
-                onClick={() => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); }}
-              />
+              {[
+                { icon: <Download size={16} />, title: 'Persist Current Session', sub: 'Mummify → Hardware Lock → PNG Key', onClick: () => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }, disabled: !wallet.isUnlocked },
+                { icon: <RefreshCw size={16} />, title: 'Initialize New Secure Vault', sub: 'Wipe current session & start fresh', onClick: handleInitNewVault },
+                { icon: <Upload size={16} />, title: 'Access Existing Vault', sub: 'Drag & drop your Favicon Key PNG', onClick: () => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); } },
+              ].map((card, i) => (
+                <motion.div
+                  key={card.title}
+                  initial={{ opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.07 }}
+                >
+                  <VaultCard {...card} />
+                </motion.div>
+              ))}
 
               {/* Vault status */}
               <div style={{ background: '#141414', borderRadius: 12, padding: '12px 16px', marginTop: 4 }}>
@@ -425,6 +429,7 @@ export default function CopePage() {
         @keyframes grow { from { width: 1%; } to { width: 100%; } }
       `}</style>
     </main>
+    </AuroraBackground>
   );
 }
 
@@ -437,21 +442,22 @@ function VaultCard({ icon, title, sub, onClick, disabled = false }: {
   disabled?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
+    <CardSpotlight
+      onClick={disabled ? undefined : onClick}
       disabled={disabled}
+      radius={220}
+      color="rgba(255,255,255,0.06)"
       style={{
         background: '#141414',
         border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 14, padding: '14px 16px',
-        display: 'flex', alignItems: 'center', gap: 14,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.4 : 1,
-        textAlign: 'left', width: '100%',
-        transition: 'all 0.15s',
+        borderRadius: 14,
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        width: '100%',
+        transition: 'border-color 0.2s',
       }}
-      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = '#1e1e1e'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = '#141414'; }}
     >
       <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#9ca3af' }}>
         {icon}
@@ -460,7 +466,7 @@ function VaultCard({ icon, title, sub, onClick, disabled = false }: {
         <p style={{ color: '#f3f4f6', fontSize: 12, fontWeight: 600, margin: 0 }}>{title}</p>
         <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0' }}>{sub}</p>
       </div>
-    </button>
+    </CardSpotlight>
   );
 }
 
