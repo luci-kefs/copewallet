@@ -20,6 +20,22 @@ import {
 import { buildSuperEntropySeed } from '@/lib/entropy';
 import { scatterStore, ScatteredStore, wipeScatteredStore, startHeapNoise, stopHeapNoise } from '@/lib/memory-vault';
 import { getHardwareUUID, startEnvironmentWatch } from '@/lib/fingerprint';
+import {
+  registerBreachWipe,
+  startIntegrityWatch,
+  stopIntegrityWatch,
+  activateSilentLockout,
+  isBreachLockedOut,
+  poisonVault,
+  isUnauthorizedEnvironment,
+} from '@/lib/breach';
+import { checkSingletonTab, startHistoryScrubber } from '@/lib/history';
+import {
+  persistVault,
+  hasPersistedVault,
+  loadPersistedVault,
+  nukePersistedVault,
+} from '@/lib/persistent-vault';
 
 // Block 35: Two explicit operating modes
 export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
@@ -36,6 +52,8 @@ interface WalletState {
   isGhostLocked: boolean;        // anomaly detection lock (Block 8)
   sessionStartedAt: number | null;
   devToolsDetected: number;      // graduated counter (Block 34)
+  isBreachLocked: boolean;       // logic bomb lockout (Block 10)
+  hasPersisted: boolean;         // persistent vault exists (Block 18)
 }
 
 // Decoy honeypot variables (Block 5 Task 1)
@@ -57,6 +75,8 @@ interface WalletContextType extends WalletState {
   getMnemonic: () => string | null;
   activeAddress: string | null;
   scatteredKeyStore: ScatteredStore | null;
+  enablePersistentMode: (passphrase: string) => Promise<void>;
+  unlockPersistentVault: (passphrase: string) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -72,6 +92,8 @@ const INITIAL_STATE: WalletState = {
   isGhostLocked: false,
   sessionStartedAt: null,
   devToolsDetected: 0,
+  isBreachLocked: false,
+  hasPersisted: false,
 };
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -93,9 +115,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setState(INITIAL_STATE);
     stopKeyRotation();
     stopHeapNoise();
+    stopIntegrityWatch();
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
-    // Update decoys to noise
     _updateDecoys();
   }, []);
 
@@ -228,6 +250,53 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state._v_enc]);
 
+  // Persistent mode — Block 18 Task 2 (explicit user consent)
+  const enablePersistentMode = useCallback(async (passphrase: string) => {
+    if (!state._v_enc) return;
+    const hwId = await getHardwareUUID();
+    const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
+    await persistVault(mnemonic, passphrase, hwId);
+    setState((p) => ({ ...p, mode: 'PERSISTENT' }));
+  }, [state._v_enc]);
+
+  const unlockPersistentVault = useCallback(async (passphrase: string) => {
+    const hwId = await getHardwareUUID();
+    const mnemonic = await loadPersistedVault(passphrase, hwId);
+    await importCopeWallet(mnemonic);
+  }, [importCopeWallet]);
+
+  // Check for persisted vault on mount (Block 18 Task 3)
+  useEffect(() => {
+    hasPersistedVault().then((has) => {
+      if (has) setState((p) => ({ ...p, hasPersisted: true }));
+    });
+  }, []);
+
+  // Breach registration (Block 10)
+  useEffect(() => {
+    registerBreachWipe(() => {
+      // Poison vault before wipe
+      setState((p) => ({
+        ...p,
+        _v_enc: poisonVault(),
+        _k_enc: poisonVault(),
+        isBreachLocked: true,
+      }));
+      setTimeout(() => wipeCopeWallet(), 100);
+    });
+
+    // Unauthorized environment check
+    if (isUnauthorizedEnvironment()) {
+      activateSilentLockout();
+    }
+  }, [wipeCopeWallet]);
+
+  // History scrubber + singleton tab (Block 14)
+  useEffect(() => {
+    checkSingletonTab();
+    startHistoryScrubber();
+  }, []);
+
   // Anti-Persistence: wipe on unload (Block 2)
   useEffect(() => {
     const handler = () => wipeCopeWallet();
@@ -346,6 +415,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         rotateVaultKeys,
         getMnemonic,
         scatteredKeyStore: scatteredKeyRef.current,
+        enablePersistentMode,
+        unlockPersistentVault,
       }}
     >
       {children}
