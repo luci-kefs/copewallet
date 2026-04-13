@@ -69,7 +69,13 @@ export default function CopePage() {
 
   // ── Remote kill-switch (Block 29) ─────────────────────────────
   useEffect(() => {
+    // Only subscribe if Supabase is configured
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) return;
+
     let ch: ReturnType<typeof supabase.channel> | null = null;
+    let failed = false;
+
     try {
       ch = supabase.channel('vault-status')
         .on('postgres_changes' as any,
@@ -81,11 +87,16 @@ export default function CopePage() {
             }
           })
         .subscribe((status: string) => {
-          if (status === 'CHANNEL_ERROR') { if (ch) supabase.removeChannel(ch); }
+          // On any error/timeout, remove channel and do NOT retry
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') && !failed) {
+            failed = true;
+            if (ch) { supabase.removeChannel(ch); ch = null; }
+          }
         });
     } catch {}
     return () => { if (ch) supabase.removeChannel(ch); };
-  }, [wallet]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Panic keyboard shortcut (Block 6) ─────────────────────────
   useEffect(() => {
@@ -119,15 +130,21 @@ export default function CopePage() {
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
-      const hwId = await getHardwareUUID();
-      await wallet.enablePersistentMode(passphrase);
-      const combinedKey = getCurrentKey() + hwId;
-      const mnemonic = wallet.getMnemonic();
+      // Get mnemonic with proper hwId-combined key BEFORE any state changes
+      const mnemonic = await wallet.getMnemonicForExport();
       if (!mnemonic) throw new Error('Vault empty');
-      const encPayload = encryptData(mnemonic, combinedKey + passphrase);
+
+      // Persist to IndexedDB (Block 18)
+      await wallet.enablePersistentMode(passphrase);
+
+      // Embed in steganographic PNG for offline backup (Block 31)
+      const hwId = await getHardwareUUID();
+      const encPayload = encryptData(mnemonic, getCurrentKey() + hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
-    } catch { setPersistError('Operation failed. Try again.'); }
+    } catch (e) {
+      setPersistError('Operation failed. Try again.');
+    }
     finally { setIsProcessing(false); }
   };
 

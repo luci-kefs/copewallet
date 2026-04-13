@@ -73,6 +73,7 @@ interface WalletContextType extends WalletState {
   triggerPanic: () => void;
   rotateVaultKeys: () => void;
   getMnemonic: () => string | null;
+  getMnemonicForExport: () => Promise<string | null>;
   activeAddress: string | null;
   scatteredKeyStore: ScatteredStore | null;
   enablePersistentMode: (passphrase: string) => Promise<void>;
@@ -250,6 +251,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state._v_enc]);
 
+  // Secure mnemonic export — decrypts with full combinedKey including hwId
+  const getMnemonicForExport = useCallback(async (): Promise<string | null> => {
+    if (!state._v_enc) return null;
+    try {
+      const hwId = await getHardwareUUID();
+      const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
+      return mnemonic || null;
+    } catch {
+      return null;
+    }
+  }, [state._v_enc]);
+
   // Persistent mode — Block 18 Task 2 (explicit user consent)
   const enablePersistentMode = useCallback(async (passphrase: string) => {
     if (!state._v_enc) return;
@@ -414,6 +427,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         triggerPanic,
         rotateVaultKeys,
         getMnemonic,
+        getMnemonicForExport,
         scatteredKeyStore: scatteredKeyRef.current,
         enablePersistentMode,
         unlockPersistentVault,
