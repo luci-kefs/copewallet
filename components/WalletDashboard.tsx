@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Copy, Send, History, RefreshCw, ChevronDown, ExternalLink, ArrowUpRight, ArrowDownLeft, X, Check, Zap } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  QrCode, Send, Copy, History, RefreshCw, Check, X,
+  ExternalLink, ArrowUpRight, ArrowDownLeft, Eye, EyeOff,
+  Zap, ChevronRight,
+} from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
-import { CHAINS, FEATURED_CHAINS, Chain, getChainById } from '@/lib/chains';
+import { CHAINS, Chain } from '@/lib/chains';
 import { fetchTokenBalances, fetchTxHistory, TokenBalance, TxRecord } from '@/lib/tokens';
 import { getPrices, formatUSD } from '@/lib/prices';
 import { buildMaskedTransaction, stealthDelay, fireDummyEchoes } from '@/lib/transaction';
@@ -14,13 +18,98 @@ import { GhostCapsule } from '@/components/GhostCapsule';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
-// ─── Send Modal ────────────────────────────────────────────────────────────────
-interface SendModalProps {
-  chain: Chain;
-  onClose: () => void;
+// ─── Chain SVG Icon ───────────────────────────────────────────────────────────
+function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: `${chain.color}1a`,
+      border: `1.5px solid ${chain.color}55`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <span style={{ color: chain.color, fontSize: size * 0.32, fontWeight: 700, lineHeight: 1 }}>
+        {chain.shortName.slice(0, 3)}
+      </span>
+    </div>
+  );
 }
 
-function SendModal({ chain, onClose }: SendModalProps) {
+// ─── All Networks Modal ───────────────────────────────────────────────────────
+function AllNetworksModal({ selected, onSelect, onClose }: {
+  selected: Chain;
+  onSelect: (c: Chain) => void;
+  onClose: () => void;
+}) {
+  const smart = CHAINS.filter(c => c.isAlchemy);
+  const eoa = CHAINS.filter(c => !c.isAlchemy);
+
+  const ChainCard = ({ c }: { c: Chain }) => (
+    <button
+      onClick={() => { onSelect(c); onClose(); }}
+      style={{
+        background: selected.id === c.id ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.04)',
+        border: selected.id === c.id ? `1.5px solid ${c.color}88` : '1px solid rgba(255,255,255,0.08)',
+        borderRadius: 12, padding: '12px 8px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+        cursor: 'pointer', position: 'relative', transition: 'all 0.15s',
+        width: '100%',
+      }}>
+      {selected.id === c.id && (
+        <div style={{
+          position: 'absolute', top: 7, right: 7,
+          width: 7, height: 7, borderRadius: '50%', background: '#22c55e',
+        }} />
+      )}
+      <ChainIcon chain={c} size={34} />
+      <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 700 }}>{c.symbol}</span>
+      <span style={{ color: '#9ca3af', fontSize: 9 }}>{c.name}</span>
+      {c.isAlchemy
+        ? <span style={{ background: '#1e40af33', color: '#93c5fd', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>7702</span>
+        : <span style={{ background: '#374151', color: '#9ca3af', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>EOA</span>
+      }
+    </button>
+  );
+
+  return (
+    <div
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        background: '#111', borderRadius: 16, width: 360, maxWidth: '92vw',
+        maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.8)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>All Networks</span>
+          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '16px 20px', flex: 1 }}>
+          <p style={{ color: '#6b7280', fontSize: 9, letterSpacing: '0.12em', fontWeight: 600, marginBottom: 10 }}>
+            EVM SMART WALLETS (GASLESS) ⓘ
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+            {smart.map(c => <ChainCard key={c.id} c={c} />)}
+          </div>
+          <p style={{ color: '#6b7280', fontSize: 9, letterSpacing: '0.12em', fontWeight: 600, marginBottom: 10 }}>
+            EVM EOA WALLETS ⓘ
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            {eoa.map(c => <ChainCard key={c.id} c={c} />)}
+          </div>
+          <p style={{ color: '#4b5563', fontSize: 9, textAlign: 'center', marginTop: 16 }}>
+            {CHAINS.length} networks
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Send Modal ───────────────────────────────────────────────────────────────
+function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
   const wallet = useWallet();
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
@@ -29,25 +118,17 @@ function SendModal({ chain, onClose }: SendModalProps) {
   const [errMsg, setErrMsg] = useState('');
 
   const handleSend = async () => {
-    if (!wallet.activeAddress || !wallet.scatteredKeyStore) {
-      setErrMsg('Wallet not ready'); return;
-    }
+    if (!wallet.activeAddress || !wallet.scatteredKeyStore) { setErrMsg('Wallet not ready'); return; }
     if (!ethers.isAddress(to)) { setErrMsg('Invalid address'); return; }
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      setErrMsg('Invalid amount'); return;
-    }
-
-    setStatus('signing');
-    setErrMsg('');
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { setErrMsg('Invalid amount'); return; }
+    setStatus('signing'); setErrMsg('');
     try {
       const tx = await buildMaskedTransaction(to, amount, wallet.activeAddress, chain.id);
-      const provider = getProvider(chain.id);
-
       setStatus('sending');
       await stealthDelay();
-      fireDummyEchoes();
-
+      void fireDummyEchoes();
       const signed = await ephemeralSign(wallet.scatteredKeyStore, tx);
+      const provider = getProvider(chain.id);
       const sent = await provider.broadcastTransaction(signed);
       setTxHash(sent.hash);
       setStatus('done');
@@ -57,161 +138,88 @@ function SendModal({ chain, onClose }: SendModalProps) {
     }
   };
 
-  const explorerUrl = `${chain.explorerUrl}/tx/${txHash}`;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-sm mx-4 bg-black border border-white flex flex-col gap-4 p-6"
-        style={{ borderColor: 'rgba(255,255,255,0.1)', borderRadius: 4 }}>
-
-        <div className="flex items-center justify-between">
-          <p className="font-light text-white tracking-wider" style={{ fontSize: 12 }}>
-            Send {chain.symbol}
-          </p>
-          <button onClick={onClose} className="text-gray-600 hover:text-gray-400">
-            <X size={14} />
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: 16, width: 360, maxWidth: '92vw', padding: 20, boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <span style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>Send {chain.symbol}</span>
+          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
           </button>
         </div>
-
         {status === 'done' ? (
-          <div className="flex flex-col items-center gap-3 py-4">
-            <Check size={20} className="text-white" style={{ opacity: 0.5 }} />
-            <p className="font-light text-gray-300 tracking-wider" style={{ fontSize: 11 }}>
-              Transaction Broadcast
-            </p>
-            <p className="font-mono text-gray-600 text-center break-all" style={{ fontSize: 8 }}>
-              {txHash}
-            </p>
-            <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1 font-extralight text-gray-500 hover:text-gray-300 transition-colors"
-              style={{ fontSize: 9 }}>
-              View on Explorer <ExternalLink size={9} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '20px 0' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#16a34a22', border: '1.5px solid #16a34a66', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={22} style={{ color: '#22c55e' }} />
+            </div>
+            <span style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>Broadcast!</span>
+            <span style={{ color: '#6b7280', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{txHash}</span>
+            <a href={`${chain.explorerUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
+              style={{ color: '#60a5fa', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              View on Explorer <ExternalLink size={10} />
             </a>
           </div>
         ) : (
-          <>
-            <div className="flex flex-col gap-3">
-              <GhostCapsule
-                type="text"
-                placeholder={`To address (0x...)`}
-                onValue={setTo}
-                className="w-full"
-              />
-              <GhostCapsule
-                type="text"
-                placeholder={`Amount (${chain.symbol})`}
-                onValue={setAmount}
-                className="w-full"
-              />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '4px 12px' }}>
+              <GhostCapsule type="text" placeholder={`Recipient address (0x...)`} onValue={setTo} className="w-full" />
             </div>
-
-            {errMsg && (
-              <p className="font-extralight text-red-800 tracking-wide" style={{ fontSize: 9 }}>
-                {errMsg}
-              </p>
-            )}
-
-            <div className="flex gap-2 text-xs" style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>
-              <span>Network: {chain.name}</span>
-              <span>•</span>
-              <span>Stealth delay active</span>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '4px 12px' }}>
+              <GhostCapsule type="text" placeholder={`Amount (${chain.symbol})`} onValue={setAmount} className="w-full" />
             </div>
-
+            {errMsg && <span style={{ color: '#f87171', fontSize: 10 }}>{errMsg}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 8 }}>
+              <ChainIcon chain={chain} size={18} />
+              <span style={{ color: '#9ca3af', fontSize: 10 }}>Network: {chain.name}</span>
+              <span style={{ color: '#374151', fontSize: 9, marginLeft: 'auto' }}>Stealth delay active</span>
+            </div>
             <button
               onClick={handleSend}
               disabled={status === 'signing' || status === 'sending'}
-              className="w-full py-2.5 font-light text-black bg-white hover:bg-gray-100 transition-colors tracking-wider disabled:opacity-40"
-              style={{ fontSize: 11, borderRadius: 2 }}>
-              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : 'Confirm Send'}
+              style={{
+                background: status === 'signing' || status === 'sending' ? '#374151' : '#fff',
+                color: status === 'signing' || status === 'sending' ? '#9ca3af' : '#000',
+                border: 'none', borderRadius: 10, padding: '12px', fontSize: 13,
+                fontWeight: 600, cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s',
+              }}>
+              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${chain.symbol}`}
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-// ─── Chain Selector Dropdown ───────────────────────────────────────────────────
-interface ChainSelectorProps {
-  selected: Chain;
-  onChange: (chain: Chain) => void;
-}
-
-function ChainSelector({ selected, onChange }: ChainSelectorProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
+// ─── QR Modal ─────────────────────────────────────────────────────────────────
+function QRModal({ address, onClose }: { address: string; onClose: () => void }) {
+  // Simple QR placeholder — shows address in large mono text
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 transition-all"
-        style={{
-          border: '1px solid rgba(255,255,255,0.1)',
-          borderRadius: 3,
-          background: 'rgba(255,255,255,0.03)',
-          fontSize: 10,
-        }}>
-        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: selected.color }} />
-        <span className="font-light text-gray-300 tracking-wider">{selected.shortName}</span>
-        <ChevronDown size={10} className="text-gray-600" />
-      </button>
-
-      {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 w-48 bg-black"
-          style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: 3 }}>
-          {/* Featured chains */}
-          <div className="p-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-            <p className="font-extralight text-gray-700 tracking-widest mb-1.5" style={{ fontSize: 7 }}>
-              FEATURED
-            </p>
-            <div className="grid grid-cols-4 gap-1">
-              {FEATURED_CHAINS.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => { onChange(c); setOpen(false); }}
-                  className="flex flex-col items-center gap-0.5 py-1.5 px-1 transition-all hover:bg-white hover:bg-opacity-5 rounded"
-                  style={{ opacity: c.id === selected.id ? 1 : 0.6 }}>
-                  <div className="w-2 h-2 rounded-full" style={{ background: c.color }} />
-                  <span className="font-extralight text-gray-500 leading-none" style={{ fontSize: 7 }}>
-                    {c.shortName}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* All chains */}
-          <div className="py-1 max-h-48 overflow-y-auto">
-            {CHAINS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => { onChange(c); setOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-white hover:bg-opacity-5"
-                style={{ background: c.id === selected.id ? 'rgba(255,255,255,0.04)' : 'transparent' }}>
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: c.color }} />
-                <span className="font-extralight text-gray-400 tracking-wider flex-1" style={{ fontSize: 9 }}>
-                  {c.name}
-                </span>
-                {c.id === selected.id && <Check size={8} className="text-gray-600" />}
-              </button>
-            ))}
-          </div>
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: 16, width: 320, maxWidth: '92vw', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>Receive</span>
+          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={16} /></button>
         </div>
-      )}
+        {/* QR placeholder grid */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 16, width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <QrCode size={140} style={{ color: '#000' }} />
+        </div>
+        <p style={{ color: '#9ca3af', fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>
+          {address}
+        </p>
+        <p style={{ color: '#6b7280', fontSize: 9, textAlign: 'center' }}>
+          Send only compatible assets to this address
+        </p>
+      </div>
     </div>
   );
 }
 
-// ─── Main WalletDashboard ──────────────────────────────────────────────────────
+// ─── Main WalletDashboard ─────────────────────────────────────────────────────
 export function WalletDashboard() {
   const wallet = useWallet();
   const [activeTab, setActiveTab] = useState<Tab>('balance');
@@ -223,25 +231,27 @@ export function WalletDashboard() {
   const [isLoadingTxs, setIsLoadingTxs] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [showNetworks, setShowNetworks] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hideBalance, setHideBalance] = useState(false);
 
   const address = wallet.activeAddress;
+  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-5)}` : '—';
 
-  // ── Load token balances ──────────────────────────────────────────
+  // Load token balances
   const loadTokens = useCallback(async () => {
     if (!address) return;
     setIsLoadingTokens(true);
     try {
       const toks = await fetchTokenBalances(address, selectedChain.id);
       setTokens(toks);
-      // Fetch prices for all coingecko ids
-      const cgIds = toks
-        .map((t) => t.coingeckoId ?? getChainById(selectedChain.id)?.coingeckoId)
-        .filter(Boolean) as string[];
-      // Also add native chain coingecko id
-      if (selectedChain.coingeckoId) cgIds.push(selectedChain.coingeckoId);
+      const cgIds = [...new Set([
+        selectedChain.coingeckoId,
+        ...toks.map(t => t.coingeckoId).filter(Boolean) as string[],
+      ])];
       if (cgIds.length > 0) {
-        const p = await getPrices([...new Set(cgIds)]);
+        const p = await getPrices(cgIds);
         setPrices(p);
       }
     } finally {
@@ -249,7 +259,7 @@ export function WalletDashboard() {
     }
   }, [address, selectedChain.id]);
 
-  // ── Load transaction history ────────────────────────────────────
+  // Load TX history
   const loadTxs = useCallback(async () => {
     if (!address) return;
     setIsLoadingTxs(true);
@@ -261,231 +271,213 @@ export function WalletDashboard() {
     }
   }, [address, selectedChain.id]);
 
-  // Load on wallet unlock or chain change
   useEffect(() => {
     if (!wallet.isUnlocked || !address) { setTokens([]); setTxs([]); return; }
     loadTokens();
   }, [wallet.isUnlocked, address, selectedChain.id]);
 
   useEffect(() => {
-    if (activeTab === 'transactions' && wallet.isUnlocked && address) {
-      loadTxs();
-    }
+    if (activeTab === 'transactions' && wallet.isUnlocked && address) loadTxs();
   }, [activeTab, wallet.isUnlocked, address, selectedChain.id]);
 
-  // ── Copy address ─────────────────────────────────────────────────
   const handleCopy = async () => {
     if (!address) return;
-    try {
-      await navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
+    try { await navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
   };
 
-  // ── Refresh ──────────────────────────────────────────────────────
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([loadTokens(), activeTab === 'transactions' ? loadTxs() : Promise.resolve()]);
     setIsRefreshing(false);
   };
 
-  // ── Total USD balance ────────────────────────────────────────────
   const totalUSD = tokens.reduce((sum, t) => {
-    const cgId = t.coingeckoId ?? selectedChain.coingeckoId;
-    const price = cgId ? (prices[cgId] ?? 0) : 0;
-    return sum + parseFloat(t.balance) * price;
+    const price = t.coingeckoId ? (prices[t.coingeckoId] ?? 0) : (prices[selectedChain.coingeckoId] ?? 0);
+    return sum + parseFloat(t.balance || '0') * price;
   }, 0);
 
-  // Format address
-  const shortAddr = address
-    ? `${address.slice(0, 6)}...${address.slice(-4)}`
-    : '—';
-
-  const tabStyle = (tab: Tab): React.CSSProperties => ({
-    fontSize: 9,
-    letterSpacing: '0.15em',
-    borderBottom: activeTab === tab ? '1px solid rgba(255,255,255,0.3)' : '1px solid transparent',
-    color: activeTab === tab ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)',
-    paddingBottom: 6,
-    transition: 'all 0.15s',
-  });
+  // Featured 4 chains for the quick row
+  const featuredChains = CHAINS.slice(0, 4);
 
   if (!wallet.isUnlocked) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3">
-        <div className="w-px h-px bg-white rounded-full animate-ping" />
-        <p className="font-extralight text-gray-700 tracking-widest" style={{ fontSize: 9 }}>
-          Initializing...
-        </p>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.1)', borderTopColor: 'rgba(255,255,255,0.5)', animation: 'spin 1s linear infinite' }} />
+        <span style={{ color: '#6b7280', fontSize: 12 }}>Generating wallet...</span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
     <>
-      {showSend && (
-        <SendModal chain={selectedChain} onClose={() => setShowSend(false)} />
-      )}
+      {showSend && <SendModal chain={selectedChain} onClose={() => setShowSend(false)} />}
+      {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
+      {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <div className="flex flex-col h-full w-full">
+      <div style={{ background: '#000', minHeight: '100%', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* ── Header: Address + Chain + Badges ── */}
-        <div className="flex items-start justify-between px-5 pt-5 pb-3">
-          <div className="flex flex-col gap-1 min-w-0">
-            {/* Address + Volatile badge */}
-            <div className="flex items-center gap-2">
-              <p className="font-mono text-gray-300 tracking-wider" style={{ fontSize: 10 }}>
-                {shortAddr}
-              </p>
-              <span className="px-1.5 py-0.5 font-extralight text-gray-700 tracking-widest uppercase"
-                style={{ fontSize: 6, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 2 }}>
-                Volatile
-              </span>
-            </div>
-            {/* Network badge row */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="px-1.5 py-0.5 font-extralight tracking-widest uppercase"
-                style={{
-                  fontSize: 6,
-                  border: '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: 2,
-                  color: selectedChain.color,
-                }}>
-                {selectedChain.name}
-              </span>
-              <span className="px-1.5 py-0.5 font-extralight text-gray-700 tracking-widest uppercase"
-                style={{ fontSize: 6, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 2 }}>
-                GasLess
-              </span>
-              <span className="px-1.5 py-0.5 font-extralight text-gray-700 tracking-widest uppercase"
-                style={{ fontSize: 6, border: '1px solid rgba(255,255,255,0.07)', borderRadius: 2 }}>
-                EIP-7702
-              </span>
-            </div>
+        {/* ── Header ── */}
+        <div style={{ textAlign: 'center', paddingBottom: 4 }}>
+          <h2 style={{ color: '#f9fafb', fontSize: 18, fontWeight: 700, margin: 0 }}>New Session</h2>
+          <p style={{ color: '#6b7280', fontSize: 11, margin: '3px 0 0' }}>Volatile wallet — RAM only</p>
+        </div>
+
+        {/* ── Address Card (white) ── */}
+        <div style={{ background: '#fff', borderRadius: 16, padding: '14px 18px', textAlign: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 6, flexWrap: 'wrap' }}>
+            <span style={{ color: '#374151', fontSize: 12, fontWeight: 500 }}>
+              {selectedChain.name} Wallet
+            </span>
+            <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 9, padding: '2px 9px', borderRadius: 20, fontWeight: 600 }}>
+              GasLess / EIP-7702
+            </span>
           </div>
-
-          {/* Chain selector */}
-          <ChainSelector selected={selectedChain} onChange={setSelectedChain} />
+          <p style={{ color: '#1e3a8a', fontSize: 17, fontWeight: 700, letterSpacing: '0.03em', margin: 0, fontFamily: 'monospace', cursor: 'pointer' }}
+            onClick={handleCopy}>
+            {shortAddr}
+          </p>
+          <p style={{ color: '#9ca3af', fontSize: 9, margin: '4px 0 0' }}>
+            {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile mode — wipes on close'}
+          </p>
         </div>
 
-        {/* ── Action Buttons ── */}
-        <div className="flex items-center gap-2 px-5 pb-4">
-          <ActionBtn
-            icon={<Send size={10} />}
-            label="Send"
-            onClick={() => setShowSend(true)}
-          />
-          <ActionBtn
-            icon={copied ? <Check size={10} /> : <Copy size={10} />}
-            label={copied ? 'Copied' : 'Copy'}
-            onClick={handleCopy}
-          />
-          <ActionBtn
-            icon={<History size={10} />}
-            label="History"
-            onClick={() => setActiveTab('transactions')}
-            active={activeTab === 'transactions'}
-          />
-          <ActionBtn
-            icon={<RefreshCw size={10} className={isRefreshing ? 'animate-spin' : ''} />}
-            label="Refresh"
-            onClick={handleRefresh}
-          />
-          <ActionBtn
-            icon={<Zap size={10} />}
-            label="New"
-            onClick={() => {
-              wallet.wipeCopeWallet();
-              setTimeout(() => wallet.createCopeWallet(), 80);
-            }}
-          />
+        {/* ── Action Buttons (dark card) ── */}
+        <div style={{ background: '#141414', borderRadius: 16, padding: '14px 8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+            <ActionBtn icon={<QrCode size={18} />} label="Connect" color="#059669" onClick={() => setShowQR(true)} />
+            <ActionBtn icon={<Send size={18} />} label="Send" onClick={() => setShowSend(true)} />
+            <ActionBtn icon={copied ? <Check size={18} /> : <Copy size={18} />} label={copied ? 'Copied!' : 'Copy'} onClick={handleCopy} />
+            <ActionBtn
+              icon={<History size={18} />}
+              label="History"
+              active={activeTab === 'transactions'}
+              onClick={() => setActiveTab('transactions')}
+            />
+            <ActionBtn
+              icon={<RefreshCw size={18} />}
+              label="New"
+              onClick={() => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
+            />
+          </div>
         </div>
 
-        {/* ── Tabs ── */}
-        <div className="flex items-center gap-5 px-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-          <button style={tabStyle('balance')} onClick={() => setActiveTab('balance')}
-            className="uppercase tracking-widest font-extralight">
-            Balance
-          </button>
-          <button style={tabStyle('transactions')} onClick={() => setActiveTab('transactions')}
-            className="uppercase tracking-widest font-extralight">
-            Transactions
-          </button>
-          <button style={tabStyle('lightning')} onClick={() => setActiveTab('lightning')}
-            className="uppercase tracking-widest font-extralight">
-            Lightning
-          </button>
+        {/* ── Networks (dark card) ── */}
+        <div style={{ background: '#141414', borderRadius: 16, padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ color: '#f9fafb', fontSize: 13, fontWeight: 600 }}>More Networks</span>
+            <button
+              onClick={() => setShowNetworks(true)}
+              style={{ color: '#6b7280', background: 'none', border: 'none', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
+              See List <ChevronRight size={12} />
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+            {featuredChains.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedChain(c)}
+                style={{
+                  background: selectedChain.id === c.id ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
+                  border: selectedChain.id === c.id ? `1px solid ${c.color}66` : '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 10, padding: '10px 6px',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}>
+                <ChainIcon chain={c} size={36} />
+                <span style={{ color: '#e5e7eb', fontSize: 10, fontWeight: 700 }}>{c.name}</span>
+                <span style={{ color: c.color, fontSize: 8, fontWeight: 600 }}>Gasless</span>
+                <span style={{ color: '#4b5563', fontSize: 7 }}>EIP-7702</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* ── Tab Content ── */}
-        <div className="flex-1 overflow-y-auto">
+        {/* ── Balance / Transactions Card (white) ── */}
+        <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
+          {/* Tab bar */}
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px', borderBottom: '1px solid #f3f4f6' }}>
+            {(['balance', 'transactions', 'lightning'] as Tab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  background: 'none', border: 'none', padding: '13px 0', marginRight: 18,
+                  fontSize: 12, fontWeight: activeTab === tab ? 700 : 400,
+                  color: activeTab === tab ? '#111827' : '#9ca3af',
+                  borderBottom: activeTab === tab ? '2px solid #111827' : '2px solid transparent',
+                  cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}>
+                {tab === 'balance' ? 'Balance' : tab === 'transactions' ? 'Transactions' : 'Lightning Nodes'}
+              </button>
+            ))}
+            <button
+              onClick={handleRefresh}
+              style={{ marginLeft: 'auto', background: '#f9fafb', border: 'none', borderRadius: 8, padding: 7, cursor: 'pointer', display: 'flex', color: '#374151' }}>
+              <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
+            </button>
+          </div>
 
           {/* BALANCE TAB */}
           {activeTab === 'balance' && (
-            <div className="flex flex-col">
-              {/* Total Balance */}
-              <div className="px-5 py-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                <p className="font-extralight text-gray-600 tracking-widest uppercase mb-1" style={{ fontSize: 7 }}>
-                  Total Balance
-                </p>
-                <p className="font-thin text-white tracking-widest" style={{ fontSize: 26 }}>
-                  {formatUSD(totalUSD)}
-                </p>
+            <div style={{ padding: '14px 16px' }}>
+              {/* Total balance row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <span style={{ color: '#6b7280', fontSize: 11 }}>Total Balance</span>
+                    <button
+                      onClick={() => setHideBalance(!hideBalance)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', padding: 0 }}>
+                      {hideBalance ? <Eye size={12} /> : <EyeOff size={12} />}
+                    </button>
+                  </div>
+                  <span style={{ color: '#111827', fontSize: 26, fontWeight: 800 }}>
+                    {hideBalance ? '••••' : formatUSD(totalUSD)}
+                  </span>
+                </div>
+                <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 10, padding: '4px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600, marginTop: 4 }}>
+                  ↗ Live
+                </span>
               </div>
 
               {/* Token list */}
               {isLoadingTokens ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-px h-4 bg-white opacity-10 animate-pulse" />
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : tokens.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-8">
-                  <p className="font-extralight text-gray-700 tracking-widest" style={{ fontSize: 9 }}>
-                    No assets found
-                  </p>
-                  <p className="font-extralight text-gray-800 tracking-wider text-center px-8" style={{ fontSize: 8 }}>
-                    This wallet has no balances on {selectedChain.name}
-                  </p>
+                <div style={{ textAlign: 'center', padding: '16px 0', color: '#9ca3af', fontSize: 11 }}>
+                  No assets on {selectedChain.name}
                 </div>
               ) : (
-                <div className="flex flex-col divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   {tokens.map((token, i) => {
                     const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
                     const price = cgId ? (prices[cgId] ?? 0) : 0;
-                    const usdValue = parseFloat(token.balance) * price;
+                    const usdVal = parseFloat(token.balance || '0') * price;
                     return (
                       <div key={`${token.contractAddress}-${i}`}
-                        className="flex items-center justify-between px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          {token.logo ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={token.logo} alt={token.symbol} className="w-6 h-6 rounded-full"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center"
-                              style={{ background: 'rgba(255,255,255,0.05)', fontSize: 7 }}>
-                              <span className="font-extralight text-gray-600">{token.symbol.slice(0, 2)}</span>
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                        {token.logo
+                          ? <img src={token.logo} alt={token.symbol} style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          : (
+                            <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ color: '#374151', fontSize: 10, fontWeight: 700 }}>{token.symbol.slice(0, 2)}</span>
                             </div>
-                          )}
-                          <div>
-                            <p className="font-light text-gray-300 tracking-wider" style={{ fontSize: 10 }}>
-                              {token.symbol}
-                            </p>
-                            <p className="font-extralight text-gray-700 tracking-wide" style={{ fontSize: 8 }}>
-                              {token.name}
-                            </p>
-                          </div>
+                          )
+                        }
+                        <div style={{ flex: 1 }}>
+                          <p style={{ margin: 0, color: '#111827', fontSize: 13, fontWeight: 600 }}>{token.symbol}</p>
+                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 10 }}>{token.name.toUpperCase()}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-light text-gray-300 tracking-wider" style={{ fontSize: 10 }}>
-                            {token.balance}
+                        <div style={{ textAlign: 'right' }}>
+                          <p style={{ margin: 0, color: '#111827', fontSize: 12, fontWeight: 600 }}>
+                            {hideBalance ? '••••' : `${parseFloat(token.balance) < 0.000001 ? '< 0.000001' : token.balance} ${token.symbol}`}
                           </p>
-                          {price > 0 && (
-                            <p className="font-extralight text-gray-600 tracking-wide" style={{ fontSize: 8 }}>
-                              {formatUSD(usdValue)}
-                            </p>
-                          )}
+                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 10 }}>
+                            {price > 0 ? (hideBalance ? '••••' : formatUSD(usdVal)) : 'No price data'}
+                          </p>
                         </div>
                       </div>
                     );
@@ -497,114 +489,94 @@ export function WalletDashboard() {
 
           {/* TRANSACTIONS TAB */}
           {activeTab === 'transactions' && (
-            <div className="flex flex-col">
+            <div style={{ padding: '8px 0' }}>
               {isLoadingTxs ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-px h-4 bg-white opacity-10 animate-pulse" />
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+                  <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : txs.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-8">
-                  <p className="font-extralight text-gray-700 tracking-widest" style={{ fontSize: 9 }}>
-                    No transactions found
-                  </p>
-                  <p className="font-extralight text-gray-800 tracking-wider" style={{ fontSize: 8 }}>
-                    {selectedChain.isAlchemy ? `No activity on ${selectedChain.name}` : 'History requires Alchemy RPC'}
-                  </p>
+                <div style={{ textAlign: 'center', padding: '20px 16px', color: '#9ca3af', fontSize: 11 }}>
+                  {selectedChain.isAlchemy ? `No transactions on ${selectedChain.name}` : 'TX history requires Alchemy RPC'}
                 </div>
               ) : (
-                <div className="flex flex-col divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                  {txs.map((tx) => {
-                    const isOut = tx.direction === 'out';
-                    const date = tx.timestamp
-                      ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                      : '—';
-                    const explorerUrl = `${selectedChain.explorerUrl}/tx/${tx.hash}`;
-                    return (
-                      <a
-                        key={tx.hash}
-                        href={explorerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between px-5 py-3 hover:bg-white hover:bg-opacity-5 transition-colors group">
-                        <div className="flex items-center gap-3">
-                          <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ background: 'rgba(255,255,255,0.04)' }}>
-                            {isOut
-                              ? <ArrowUpRight size={9} className="text-gray-500" />
-                              : <ArrowDownLeft size={9} className="text-gray-500" />
-                            }
-                          </div>
-                          <div>
-                            <p className="font-light text-gray-300 tracking-wider" style={{ fontSize: 10 }}>
-                              {isOut ? 'Sent' : 'Received'}
-                            </p>
-                            <p className="font-extralight text-gray-700 tracking-wide font-mono" style={{ fontSize: 7 }}>
-                              {tx.hash.slice(0, 8)}...{tx.hash.slice(-4)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right flex flex-col items-end gap-0.5">
-                          <p className="font-light tracking-wider" style={{
-                            fontSize: 10,
-                            color: isOut ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.7)',
-                          }}>
-                            {isOut ? '-' : '+'}{tx.value} {tx.asset}
-                          </p>
-                          <p className="font-extralight text-gray-700 tracking-wide" style={{ fontSize: 7 }}>
-                            {date}
-                          </p>
-                        </div>
-                      </a>
-                    );
-                  })}
-                </div>
+                txs.map((tx) => {
+                  const isOut = tx.direction === 'out';
+                  const date = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                  return (
+                    <a key={tx.hash} href={`${selectedChain.explorerUrl}/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', textDecoration: 'none', borderBottom: '1px solid #f9fafb', transition: 'background 0.1s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: isOut ? '#fef2f2' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {isOut ? <ArrowUpRight size={15} style={{ color: '#ef4444' }} /> : <ArrowDownLeft size={15} style={{ color: '#22c55e' }} />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, color: '#111827', fontSize: 12, fontWeight: 600 }}>{isOut ? 'Sent' : 'Received'}</p>
+                        <p style={{ margin: 0, color: '#9ca3af', fontSize: 9, fontFamily: 'monospace' }}>
+                          {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: isOut ? '#ef4444' : '#22c55e' }}>
+                          {isOut ? '-' : '+'}{tx.value} {tx.asset}
+                        </p>
+                        <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>{date}</p>
+                      </div>
+                    </a>
+                  );
+                })
               )}
             </div>
           )}
 
           {/* LIGHTNING TAB */}
           {activeTab === 'lightning' && (
-            <div className="flex flex-col items-center gap-3 py-10 px-5">
-              <Zap size={16} className="text-gray-700" />
-              <p className="font-extralight text-gray-600 tracking-widest uppercase" style={{ fontSize: 8 }}>
-                Lightning Nodes
-              </p>
-              <p className="font-extralight text-gray-800 tracking-wider text-center max-w-xs" style={{ fontSize: 8 }}>
-                Lightning Network integration coming soon. Connect your node to enable instant payments.
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '28px 16px' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={22} style={{ color: '#ca8a04' }} />
+              </div>
+              <p style={{ color: '#374151', fontSize: 13, fontWeight: 600, margin: 0 }}>Lightning Nodes</p>
+              <p style={{ color: '#9ca3af', fontSize: 11, textAlign: 'center', maxWidth: 200, margin: 0, lineHeight: 1.5 }}>
+                Lightning Network integration coming soon. Connect your node for instant payments.
               </p>
             </div>
           )}
         </div>
+
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
       </div>
     </>
   );
 }
 
-// ─── Action Button ─────────────────────────────────────────────────────────────
-function ActionBtn({
-  icon, label, onClick, active = false,
-}: {
+// ─── Action Button ────────────────────────────────────────────────────────────
+function ActionBtn({ icon, label, onClick, color, active = false }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
+  color?: string;
   active?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1 px-3 py-2 transition-all hover:bg-white hover:bg-opacity-5"
       style={{
-        borderRadius: 3,
-        border: active ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.05)',
-        minWidth: 44,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px',
       }}>
-      <span style={{ color: active ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)' }}>
+      <div style={{
+        width: 46, height: 46, borderRadius: '50%',
+        background: color ? `${color}22` : active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)',
+        border: color ? `1px solid ${color}44` : active ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.15s',
+        color: color ?? (active ? '#fff' : '#e5e7eb'),
+      }}>
         {icon}
-      </span>
-      <span className="font-extralight tracking-widest uppercase"
-        style={{ fontSize: 6, color: active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)' }}>
-        {label}
-      </span>
+      </div>
+      <span style={{ color: '#9ca3af', fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap' }}>{label}</span>
     </button>
   );
 }
