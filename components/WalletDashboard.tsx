@@ -125,33 +125,50 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
 }
 
 // ─── Send Modal ───────────────────────────────────────────────────────────────
-function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
+function SendModal({ tokens, prices, defaultChain, onClose }: {
+  tokens: TokenBalance[];
+  prices: Record<string, number>;
+  defaultChain: Chain;
+  onClose: () => void;
+}) {
   const wallet = useWallet();
   const [to, setTo] = useState('');
-  const [amount, setAmount] = useState('');
+  // Split decimal: whole part + decimal part entered separately
+  const [whole, setWhole] = useState('');
+  const [dec, setDec] = useState('');
+  const [selectedChain, setSelectedChain] = useState<Chain>(defaultChain);
   const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
 
+  const amountStr = `${whole || '0'}.${dec || '0'}`;
+  const amountNum = parseFloat(amountStr);
+
+  // Only allow digit keypresses
+  const digitsOnly = (e: React.KeyboardEvent) => {
+    if (!/^\d$/.test(e.key) && !['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const handleSend = async () => {
     if (!wallet.activeAddress || !wallet.scatteredKeyStore) { setErrMsg('Wallet not ready'); return; }
     if (!ethers.isAddress(to)) { setErrMsg('Invalid address'); return; }
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { setErrMsg('Invalid amount'); return; }
+    if (!amountNum || amountNum <= 0 || isNaN(amountNum)) { setErrMsg('Invalid amount'); return; }
     setStatus('signing'); setErrMsg('');
     try {
-      const tx = await buildMaskedTransaction(to, amount, wallet.activeAddress, chain.id);
+      const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id);
       setStatus('sending');
       await stealthDelay();
       void fireDummyEchoes();
       const signed = await ephemeralSign(wallet.scatteredKeyStore, tx);
-      const provider = getProvider(chain.id);
+      const provider = getProvider(selectedChain.id);
       const sent = await provider.broadcastTransaction(signed);
       setTxHash(sent.hash);
       setStatus('done');
     } catch (e: unknown) {
       let msg = 'Transaction failed';
       if (e instanceof Error) {
-        // Extract short reason — strip JSON blobs
         const raw = e.message;
         const reasonMatch = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i)
           || raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
@@ -164,64 +181,115 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: 'transparent', border: 'none', outline: 'none',
+    color: '#fff', fontSize: 13, fontFamily: 'inherit',
+  };
+  const boxStyle: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.05)', borderRadius: '1rem',
+    padding: '10px 16px', border: '1px solid rgba(255,255,255,0.07)',
+  };
+
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       className="popup-backdrop"
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', padding: '28px 28px', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
-            Send {chain.symbol}
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', padding: '28px', border: '1px solid rgba(255,255,255,0.1)' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
+            Send
           </span>
           <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
             <X size={18} />
           </button>
         </div>
+
         {status === 'done' ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '24px 0' }}>
             <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '2px solid rgba(82,255,172,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Check size={26} style={{ color: '#52ffac' }} />
             </div>
-            <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase' }}>Broadcast!</span>
+            <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, textTransform: 'uppercase' }}>Broadcast!</span>
             <span style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{txHash}</span>
-            <a href={`${chain.explorerUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
+            <a href={`${selectedChain.explorerUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
               style={{ color: '#52ffac', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
               View on Explorer <ExternalLink size={12} />
             </a>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '10px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+
+            {/* Network selector */}
+            <div style={boxStyle}>
+              <p style={{ color: '#666', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6 }}>Network</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {CHAINS.filter(c => !c.isTestnet).map(c => (
+                  <button key={c.id} onClick={() => setSelectedChain(c)}
+                    style={{
+                      padding: '4px 10px', borderRadius: '2rem', fontSize: 10, fontWeight: 900,
+                      border: selectedChain.id === c.id ? `1.5px solid ${c.color}` : '1px solid rgba(255,255,255,0.1)',
+                      background: selectedChain.id === c.id ? `${c.color}18` : 'transparent',
+                      color: selectedChain.id === c.id ? c.color : '#888',
+                      cursor: 'pointer', transition: 'all 0.1s',
+                    }}>
+                    {c.shortName}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Recipient */}
+            <div style={boxStyle}>
               <input
                 type="text"
                 placeholder="Recipient address (0x...)"
                 autoComplete="off"
                 value={to}
                 onChange={e => setTo(e.target.value)}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: 'inherit' }}
+                style={inputStyle}
               />
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '10px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+
+            {/* Amount — split whole . decimal */}
+            <div style={{ ...boxStyle, display: 'flex', alignItems: 'center', gap: 0 }}>
               <input
                 type="text"
-                placeholder={`Amount (${chain.symbol})`}
+                inputMode="numeric"
+                placeholder="0"
                 autoComplete="off"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: 'inherit' }}
+                value={whole}
+                onKeyDown={digitsOnly}
+                onChange={e => setWhole(e.target.value.replace(/\D/g, ''))}
+                style={{ ...inputStyle, width: '40%', textAlign: 'right', fontSize: 20, fontWeight: 900 }}
               />
+              <span style={{ color: '#52ffac', fontSize: 24, fontWeight: 900, padding: '0 4px', flexShrink: 0 }}>.</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="00"
+                autoComplete="off"
+                value={dec}
+                onKeyDown={digitsOnly}
+                onChange={e => setDec(e.target.value.replace(/\D/g, '').slice(0, 18))}
+                style={{ ...inputStyle, width: '40%', fontSize: 20, fontWeight: 900 }}
+              />
+              <span style={{ color: '#666', fontSize: 11, fontWeight: 900, marginLeft: 'auto', flexShrink: 0 }}>{selectedChain.symbol}</span>
             </div>
+
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
+
             <button onClick={handleSend} disabled={status === 'signing' || status === 'sending'}
               style={{
                 background: status === 'signing' || status === 'sending' ? '#1a1a1a' : '#52ffac',
                 color: status === 'signing' || status === 'sending' ? '#c6c6c6' : '#002111',
                 border: 'none', borderRadius: '1rem', padding: '16px',
-                fontSize: 14, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase',
+                fontSize: 14, fontWeight: 900, textTransform: 'uppercase',
                 letterSpacing: '0.05em', cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s', marginTop: 4,
               }}>
-              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${chain.symbol}`}
+              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${selectedChain.symbol}`}
             </button>
           </div>
         )}
@@ -550,6 +618,31 @@ export function WalletDashboard() {
     loadTokens();
   }, [wallet.isUnlocked, address, selectedChain.id]);
 
+  // Auto-select network with highest USD balance on first unlock
+  const autoSelectedRef = React.useRef(false);
+  useEffect(() => {
+    if (!wallet.isUnlocked || !address || autoSelectedRef.current) return;
+    autoSelectedRef.current = true;
+    const alchemyChains = CHAINS.filter(c => c.isAlchemy && !c.isTestnet);
+    Promise.all(
+      alchemyChains.map(async c => {
+        try {
+          const toks = await fetchTokenBalances(address, c.id);
+          const cgIds = [...new Set(toks.map(t => t.coingeckoId).filter(Boolean) as string[]), c.coingeckoId];
+          const p = await getPrices(cgIds);
+          const usd = toks.reduce((s, t) => {
+            const cg = t.coingeckoId ?? c.coingeckoId;
+            return s + parseFloat(t.balance || '0') * (p[cg] ?? 0);
+          }, 0);
+          return { chain: c, usd };
+        } catch { return { chain: c, usd: 0 }; }
+      })
+    ).then(results => {
+      const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
+      if (best && best.usd > 0) setSelectedChain(best.chain);
+    }).catch(() => {});
+  }, [wallet.isUnlocked, address]);
+
   useEffect(() => {
     if (activeTab === 'transactions' && wallet.isUnlocked && address) loadTxs();
   }, [activeTab, wallet.isUnlocked, address, selectedChain.id]);
@@ -614,7 +707,7 @@ export function WalletDashboard() {
 
   return (
     <>
-      {showSend && <SendModal chain={selectedChain} onClose={() => setShowSend(false)} />}
+      {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
