@@ -137,8 +137,10 @@ export default function CopePage() {
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
+      if (!wallet.isUnlocked) { setPersistError('DBG: wallet not unlocked'); setIsProcessing(false); return; }
+      if (!wallet._v_enc) { setPersistError('DBG: _v_enc is null'); setIsProcessing(false); return; }
       const mnemonic = await wallet.getMnemonicForExport();
-      if (!mnemonic) throw new Error('Vault empty');
+      if (!mnemonic) { setPersistError('DBG: getMnemonicForExport returned null'); setIsProcessing(false); return; }
       await wallet.enablePersistentMode(passphrase);
       const hwId = await getHardwareUUID();
       const encPayload = encryptData(mnemonic, hwId + passphrase);
