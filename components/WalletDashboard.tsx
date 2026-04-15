@@ -474,14 +474,6 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionToggling, setSessionToggling] = useState(false);
-  // Debounce the loading state so brief wipe→create cycles don't flash the spinner
-  const [showLoading, setShowLoading] = useState(false);
-
-  useEffect(() => {
-    if (wallet.isUnlocked) { setShowLoading(false); return; }
-    const t = setTimeout(() => setShowLoading(true), 300);
-    return () => clearTimeout(t);
-  }, [wallet.isUnlocked]);
 
   const address = wallet.activeAddress;
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
@@ -540,7 +532,6 @@ export function WalletDashboard() {
 
   // ── Loading ──
   if (!wallet.isUnlocked) {
-    if (!showLoading) return <section className="flex-1 bg-surface overflow-y-auto" />;
     return (
       <section className="flex-1 bg-surface flex flex-col items-center justify-center overflow-y-auto">
         <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}

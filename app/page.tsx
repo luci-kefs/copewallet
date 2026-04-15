@@ -130,21 +130,18 @@ export default function CopePage() {
 
   // ── PERSIST SESSION ────────────────────────────────────────────
   const handlePersistSession = async () => {
-    if (!wallet.isUnlocked) { setPersistError('Wallet not ready'); return; }
     if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
       const mnemonic = await wallet.getMnemonicForExport();
-      if (!mnemonic) { setPersistError('Could not read wallet — try refreshing'); setIsProcessing(false); return; }
+      if (!mnemonic) throw new Error('Vault empty');
       await wallet.enablePersistentMode(passphrase);
       const hwId = await getHardwareUUID();
       const encPayload = encryptData(mnemonic, hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
-    } catch (e) {
-      setPersistError(e instanceof Error ? e.message : 'Operation failed. Try again.');
-    }
+    } catch { setPersistError('Operation failed. Try again.'); }
     finally { setIsProcessing(false); }
   };
 
@@ -390,17 +387,11 @@ export default function CopePage() {
                   </div>
                   {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
                 </div>
-                {(() => {
-                  const notReady = rightPanel === 'new_vault' && !wallet.isUnlocked;
-                  const disabled = isProcessing || notReady;
-                  return (
-                    <button onClick={handlePersistSession} disabled={disabled}
-                      className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${disabled ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
-                      <span>{isProcessing ? 'Processing...' : notReady ? 'Generating wallet...' : 'Forge Vault & Download Key'}</span>
-                      {!disabled && <span className="material-symbols-outlined text-2xl">download</span>}
-                    </button>
-                  );
-                })()}
+                <button onClick={handlePersistSession} disabled={isProcessing}
+                  className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
+                  <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
+                  {!isProcessing && <span className="material-symbols-outlined text-2xl">download</span>}
+                </button>
               </div>
             </motion.div>
           )}
