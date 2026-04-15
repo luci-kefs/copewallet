@@ -663,6 +663,31 @@ export function WalletDashboard() {
     return sum + parseFloat(t.balance || '0') * price;
   }, 0);
 
+  // Count-up animation for balance
+  const [displayUSD, setDisplayUSD] = useState(0);
+  const countUpRef = useRef<number | null>(null);
+  const prevUSDRef = useRef(0);
+  useEffect(() => {
+    if (isLoadingTokens) return;
+    const from = prevUSDRef.current;
+    const to = totalUSD;
+    prevUSDRef.current = to;
+    if (countUpRef.current) cancelAnimationFrame(countUpRef.current);
+    if (from === to) { setDisplayUSD(to); return; }
+    const duration = 900; // ms
+    const startTime = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayUSD(from + (to - from) * eased);
+      if (progress < 1) countUpRef.current = requestAnimationFrame(tick);
+    };
+    countUpRef.current = requestAnimationFrame(tick);
+    return () => { if (countUpRef.current) cancelAnimationFrame(countUpRef.current); };
+  }, [totalUSD, isLoadingTokens]);
+
   // ── Loading ──
   if (!wallet.isUnlocked && !everUnlocked) {
     return (
@@ -751,16 +776,11 @@ export function WalletDashboard() {
           <div className="space-y-6">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
-              <motion.h1
-                key={totalUSD}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-                className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
+              <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
                 {isLoadingTokens ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
-                ) : formatUSD(totalUSD)}
-              </motion.h1>
+                ) : formatUSD(displayUSD)}
+              </h1>
               {isRefreshing && (
                 <div className="mb-4" style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
               )}
