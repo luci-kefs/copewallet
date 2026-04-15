@@ -113,7 +113,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const mnemonicShownRef = useRef(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Ref backup for vault combined key — survives re-renders, complements module-level var
+  // Plain-text mnemonic ref — set on create/import, wiped on wipe. Avoids all decrypt issues.
+  const mnemonicRef = useRef<string | null>(null);
+  // Ref backup for vault combined key
   const vaultKeyRef = useRef<string | null>(null);
 
   // GHOST: no storage ops permitted below this line (EPHEMERAL mode boundary)
@@ -125,6 +127,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       scatteredKeyRef.current = null;
     }
     mnemonicShownRef.current = false;
+    mnemonicRef.current = null;
     _vaultCombinedKey = null;
     vaultKeyRef.current = null;
     setState(INITIAL_STATE);
@@ -171,9 +174,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const encMnemonic = encryptData(mnemonic, combinedKey);
       const encPrivKey = encryptData(privateKey, combinedKey);
 
-      // Track the combined key so getMnemonicForExport always has it
+      // Track the combined key and plain mnemonic for reliable export
       _vaultCombinedKey = combinedKey;
       vaultKeyRef.current = combinedKey;
+      mnemonicRef.current = mnemonic;
 
       // Scatter private key in memory
       scatteredKeyRef.current = scatterStore(privateKey);
@@ -231,9 +235,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const hwId = await getHardwareUUID();
       const combinedKey = getCurrentKey() + hwId;
 
-      // Track the combined key
+      // Track the combined key and plain mnemonic
       _vaultCombinedKey = combinedKey;
       vaultKeyRef.current = combinedKey;
+      mnemonicRef.current = mnemonic.trim();
 
       scatteredKeyRef.current = scatterStore(privateKey);
 
@@ -281,30 +286,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state._v_enc]);
 
-  // Secure mnemonic export — decrypts with full combinedKey including hwId
+  // Secure mnemonic export — reads from in-memory ref, no decrypt needed
   const getMnemonicForExport = useCallback(async (): Promise<string | null> => {
-    if (!state._v_enc) return null;
-    try {
-      const hwId = await getHardwareUUID();
-      const currentKey = getCurrentKey();
-      // Build candidate key list — prefer tracked keys (most reliable)
-      const candidates = Array.from(new Set([
-        _vaultCombinedKey,
-        vaultKeyRef.current,
-        currentKey + hwId,
-        currentKey,
-      ].filter(Boolean))) as string[];
-      for (const k of candidates) {
-        try {
-          const m = decryptData(state._v_enc, k);
-          if (m && m.trim().split(/\s+/).length >= 12) return m;
-        } catch {}
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }, [state._v_enc]);
+    return mnemonicRef.current ?? null;
+  }, []);
 
   // Persistent mode — Block 18 Task 2 (explicit user consent)
   // mnemonic is passed in directly (already decrypted by caller) to avoid double-decrypt
@@ -323,28 +308,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Block 36: localStorage session lock (device-bound, no passphrase)
   const enableSessionLock = useCallback(async () => {
-    if (!state._v_enc) return;
-    const hwId = await getHardwareUUID();
-    const currentKey = getCurrentKey();
-    const candidates = Array.from(new Set([
-      _vaultCombinedKey,
-      vaultKeyRef.current,
-      currentKey + hwId,
-      currentKey,
-    ].filter(Boolean))) as string[];
-    let mnemonic = '';
-    for (const k of candidates) {
-      try {
-        const m = decryptData(state._v_enc, k);
-        if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }
-      } catch {}
-    }
+    const mnemonic = mnemonicRef.current;
     if (!mnemonic) return;
-    // Encrypt with hwId only — no passphrase, device-bound
+    const hwId = await getHardwareUUID();
     const payload = encryptData(mnemonic, hwId);
     saveSession(payload);
     setState((p) => ({ ...p, isSessionLocked: true }));
-  }, [state._v_enc]);
+  }, []);
 
   const disableSessionLock = useCallback(() => {
     clearSession();
