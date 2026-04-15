@@ -54,16 +54,24 @@ export async function embedInPNG(secretText: string, filename = 'copewallet'): P
   const imageData = ctx.getImageData(0, 0, 256, 256);
   const data = imageData.data;
 
-  // Prepend magic bytes + length header
-  const payload = JSON.stringify({ v: 1, d: secretText });
-  const lengthBytes = new Uint32Array([payload.length]);
-  const header = new Uint8Array([
-    ...MAGIC,
-    ...new Uint8Array(lengthBytes.buffer),
-  ]);
+  // Encode payload as UTF-8 bytes first, then build header from byte length
+  const payloadStr = JSON.stringify({ v: 1, d: secretText });
+  const payloadBytes = new TextEncoder().encode(payloadStr);
+  const byteLen = payloadBytes.length;
 
-  const fullPayload = String.fromCharCode(...header) + payload;
-  const bits = stringToBits(fullPayload);
+  // Build full byte stream: magic(4) + length(4, little-endian) + payload bytes
+  const fullBytes = new Uint8Array(8 + byteLen);
+  fullBytes.set(MAGIC, 0);
+  new DataView(fullBytes.buffer).setUint32(4, byteLen, true);
+  fullBytes.set(payloadBytes, 8);
+
+  // Convert bytes to bits
+  const bits: number[] = [];
+  for (const byte of fullBytes) {
+    for (let i = 7; i >= 0; i--) {
+      bits.push((byte >> i) & 1);
+    }
+  }
 
   // Embed bits into R channel LSBs
   for (let i = 0; i < bits.length && i < data.length / 4; i++) {
@@ -126,14 +134,22 @@ export async function extractFromPNG(file: File): Promise<string> {
             }
           }
 
-          const length = new DataView(headerBytes.buffer).getUint32(4, true);
-          if (length <= 0 || length > totalPixels - HEADER_BYTES) {
+          const byteLen = new DataView(headerBytes.buffer).getUint32(4, true);
+          if (byteLen <= 0 || byteLen > totalPixels - HEADER_BYTES) {
             reject(new Error('Invalid Key'));
             return;
           }
 
-          const payloadBits = allBits.slice(HEADER_BYTES * 8, HEADER_BYTES * 8 + length * 8);
-          const payload = bitsToString(payloadBits);
+          // Reconstruct payload bytes from bits
+          const payloadBytes = new Uint8Array(byteLen);
+          for (let i = 0; i < byteLen; i++) {
+            let byte = 0;
+            for (let j = 0; j < 8; j++) {
+              byte = (byte << 1) | (allBits[HEADER_BYTES * 8 + i * 8 + j] ?? 0);
+            }
+            payloadBytes[i] = byte;
+          }
+          const payload = new TextDecoder().decode(payloadBytes);
 
           try {
             const parsed = JSON.parse(payload);
