@@ -11,6 +11,7 @@ interface CountUpProps {
   className?: string;
   startWhen?: boolean;
   separator?: string;
+  minDecimals?: number;
   onStart?: () => void;
   onEnd?: () => void;
 }
@@ -24,6 +25,7 @@ export default function CountUp({
   className = '',
   startWhen = true,
   separator = '',
+  minDecimals,
   onStart,
   onEnd,
 }: CountUpProps) {
@@ -45,7 +47,7 @@ export default function CountUp({
     return 0;
   };
 
-  const maxDecimals = Math.max(getDecimalPlaces(from), getDecimalPlaces(to));
+  const maxDecimals = Math.max(getDecimalPlaces(from), getDecimalPlaces(to), minDecimals ?? 0);
 
   const formatValue = useCallback(
     (latest: number) => {

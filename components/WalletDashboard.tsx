@@ -619,7 +619,7 @@ export function WalletDashboard() {
   }, [wallet.isUnlocked, address, selectedChain.id]);
 
   // Auto-select network with highest USD balance on first unlock
-  const autoSelectedRef = React.useRef(false);
+  const autoSelectedRef = useRef(false);
   useEffect(() => {
     if (!wallet.isUnlocked || !address || autoSelectedRef.current) return;
     autoSelectedRef.current = true;
@@ -628,18 +628,23 @@ export function WalletDashboard() {
       alchemyChains.map(async c => {
         try {
           const toks = await fetchTokenBalances(address, c.id);
-          const cgIds = [...new Set(toks.map(t => t.coingeckoId).filter(Boolean) as string[]), c.coingeckoId];
+          const cgIds = [...new Set([c.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
           const p = await getPrices(cgIds);
           const usd = toks.reduce((s, t) => {
             const cg = t.coingeckoId ?? c.coingeckoId;
             return s + parseFloat(t.balance || '0') * (p[cg] ?? 0);
           }, 0);
-          return { chain: c, usd };
-        } catch { return { chain: c, usd: 0 }; }
+          return { chain: c, usd, toks, p };
+        } catch { return { chain: c, usd: 0, toks: [], p: {} }; }
       })
     ).then(results => {
       const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
-      if (best && best.usd > 0) setSelectedChain(best.chain);
+      if (best && best.usd > 0) {
+        // Set chain, tokens and prices all at once to avoid 0-flash
+        setSelectedChain(best.chain);
+        setTokens(best.toks);
+        setPrices(best.p);
+      }
     }).catch(() => {});
   }, [wallet.isUnlocked, address]);
 
@@ -668,6 +673,7 @@ export function WalletDashboard() {
   const [countFrom, setCountFrom] = useState(0);
   const [countTo, setCountTo] = useState(0);
   const [countKey, setCountKey] = useState(0);
+  const [showFullBalance, setShowFullBalance] = useState(false);
   useEffect(() => {
     if (isLoadingTokens) return;
     setCountFrom(prevTotalUSDRef.current);
@@ -768,16 +774,41 @@ export function WalletDashboard() {
                 {isLoadingTokens ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
                 ) : (
-                  <span>
+                  <span className="flex items-baseline gap-0">
                     <span className="text-on-surface-variant opacity-60">$</span>
-                    <CountUp
-                      key={countKey}
-                      from={countFrom}
-                      to={countTo}
-                      separator=","
-                      duration={1.2}
-                      startWhen={!isLoadingTokens}
-                    />
+                    {/* Whole part hidden behind ••• until tapped, decimal always visible */}
+                    {showFullBalance ? (
+                      // Full balance with separator
+                      <CountUp
+                        key={countKey}
+                        from={countFrom}
+                        to={countTo}
+                        separator=","
+                        duration={2.5}
+                        startWhen={!isLoadingTokens}
+                      />
+                    ) : (
+                      <span className="flex items-baseline gap-0">
+                        {/* ••• tappable whole-number mask */}
+                        <button
+                          onClick={() => setShowFullBalance(true)}
+                          className="hover:opacity-60 transition-opacity font-black"
+                          style={{ fontSize: 'inherit', background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, color: 'rgba(255,255,255,0.25)', letterSpacing: '-0.02em' }}>
+                          •••
+                        </button>
+                        {/* Always-visible decimal part */}
+                        <span style={{ color: 'rgba(255,255,255,0.4)' }}>.</span>
+                        <CountUp
+                          key={countKey + '_dec'}
+                          from={parseFloat((countFrom % 1).toFixed(2))}
+                          to={parseFloat((countTo % 1).toFixed(2))}
+                          duration={2.5}
+                          minDecimals={2}
+                          startWhen={!isLoadingTokens}
+                          className="opacity-40"
+                        />
+                      </span>
+                    )}
                   </span>
                 )}
               </h1>
