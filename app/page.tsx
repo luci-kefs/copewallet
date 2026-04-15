@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Image from 'next/image';
 import { Shield, Download, RefreshCw, Upload, Lock, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
@@ -139,7 +138,7 @@ export default function CopePage() {
     try {
       const mnemonic = await wallet.getMnemonicForExport();
       if (!mnemonic) throw new Error('Vault empty');
-      await wallet.enablePersistentMode(passphrase);
+      await wallet.enablePersistentMode(passphrase, mnemonic);
       const hwId = await getHardwareUUID();
       const encPayload = encryptData(mnemonic, hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
@@ -360,7 +359,8 @@ export default function CopePage() {
                 {/* Brand logo clickable area (panic trigger) */}
                 <div ref={logoRef} data-aethilm="brand" onClick={handleLogoPanic} className="absolute inset-0 cursor-pointer z-10">
                   {logoUrl && !logoError && (
-                    <Image src={logoUrl} alt="Cope Wallet" fill style={{ objectFit: 'cover', opacity: 0.4 }} onError={() => setLogoError(true)} />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={logoUrl} alt="Cope Wallet" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4 }} onError={() => setLogoError(true)} />
                   )}
                 </div>
                 <img

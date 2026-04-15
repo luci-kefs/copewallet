@@ -82,7 +82,7 @@ interface WalletContextType extends WalletState {
   getMnemonicForExport: () => Promise<string | null>;
   activeAddress: string | null;
   scatteredKeyStore: ScatteredStore | null;
-  enablePersistentMode: (passphrase: string) => Promise<void>;
+  enablePersistentMode: (passphrase: string, mnemonic: string) => Promise<void>;
   unlockPersistentVault: (passphrase: string) => Promise<void>;
   enableSessionLock: () => Promise<void>;
   disableSessionLock: () => void;
@@ -113,6 +113,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const mnemonicShownRef = useRef(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref backup for vault combined key — survives re-renders, complements module-level var
+  const vaultKeyRef = useRef<string | null>(null);
 
   // GHOST: no storage ops permitted below this line (EPHEMERAL mode boundary)
 
@@ -124,6 +126,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
     mnemonicShownRef.current = false;
     _vaultCombinedKey = null;
+    vaultKeyRef.current = null;
     setState(INITIAL_STATE);
     stopKeyRotation();
     stopHeapNoise();
@@ -170,6 +173,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       // Track the combined key so getMnemonicForExport always has it
       _vaultCombinedKey = combinedKey;
+      vaultKeyRef.current = combinedKey;
 
       // Scatter private key in memory
       scatteredKeyRef.current = scatterStore(privateKey);
@@ -195,6 +199,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             const rawPrivKey = decryptData(prev._k_enc, oldCombined);
             // Update the tracked combined key to the new one
             _vaultCombinedKey = newCombined;
+            vaultKeyRef.current = newCombined;
             return {
               ...prev,
               _v_enc: encryptData(rawMnemonic, newCombined),
@@ -228,6 +233,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       // Track the combined key
       _vaultCombinedKey = combinedKey;
+      vaultKeyRef.current = combinedKey;
 
       scatteredKeyRef.current = scatterStore(privateKey);
 
@@ -281,9 +287,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     try {
       const hwId = await getHardwareUUID();
       const currentKey = getCurrentKey();
-      // Build candidate key list — prefer the tracked combined key (most reliable)
+      // Build candidate key list — prefer tracked keys (most reliable)
       const candidates = Array.from(new Set([
         _vaultCombinedKey,
+        vaultKeyRef.current,
         currentKey + hwId,
         currentKey,
       ].filter(Boolean))) as string[];
@@ -300,26 +307,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [state._v_enc]);
 
   // Persistent mode — Block 18 Task 2 (explicit user consent)
-  const enablePersistentMode = useCallback(async (passphrase: string) => {
-    if (!state._v_enc) return;
-    const hwId = await getHardwareUUID();
-    const currentKey = getCurrentKey();
-    const candidates = Array.from(new Set([
-      _vaultCombinedKey,
-      currentKey + hwId,
-      currentKey,
-    ].filter(Boolean))) as string[];
-    let mnemonic = '';
-    for (const k of candidates) {
-      try {
-        const m = decryptData(state._v_enc, k);
-        if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }
-      } catch {}
-    }
+  // mnemonic is passed in directly (already decrypted by caller) to avoid double-decrypt
+  const enablePersistentMode = useCallback(async (passphrase: string, mnemonic: string) => {
     if (!mnemonic) throw new Error('Vault empty');
+    const hwId = await getHardwareUUID();
     await persistVault(mnemonic, passphrase, hwId);
     setState((p) => ({ ...p, mode: 'PERSISTENT' }));
-  }, [state._v_enc]);
+  }, []);
 
   const unlockPersistentVault = useCallback(async (passphrase: string) => {
     const hwId = await getHardwareUUID();
@@ -334,6 +328,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     const currentKey = getCurrentKey();
     const candidates = Array.from(new Set([
       _vaultCombinedKey,
+      vaultKeyRef.current,
       currentKey + hwId,
       currentKey,
     ].filter(Boolean))) as string[];
