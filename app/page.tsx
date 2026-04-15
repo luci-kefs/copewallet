@@ -149,12 +149,14 @@ export default function CopePage() {
     finally { setIsProcessing(false); }
   };
 
-  const handleInitNewVault = async () => {
+  const handleInitNewVault = () => {
     wallet.disableSessionLock();
     wallet.wipeCopeWallet();
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
-    await wallet.createCopeWallet();
+    // createCopeWallet is called by the page-level useEffect that watches for unlocked=false
+    // trigger it after a tick so wipe state settles first
+    setTimeout(() => wallet.createCopeWallet(), 50);
   };
 
   const handleFileDrop = async (file: File) => {
@@ -375,11 +377,17 @@ export default function CopePage() {
                   </div>
                   {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
                 </div>
-                <button onClick={handlePersistSession} disabled={isProcessing || !wallet.isUnlocked}
-                  className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing || !wallet.isUnlocked ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
-                  <span>{isProcessing ? 'Processing...' : !wallet.isUnlocked ? 'Generating wallet...' : 'Forge Vault & Download Key'}</span>
-                  {!isProcessing && wallet.isUnlocked && <span className="material-symbols-outlined text-2xl">download</span>}
-                </button>
+                {(() => {
+                  const notReady = rightPanel === 'new_vault' && !wallet.isUnlocked;
+                  const disabled = isProcessing || notReady;
+                  return (
+                    <button onClick={handlePersistSession} disabled={disabled}
+                      className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${disabled ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
+                      <span>{isProcessing ? 'Processing...' : notReady ? 'Generating wallet...' : 'Forge Vault & Download Key'}</span>
+                      {!disabled && <span className="material-symbols-outlined text-2xl">download</span>}
+                    </button>
+                  );
+                })()}
               </div>
             </motion.div>
           )}
