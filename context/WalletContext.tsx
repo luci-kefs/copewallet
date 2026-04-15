@@ -68,6 +68,10 @@ const _updateDecoys = () => {
   _wallet_backup = Math.random().toString(36).repeat(4);
 };
 
+// Module-level vault key tracker — updated on every createCopeWallet / importCopeWallet
+// and re-updated on every key rotation, so getMnemonicForExport always has the right key
+let _vaultCombinedKey: string | null = null;
+
 interface WalletContextType extends WalletState {
   createCopeWallet: () => Promise<void>;
   importCopeWallet: (mnemonic: string) => Promise<void>;
@@ -119,6 +123,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       scatteredKeyRef.current = null;
     }
     mnemonicShownRef.current = false;
+    _vaultCombinedKey = null;
     setState(INITIAL_STATE);
     stopKeyRotation();
     stopHeapNoise();
@@ -163,6 +168,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const encMnemonic = encryptData(mnemonic, combinedKey);
       const encPrivKey = encryptData(privateKey, combinedKey);
 
+      // Track the combined key so getMnemonicForExport always has it
+      _vaultCombinedKey = combinedKey;
+
       // Scatter private key in memory
       scatteredKeyRef.current = scatterStore(privateKey);
 
@@ -182,14 +190,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           const hwUUID = hwId;
           const oldCombined = oldKey + hwUUID;
           const newCombined = newKey + hwUUID;
-          const rawMnemonic = decryptData(prev._v_enc, oldCombined);
-          const rawPrivKey = decryptData(prev._k_enc, oldCombined);
-          return {
-            ...prev,
-            _v_enc: encryptData(rawMnemonic, newCombined),
-            _k_enc: encryptData(rawPrivKey, newCombined),
-            isPulseActive: true,
-          };
+          try {
+            const rawMnemonic = decryptData(prev._v_enc, oldCombined);
+            const rawPrivKey = decryptData(prev._k_enc, oldCombined);
+            // Update the tracked combined key to the new one
+            _vaultCombinedKey = newCombined;
+            return {
+              ...prev,
+              _v_enc: encryptData(rawMnemonic, newCombined),
+              _k_enc: encryptData(rawPrivKey, newCombined),
+              isPulseActive: true,
+            };
+          } catch {
+            // Rotation failed — keep existing encryption, don't corrupt vault
+            return prev;
+          }
         });
         setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 500);
       });
@@ -210,6 +225,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       const hwId = await getHardwareUUID();
       const combinedKey = getCurrentKey() + hwId;
+
+      // Track the combined key
+      _vaultCombinedKey = combinedKey;
 
       scatteredKeyRef.current = scatterStore(privateKey);
 
@@ -262,7 +280,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!state._v_enc) return null;
     try {
       const hwId = await getHardwareUUID();
-      for (const k of [getCurrentKey() + hwId, getCurrentKey()]) {
+      const currentKey = getCurrentKey();
+      // Build candidate key list — prefer the tracked combined key (most reliable)
+      const candidates = Array.from(new Set([
+        _vaultCombinedKey,
+        currentKey + hwId,
+        currentKey,
+      ].filter(Boolean))) as string[];
+      for (const k of candidates) {
         try {
           const m = decryptData(state._v_enc, k);
           if (m && m.trim().split(/\s+/).length >= 12) return m;
@@ -278,8 +303,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const enablePersistentMode = useCallback(async (passphrase: string) => {
     if (!state._v_enc) return;
     const hwId = await getHardwareUUID();
+    const currentKey = getCurrentKey();
+    const candidates = Array.from(new Set([
+      _vaultCombinedKey,
+      currentKey + hwId,
+      currentKey,
+    ].filter(Boolean))) as string[];
     let mnemonic = '';
-    for (const k of [getCurrentKey() + hwId, getCurrentKey()]) {
+    for (const k of candidates) {
       try {
         const m = decryptData(state._v_enc, k);
         if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }
@@ -300,7 +331,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const enableSessionLock = useCallback(async () => {
     if (!state._v_enc) return;
     const hwId = await getHardwareUUID();
-    const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
+    const currentKey = getCurrentKey();
+    const candidates = Array.from(new Set([
+      _vaultCombinedKey,
+      currentKey + hwId,
+      currentKey,
+    ].filter(Boolean))) as string[];
+    let mnemonic = '';
+    for (const k of candidates) {
+      try {
+        const m = decryptData(state._v_enc, k);
+        if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }
+      } catch {}
+    }
     if (!mnemonic) return;
     // Encrypt with hwId only — no passphrase, device-bound
     const payload = encryptData(mnemonic, hwId);
