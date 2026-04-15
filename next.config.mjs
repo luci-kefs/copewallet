@@ -26,7 +26,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com",
-              "img-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://assets.coingecko.com https://coin-images.coingecko.com data: blob:",
+              "img-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://assets.coingecko.com https://coin-images.coingecko.com https://lh3.googleusercontent.com data: blob:",
               "font-src 'self' https://fonts.gstatic.com",
               "frame-ancestors 'none'",
             ].join('; '),

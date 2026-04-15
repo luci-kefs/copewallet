@@ -9,27 +9,29 @@
 }
 
 * {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: #222222 #000000;
 }
 
-*::-webkit-scrollbar {
-  display: none;
-}
+*::-webkit-scrollbar { width: 6px; }
+*::-webkit-scrollbar-track { background: #000000; }
+*::-webkit-scrollbar-thumb { background: #222222; border-radius: 10px; }
+*::-webkit-scrollbar-thumb:hover { background: #333333; }
 
 html,
 body {
   overflow: hidden;
   background: #000000;
   color: #ffffff;
-  font-family: 'Inter', 'Geist', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-user-select: none;
   user-select: none;
 }
 
 /* OCR/screenshot discouragement */
 ::selection {
-  background: transparent;
+  background: #52ffac;
+  color: #002111;
 }
 
 /* Material Symbols base */
@@ -45,20 +47,62 @@ body {
   white-space: nowrap;
   word-wrap: normal;
   direction: ltr;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   -webkit-font-feature-settings: 'liga';
   font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
 
+.monolith-gradient {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0) 100%);
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #353535;
+  transition: .4s;
+  border-radius: 24px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .slider {
+  background-color: #52ffac;
+}
+input:checked + .slider:before {
+  transform: translateX(24px);
+  background-color: #000000;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
 }
 
 /* Subtle noise texture for screenshot protection */

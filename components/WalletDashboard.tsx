@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Send, Copy, History, RefreshCw, Check, X,
-  ExternalLink, ArrowUpRight, ArrowDownLeft, Eye, EyeOff,
-  Zap, Wifi, WifiOff, AlertCircle, Link,
+  Copy, Check, X, ExternalLink,
+  ArrowUpRight, ArrowDownLeft, Zap, Wifi, WifiOff, AlertCircle, Link,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
@@ -38,27 +37,19 @@ const CHAIN_SVG_PATHS: Record<string, React.ReactNode> = {
   GNO:   <><circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.15" stroke="currentColor" strokeWidth="1.5"/><path d="M9 9 L15 15 M15 9 L9 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></>,
 };
 
-// ─── Chain SVG Icon ───────────────────────────────────────────────────────────
 function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
   const [imgErr, setImgErr] = useState(false);
   const svgPath = CHAIN_SVG_PATHS[chain.shortName];
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: `${chain.color}18`,
-      border: `1.5px solid ${chain.color}44`,
+      background: `${chain.color}18`, border: `1.5px solid ${chain.color}44`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0, overflow: 'hidden',
     }}>
       {chain.logoUrl && !imgErr ? (
-        <img
-          src={chain.logoUrl}
-          alt={chain.shortName}
-          width={size * 0.7}
-          height={size * 0.7}
-          style={{ borderRadius: '50%', objectFit: 'cover' }}
-          onError={() => setImgErr(true)}
-        />
+        <img src={chain.logoUrl} alt={chain.shortName} width={size * 0.7} height={size * 0.7}
+          style={{ borderRadius: '50%', objectFit: 'cover' }} onError={() => setImgErr(true)} />
       ) : svgPath ? (
         <svg viewBox="0 0 24 24" width={size * 0.56} height={size * 0.56} style={{ color: chain.color }}>
           {svgPath}
@@ -74,29 +65,22 @@ function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
 
 // ─── All Networks Modal ───────────────────────────────────────────────────────
 function AllNetworksModal({ selected, onSelect, onClose }: {
-  selected: Chain;
-  onSelect: (c: Chain) => void;
-  onClose: () => void;
+  selected: Chain; onSelect: (c: Chain) => void; onClose: () => void;
 }) {
   const smart = CHAINS.filter(c => c.isAlchemy && !c.isTestnet);
   const eoa = CHAINS.filter(c => !c.isAlchemy && !c.isTestnet);
   const testnets = CHAINS.filter(c => c.isTestnet);
 
   const ChainCard = ({ c }: { c: Chain }) => (
-    <button
-      onClick={() => { onSelect(c); onClose(); }}
-      style={{
-        background: selected.id === c.id ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
-        border: selected.id === c.id ? `1.5px solid #52ffac44` : '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 12, padding: '12px 8px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-        cursor: 'pointer', position: 'relative', transition: 'all 0.15s', width: '100%',
-      }}>
+    <button onClick={() => { onSelect(c); onClose(); }} style={{
+      background: selected.id === c.id ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
+      border: selected.id === c.id ? '1.5px solid rgba(82,255,172,0.4)' : '1px solid rgba(255,255,255,0.07)',
+      borderRadius: '1.5rem', padding: '12px 8px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+      cursor: 'pointer', position: 'relative', transition: 'all 0.15s', width: '100%',
+    }}>
       {selected.id === c.id && (
-        <div style={{
-          position: 'absolute', top: 7, right: 7,
-          width: 7, height: 7, borderRadius: '50%', background: '#52ffac',
-        }} />
+        <div style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: '50%', background: '#52ffac' }} />
       )}
       <ChainIcon chain={c} size={34} />
       <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 700 }}>{c.symbol}</span>
@@ -104,50 +88,36 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
       {c.isTestnet
         ? <span style={{ background: '#4c1d9533', color: '#a78bfa', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>TESTNET</span>
         : c.isAlchemy
-          ? <span style={{ background: 'rgba(82,255,172,0.1)', color: '#52ffac', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>GASLESS</span>
-          : <span style={{ background: '#353535', color: '#c6c6c6', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>EOA</span>
+          ? <span style={{ background: 'rgba(82,255,172,0.1)', color: '#52ffac', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>GASLESS</span>
+          : <span style={{ background: '#353535', color: '#c6c6c6', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>EOA</span>
       }
     </button>
   );
 
   return (
-    <div
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{
-        background: '#111', borderRadius: 24, width: 360, maxWidth: '92vw',
-        maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.1)',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.8)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>All Networks</span>
-          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+      <div style={{ background: '#111', borderRadius: '2rem', width: 380, maxWidth: '92vw', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>All Networks</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
             <X size={16} />
           </button>
         </div>
-        <div style={{ overflowY: 'auto', padding: '16px 20px', flex: 1 }}>
-          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase' }}>
-            Smart Wallets (Gasless) ⓘ
-          </p>
+        <div style={{ overflowY: 'auto', padding: '16px 24px', flex: 1 }}>
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.15em', fontWeight: 900, marginBottom: 12, textTransform: 'uppercase' }}>Smart Wallets (Gasless)</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
             {smart.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase' }}>
-            EOA Wallets ⓘ
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.15em', fontWeight: 900, marginBottom: 12, textTransform: 'uppercase' }}>EOA Wallets</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
             {eoa.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 10, marginTop: 16, textTransform: 'uppercase' }}>
-            Testnets (Free)
-          </p>
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.15em', fontWeight: 900, marginBottom: 12, textTransform: 'uppercase' }}>Testnets (Free)</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
             {testnets.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>
-            {CHAINS.length} networks supported
-          </p>
+          <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>{CHAINS.length} networks</p>
         </div>
       </div>
     </div>
@@ -186,50 +156,45 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: 24, width: 360, maxWidth: '92vw', padding: 20, border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>Send {chain.symbol}</span>
-          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
-            <X size={16} />
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', padding: '28px 28px', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
+            Send {chain.symbol}
+          </span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
+            <X size={18} />
           </button>
         </div>
         {status === 'done' ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '20px 0' }}>
-            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '1.5px solid rgba(82,255,172,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Check size={22} style={{ color: '#52ffac' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '24px 0' }}>
+            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '2px solid rgba(82,255,172,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={26} style={{ color: '#52ffac' }} />
             </div>
-            <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase' }}>Broadcast!</span>
+            <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase' }}>Broadcast!</span>
             <span style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{txHash}</span>
             <a href={`${chain.explorerUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
-              style={{ color: '#52ffac', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-              View on Explorer <ExternalLink size={10} />
+              style={{ color: '#52ffac', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
+              View on Explorer <ExternalLink size={12} />
             </a>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '4px 12px', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <GhostCapsule type="text" placeholder={`Recipient address (0x...)`} onValue={setTo} className="w-full" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '6px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <GhostCapsule type="text" placeholder="Recipient address (0x...)" onValue={setTo} className="w-full" />
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '4px 12px', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '6px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
               <GhostCapsule type="text" placeholder={`Amount (${chain.symbol})`} onValue={setAmount} className="w-full" />
             </div>
-            {errMsg && <span style={{ color: '#ffdad6', fontSize: 10 }}>{errMsg}</span>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
-              <ChainIcon chain={chain} size={18} />
-              <span style={{ color: '#c6c6c6', fontSize: 10 }}>Network: {chain.name}</span>
-              <span style={{ color: '#353535', fontSize: 9, marginLeft: 'auto' }}>Stealth delay active</span>
-            </div>
-            <button
-              onClick={handleSend}
-              disabled={status === 'signing' || status === 'sending'}
+            {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
+            <button onClick={handleSend} disabled={status === 'signing' || status === 'sending'}
               style={{
                 background: status === 'signing' || status === 'sending' ? '#1a1a1a' : '#52ffac',
-                color: status === 'signing' || status === 'sending' ? '#c6c6c6' : '#000',
-                border: 'none', borderRadius: 12, padding: '13px', fontSize: 13,
-                fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '0.03em',
-                cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s',
+                color: status === 'signing' || status === 'sending' ? '#c6c6c6' : '#002111',
+                border: 'none', borderRadius: '1rem', padding: '16px',
+                fontSize: 14, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase',
+                letterSpacing: '0.05em', cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
+                transition: 'all 0.15s', marginTop: 4,
               }}>
               {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${chain.symbol}`}
             </button>
@@ -250,21 +215,29 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
   };
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: 24, width: 300, maxWidth: '92vw', padding: '22px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 32px 80px rgba(0,0,0,0.9)' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: '2rem', width: 320, maxWidth: '92vw', padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, border: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>Receive</span>
-          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, padding: 7, cursor: 'pointer', display: 'flex' }}><X size={14} /></button>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>Receive</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
+          </button>
         </div>
-        <div style={{ background: '#fff', borderRadius: 16, padding: 14 }}>
-          <QRCodeSVG value={address} size={180} level="M" />
+        <div style={{ background: '#fff', borderRadius: '1rem', padding: 16 }}>
+          <QRCodeSVG value={address} size={200} level="M" />
         </div>
-        <p style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0, padding: '0 4px' }}>
+        <p style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0 }}>
           {address}
         </p>
-        <button onClick={copy}
-          style={{ background: copied ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '8px 18px', fontSize: 10, color: copied ? '#52ffac' : '#c6c6c6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700 }}>
-          {copied ? <><Check size={11} /> Copied!</> : <><Copy size={11} /> Copy Address</>}
+        <button onClick={copy} style={{
+          background: copied ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${copied ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`,
+          borderRadius: '1rem', padding: '10px 20px', fontSize: 11,
+          color: copied ? '#52ffac' : '#c6c6c6', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6, fontWeight: 900,
+          textTransform: 'uppercase', letterSpacing: '0.1em',
+        }}>
+          {copied ? <><Check size={12} /> Copied!</> : <><Copy size={12} /> Copy Address</>}
         </button>
         <p style={{ color: '#353535', fontSize: 9, textAlign: 'center', margin: 0 }}>
           Send only EVM-compatible assets to this address
@@ -277,7 +250,7 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
 // ─── Lightning Tab ────────────────────────────────────────────────────────────
 type LnStatus = 'idle' | 'connecting' | 'connected' | 'error';
 type LnSubTab = 'receive' | 'send';
-interface WebLNNode { alias?: string; pubkey?: string; color?: string; }
+interface WebLNNode { alias?: string; pubkey?: string; }
 
 function LightningTab() {
   const [status, setStatus] = useState<LnStatus>('idle');
@@ -305,10 +278,7 @@ function LightningTab() {
       await webln.enable();
       const info = await webln.getInfo();
       setNodeInfo(info?.node ?? {});
-      try {
-        const bal = await webln.getBalance?.();
-        if (bal?.balance != null) setBalance(bal.balance);
-      } catch {}
+      try { const bal = await webln.getBalance?.(); if (bal?.balance != null) setBalance(bal.balance); } catch {}
       setStatus('connected');
     } catch { setStatus('error'); }
   };
@@ -321,9 +291,8 @@ function LightningTab() {
     try {
       const result = await webln.makeInvoice({ amount: sats, defaultMemo: recvMemo || 'Cope Wallet' });
       setInvoice(result.paymentRequest);
-    } catch (e: unknown) {
-      setGenError(e instanceof Error ? e.message : 'Invoice generation failed');
-    } finally { setGenLoading(false); }
+    } catch (e: unknown) { setGenError(e instanceof Error ? e.message : 'Invoice generation failed'); }
+    finally { setGenLoading(false); }
   };
 
   const copyInvoice = async () => {
@@ -346,17 +315,14 @@ function LightningTab() {
     }
   };
 
-  // ── No WebLN ──
   if (!hasWebLN) {
     return (
-      <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <AlertCircle size={14} style={{ color: '#facc15', flexShrink: 0, marginTop: 1 }} />
+      <div className="space-y-3 p-6 bg-surface-container-low rounded-xl border border-white/5">
+        <div className="flex items-start gap-4 p-4 bg-surface-container rounded-xl border border-white/5">
+          <AlertCircle size={16} className="text-yellow-400 mt-0.5 shrink-0" />
           <div>
-            <p style={{ color: '#facc15', fontSize: 11, fontWeight: 700, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>No Lightning Provider</p>
-            <p style={{ color: '#c6c6c6', fontSize: 10, margin: 0, lineHeight: 1.5 }}>
-              Install a WebLN-compatible browser extension to enable Lightning payments.
-            </p>
+            <p className="font-black text-white text-xs uppercase tracking-widest mb-1">No Lightning Provider</p>
+            <p className="text-on-surface-variant text-xs leading-relaxed">Install a WebLN-compatible browser extension to enable Lightning payments.</p>
           </div>
         </div>
         {[
@@ -364,105 +330,95 @@ function LightningTab() {
           { name: 'Zeus', desc: 'Connect your own LND / Core Lightning node', badge: 'Self-custody' },
           { name: 'Mutiny Wallet', desc: 'Browser-native Lightning + on-chain wallet', badge: 'PWA' },
         ].map(p => (
-          <div key={p.name} style={{ background: '#0d0d0d', borderRadius: 12, padding: '10px 12px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Zap size={14} style={{ color: '#facc15' }} />
+          <div key={p.name} className="flex items-center gap-4 p-4 bg-surface-container rounded-xl border border-white/5">
+            <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center shrink-0">
+              <Zap size={16} className="text-yellow-400" />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>{p.name}</span>
-                <span style={{ background: 'rgba(82,255,172,0.1)', color: '#52ffac', fontSize: 8, padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{p.badge}</span>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-white text-sm">{p.name}</span>
+                <span className="bg-tertiary/10 text-tertiary text-[10px] px-2 py-0.5 rounded-full font-black">{p.badge}</span>
               </div>
-              <p style={{ color: '#c6c6c6', fontSize: 9, margin: '2px 0 0' }}>{p.desc}</p>
+              <p className="text-on-surface-variant text-xs mt-0.5">{p.desc}</p>
             </div>
-            <Link size={12} style={{ color: '#353535', flexShrink: 0 }} />
+            <Link size={14} className="text-surface-variant shrink-0" />
           </div>
         ))}
-        <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>After installing, reload this page to activate Lightning.</p>
+        <p className="text-surface-variant text-xs text-center">After installing, reload this page to activate Lightning.</p>
       </div>
     );
   }
 
-  // ── Not connected ──
   if (status === 'idle' || status === 'error') {
     return (
-      <div style={{ padding: '18px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {status === 'error' ? <WifiOff size={20} style={{ color: '#facc15' }} /> : <Zap size={20} style={{ color: '#facc15' }} />}
+      <div className="flex flex-col items-center gap-6 p-8 bg-surface-container-low rounded-xl border border-white/5">
+        <div className="w-16 h-16 rounded-full bg-yellow-400/10 border border-yellow-400/30 flex items-center justify-center">
+          {status === 'error' ? <WifiOff size={24} className="text-yellow-400" /> : <Zap size={24} className="text-yellow-400" />}
         </div>
-        <p style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: 0 }}>Lightning Network</p>
-        <p style={{ color: '#c6c6c6', fontSize: 10, textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
-          {status === 'error' ? 'Connection failed. Make sure your node is online and try again.' : 'Connect your WebLN node to send and receive Lightning payments instantly.'}
-        </p>
-        <button onClick={connect}
-          style={{ background: '#facc15', color: '#000', border: 'none', borderRadius: 10, padding: '9px 22px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Wifi size={12} /> Connect Node
+        <div className="text-center">
+          <p className="font-black text-white text-lg uppercase italic tracking-tighter">Lightning Network</p>
+          <p className="text-on-surface-variant text-xs mt-1 leading-relaxed max-w-xs">
+            {status === 'error' ? 'Connection failed. Make sure your node is online and try again.' : 'Connect your WebLN node to send and receive Lightning payments instantly.'}
+          </p>
+        </div>
+        <button onClick={connect} className="bg-yellow-400 text-black font-black uppercase tracking-widest text-xs px-6 py-3 rounded-xl flex items-center gap-2 active:scale-95 transition-transform">
+          <Wifi size={14} /> Connect Node
         </button>
       </div>
     );
   }
 
-  // ── Connecting ──
   if (status === 'connecting') {
     return (
-      <div style={{ padding: '18px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-          style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(250,204,21,0.15)', borderTopColor: '#facc15' }} />
-        <p style={{ color: '#c6c6c6', fontSize: 10 }}>Requesting permission...</p>
+      <div className="flex flex-col items-center gap-4 p-8">
+        <div style={{ width: 32, height: 32, borderRadius: '50%', border: '2px solid rgba(250,204,21,0.2)', borderTopColor: '#facc15', animation: 'spin 1s linear infinite' }} />
+        <p className="text-on-surface-variant text-xs">Requesting permission...</p>
       </div>
     );
   }
 
-  // ── Connected ──
   return (
-    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '8px 12px', border: '1px solid rgba(250,204,21,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ color: '#fff', fontSize: 11, fontWeight: 700, margin: 0 }}>{nodeInfo?.alias || 'Lightning Node'}</p>
-          {nodeInfo?.pubkey && (
-            <p style={{ color: '#c6c6c6', fontSize: 8, fontFamily: 'monospace', margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {nodeInfo.pubkey.slice(0, 20)}...{nodeInfo.pubkey.slice(-8)}
-            </p>
-          )}
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-3 p-4 bg-surface-container rounded-xl border border-yellow-400/20">
+        <div className="w-2 h-2 rounded-full bg-tertiary shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-white text-sm">{nodeInfo?.alias || 'Lightning Node'}</p>
+          {nodeInfo?.pubkey && <p className="text-on-surface-variant text-[10px] font-mono truncate">{nodeInfo.pubkey.slice(0, 20)}...{nodeInfo.pubkey.slice(-8)}</p>}
         </div>
         {balance != null && (
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <p style={{ color: '#facc15', fontSize: 12, fontWeight: 700, margin: 0 }}>{balance.toLocaleString()}</p>
-            <p style={{ color: '#c6c6c6', fontSize: 8, margin: 0 }}>sats</p>
+          <div className="text-right shrink-0">
+            <p className="font-black text-yellow-400 text-sm">{balance.toLocaleString()}</p>
+            <p className="text-on-surface-variant text-[10px]">sats</p>
           </div>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 4, background: '#0d0d0d', borderRadius: 8, padding: 3, border: '1px solid #1a1a1a' }}>
+      <div className="flex gap-1 p-1 bg-surface-container rounded-xl border border-white/5">
         {(['receive', 'send'] as LnSubTab[]).map(t => (
           <button key={t} onClick={() => { setSubTab(t); setPayStatus('idle'); setInvoice(''); }}
-            style={{ flex: 1, background: subTab === t ? '#1a1a1a' : 'none', border: subTab === t ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent', borderRadius: 6, padding: '5px 0', fontSize: 10, fontWeight: subTab === t ? 700 : 400, color: subTab === t ? '#52ffac' : '#c6c6c6', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-colors ${subTab === t ? 'bg-surface-container-high text-white border border-white/10' : 'text-on-surface-variant hover:text-white'}`}>
             {t === 'receive' ? '↓ Receive' : '↑ Send'}
           </button>
         ))}
       </div>
 
       {subTab === 'receive' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="space-y-3">
+          <div className="bg-white/5 rounded-xl p-3 border border-white/7">
             <GhostCapsule type="text" placeholder="Amount (sats)" onValue={setRecvAmount} className="w-full" />
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="bg-white/5 rounded-xl p-3 border border-white/7">
             <GhostCapsule type="text" placeholder="Memo (optional)" onValue={setRecvMemo} className="w-full" />
           </div>
-          {genError && <p style={{ color: '#ffdad6', fontSize: 9, margin: 0 }}>{genError}</p>}
+          {genError && <p className="text-on-error-container text-xs">{genError}</p>}
           <button onClick={makeInvoice} disabled={genLoading}
-            style={{ background: genLoading ? '#1a1a1a' : '#facc15', color: genLoading ? '#c6c6c6' : '#000', border: 'none', borderRadius: 10, padding: '9px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: genLoading ? 'not-allowed' : 'pointer' }}>
+            className={`w-full py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-[0.98] ${genLoading ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed' : 'bg-yellow-400 text-black'}`}>
             {genLoading ? 'Generating...' : 'Generate Invoice'}
           </button>
           {invoice && (
-            <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '8px 10px', border: '1px solid rgba(250,204,21,0.2)' }}>
-              <p style={{ color: '#c6c6c6', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', margin: '0 0 6px', lineHeight: 1.4 }}>
-                {invoice.slice(0, 60)}...
-              </p>
-              <button onClick={copyInvoice}
-                style={{ background: invoiceCopied ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${invoiceCopied ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 6, padding: '5px 10px', fontSize: 9, color: invoiceCopied ? '#52ffac' : '#c6c6c6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
+            <div className="bg-surface-container rounded-xl p-3 border border-yellow-400/20 space-y-2">
+              <p className="text-on-surface-variant text-[10px] font-mono break-all leading-relaxed">{invoice.slice(0, 60)}...</p>
+              <button onClick={copyInvoice} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black ${invoiceCopied ? 'bg-tertiary/10 text-tertiary border border-tertiary/30' : 'bg-white/5 text-on-surface-variant border border-white/10'}`}>
                 {invoiceCopied ? <><Check size={10} /> Copied!</> : <><Copy size={10} /> Copy Full Invoice</>}
               </button>
             </div>
@@ -471,36 +427,30 @@ function LightningTab() {
       )}
 
       {subTab === 'send' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="space-y-3">
           {payStatus === 'done' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '10px 0' }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '1px solid rgba(82,255,172,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Check size={20} style={{ color: '#52ffac' }} />
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="w-12 h-12 rounded-full bg-tertiary/10 border border-tertiary/30 flex items-center justify-center">
+                <Check size={20} className="text-tertiary" />
               </div>
-              <p style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: 0 }}>Payment Sent!</p>
-              {payPreimage && (
-                <p style={{ color: '#c6c6c6', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0 }}>
-                  Preimage: {payPreimage.slice(0, 20)}...
-                </p>
-              )}
+              <p className="font-black text-white uppercase italic text-base tracking-tighter">Payment Sent!</p>
+              {payPreimage && <p className="text-on-surface-variant text-[10px] font-mono break-all text-center">Preimage: {payPreimage.slice(0, 20)}...</p>}
               <button onClick={() => { setPayStatus('idle'); setPayReq(''); setPayPreimage(''); }}
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 16px', fontSize: 10, color: '#c6c6c6', cursor: 'pointer', fontWeight: 600 }}>
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-on-surface-variant font-black">
                 Send Another
               </button>
             </div>
           ) : (
             <>
-              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="bg-white/5 rounded-xl p-3 border border-white/7">
                 <GhostCapsule type="text" placeholder="Paste BOLT11 invoice (lnbc...)" onValue={setPayReq} className="w-full" />
               </div>
-              {payError && <p style={{ color: '#ffdad6', fontSize: 9, margin: 0 }}>{payError}</p>}
+              {payError && <p className="text-on-error-container text-xs">{payError}</p>}
               <button onClick={payInvoice} disabled={payStatus === 'paying' || !payReq.trim()}
-                style={{ background: payStatus === 'paying' ? '#1a1a1a' : '#facc15', color: payStatus === 'paying' ? '#c6c6c6' : '#000', border: 'none', borderRadius: 10, padding: '9px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: payStatus === 'paying' || !payReq.trim() ? 'not-allowed' : 'pointer' }}>
+                className={`w-full py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all active:scale-[0.98] ${payStatus === 'paying' || !payReq.trim() ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed' : 'bg-yellow-400 text-black'}`}>
                 {payStatus === 'paying' ? 'Sending...' : '⚡ Pay Invoice'}
               </button>
-              <p style={{ color: '#353535', fontSize: 8, textAlign: 'center', margin: 0 }}>
-                Supports BOLT11 invoices · Powered by WebLN
-              </p>
+              <p className="text-surface-variant text-[10px] text-center">Supports BOLT11 invoices · Powered by WebLN</p>
             </>
           )}
         </div>
@@ -524,24 +474,18 @@ export function WalletDashboard() {
   const [showNetworks, setShowNetworks] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [hideBalance, setHideBalance] = useState(false);
   const [sessionToggling, setSessionToggling] = useState(false);
 
   const address = wallet.activeAddress;
-  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-5)}` : '—';
+  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
 
   const handleSessionToggle = async () => {
-    if (sessionToggling) return;
+    if (sessionToggling || !wallet.isUnlocked) return;
     setSessionToggling(true);
     try {
-      if (wallet.isSessionLocked) {
-        wallet.disableSessionLock();
-      } else {
-        await wallet.enableSessionLock();
-      }
-    } finally {
-      setSessionToggling(false);
-    }
+      if (wallet.isSessionLocked) wallet.disableSessionLock();
+      else await wallet.enableSessionLock();
+    } finally { setSessionToggling(false); }
   };
 
   const loadTokens = useCallback(async () => {
@@ -550,24 +494,16 @@ export function WalletDashboard() {
     try {
       const toks = await fetchTokenBalances(address, selectedChain.id);
       setTokens(toks);
-      const cgIds = [...new Set([
-        selectedChain.coingeckoId,
-        ...toks.map(t => t.coingeckoId).filter(Boolean) as string[],
-      ])];
-      if (cgIds.length > 0) {
-        const p = await getPrices(cgIds);
-        setPrices(p);
-      }
+      const cgIds = [...new Set([selectedChain.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
+      if (cgIds.length > 0) { const p = await getPrices(cgIds); setPrices(p); }
     } finally { setIsLoadingTokens(false); }
   }, [address, selectedChain.id]);
 
   const loadTxs = useCallback(async () => {
     if (!address) return;
     setIsLoadingTxs(true);
-    try {
-      const history = await fetchTxHistory(address, selectedChain.id);
-      setTxs(history);
-    } finally { setIsLoadingTxs(false); }
+    try { const history = await fetchTxHistory(address, selectedChain.id); setTxs(history); }
+    finally { setIsLoadingTxs(false); }
   }, [address, selectedChain.id]);
 
   useEffect(() => {
@@ -595,21 +531,16 @@ export function WalletDashboard() {
     return sum + parseFloat(t.balance || '0') * price;
   }, 0);
 
-  const featuredChains = CHAINS.slice(0, 4);
-
-  // ── Loading state ──
+  // ── Loading ──
   if (!wallet.isUnlocked) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-          style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.15)', borderTopColor: '#52ffac' }}
-        />
-        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ color: '#c6c6c6', fontSize: 11, letterSpacing: '0.08em' }}>
+      <section className="flex-1 bg-surface flex flex-col items-center justify-center overflow-y-auto">
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.15)', borderTopColor: '#52ffac' }} />
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-on-surface-variant text-xs font-black uppercase tracking-[0.2em] mt-4">
           Generating wallet...
-        </motion.span>
-      </div>
+        </motion.p>
+      </section>
     );
   }
 
@@ -619,296 +550,227 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
+        <div className="max-w-3xl mx-auto w-full space-y-12">
 
-        {/* ── Network Pill ── */}
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={() => setShowNetworks(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1a1a1a', border: '1px solid #353535', borderRadius: 100, padding: '5px 12px 5px 6px', cursor: 'pointer' }}>
-            <ChainIcon chain={selectedChain} size={22} />
-            <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>{selectedChain.name}</span>
-            <span style={{ color: '#52ffac', fontSize: 11, lineHeight: 1, marginLeft: 1 }}>▾</span>
-          </button>
-          <span style={{
-            background: selectedChain.isTestnet ? '#4c1d9533' : selectedChain.isAlchemy ? 'rgba(82,255,172,0.1)' : '#353535',
-            color: selectedChain.isTestnet ? '#a78bfa' : selectedChain.isAlchemy ? '#52ffac' : '#c6c6c6',
-            fontSize: 8, padding: '2px 9px', borderRadius: 20, fontWeight: 700, letterSpacing: '0.08em',
-          }}>
-            {selectedChain.isTestnet ? 'TESTNET' : selectedChain.isAlchemy ? 'GASLESS' : 'EOA'}
-          </span>
-        </motion.div>
-
-        {/* ── Session Heading ── */}
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.03 }}>
-          <h2 style={{
-            fontSize: 26, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase',
-            color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.05,
-          }}>
-            {wallet.mode === 'PERSISTENT' ? 'Persistent\nSession' : 'New\nSession'}
-          </h2>
-          <p style={{ color: '#c6c6c6', fontSize: 9, margin: '4px 0 0', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            {wallet.mode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile · RAM Only'}
-          </p>
-        </motion.div>
-
-        {/* ── Session Lock Toggle ── */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: 0.06 }}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, borderTop: '1px solid #1a1a1a' }}>
-          <span style={{ color: '#c6c6c6', fontSize: 9, flex: 1, letterSpacing: '0.04em' }}>Keep session on refresh</span>
-          <button
-            onClick={handleSessionToggle}
-            disabled={sessionToggling || !wallet.isUnlocked}
-            aria-label="Toggle session lock"
-            style={{
-              width: 44, height: 24, borderRadius: 12,
-              background: wallet.isSessionLocked ? '#52ffac' : '#353535',
-              border: 'none',
-              cursor: sessionToggling || !wallet.isUnlocked ? 'not-allowed' : 'pointer',
-              position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0,
-              opacity: !wallet.isUnlocked ? 0.4 : 1,
-            }}>
-            <div style={{
-              position: 'absolute', top: 3, left: wallet.isSessionLocked ? 23 : 3,
-              width: 18, height: 18, borderRadius: '50%',
-              background: wallet.isSessionLocked ? '#000' : '#fff',
-              transition: 'left 0.2s',
-            }} />
-          </button>
-        </motion.div>
-
-        {/* ── Balance ── */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.08 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700 }}>
-              Total Curated Value
-            </span>
-            <button onClick={() => setHideBalance(!hideBalance)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#353535', padding: 0, display: 'flex' }}>
-              {hideBalance ? <Eye size={11} /> : <EyeOff size={11} />}
-            </button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: '#52ffac', fontSize: 30, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em', lineHeight: 1 }}>
-              {hideBalance ? '••••' : formatUSD(totalUSD)}
-            </span>
-            {isLoadingTokens && (
-              <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-            )}
-          </div>
-        </motion.div>
-
-        {/* ── Address Card ── */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.1 }}
-          style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ color: '#9ca3af', fontSize: 8, margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
-              {selectedChain.isAlchemy ? 'Smart Wallet · EIP-7702' : 'EOA Wallet'}
-            </p>
-            <span style={{ color: '#000', fontSize: 12, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: '0.02em' }} onClick={handleCopy}>
-              {shortAddr}
-            </span>
-          </div>
-          <button onClick={handleCopy} style={{ background: copied ? '#dcfce7' : '#f3f4f6', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: copied ? '#16a34a' : '#6b7280' }}>
-            {copied ? <><Check size={10} /><span style={{ fontSize: 9, fontWeight: 700 }}>Copied!</span></> : <Copy size={11} />}
-          </button>
-        </motion.div>
-
-        {/* ── 2×2 Action Grid ── */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.12 }}
-          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {[
-            { icon: 'qr_code_2', label: 'RECEIVE', sub: 'Show QR code', onClick: () => setShowQR(true), accent: '#52ffac' },
-            { icon: 'send', label: 'SEND', sub: `Transfer ${selectedChain.symbol}`, onClick: () => setShowSend(true), accent: '#fff' },
-            { icon: 'content_copy', label: copied ? 'COPIED!' : 'COPY ADDR', sub: 'Copy to clipboard', onClick: handleCopy, accent: copied ? '#52ffac' : '#fff' },
-            { icon: 'bolt', label: 'LIGHTNING', sub: 'WebLN payments', onClick: () => setActiveTab('lightning'), accent: activeTab === 'lightning' ? '#facc15' : '#fff' },
-          ].map((item) => (
-            <button key={item.label} onClick={item.onClick} style={{
-              background: '#1a1a1a',
-              border: `1px solid ${item.accent === '#52ffac' || item.accent === '#facc15' ? item.accent + '33' : '#353535'}`,
-              borderRadius: 14, padding: '12px 10px',
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
-              cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s',
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: item.accent, lineHeight: 1 }}>
-                {item.icon}
-              </span>
-              <div>
-                <p style={{ color: '#fff', fontSize: 10, fontWeight: 900, letterSpacing: '0.06em', margin: 0 }}>{item.label}</p>
-                <p style={{ color: '#c6c6c6', fontSize: 8, margin: '2px 0 0' }}>{item.sub}</p>
-              </div>
-            </button>
-          ))}
-        </motion.div>
-
-        {/* ── Quick Switch Networks ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.15 }}
-          style={{ background: '#0d0d0d', borderRadius: 14, padding: '10px 12px', border: '1px solid #1a1a1a' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#c6c6c6', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Quick Switch</span>
+          {/* ── Header Actions ── */}
+          <div className="flex justify-between items-center">
             <button
               onClick={() => setShowNetworks(true)}
-              style={{ color: '#52ffac', background: 'none', border: 'none', fontSize: 9, cursor: 'pointer', fontWeight: 700, letterSpacing: '0.06em' }}>
-              All Networks →
+              className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors">
+              <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
+              <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">{selectedChain.name}</span>
+              <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, marginBottom: 8 }}>
-            {featuredChains.map((c) => (
-              <button key={c.id} onClick={() => setSelectedChain(c)} style={{
-                background: selectedChain.id === c.id ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
-                border: selectedChain.id === c.id ? '1px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 8, padding: '6px 4px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer',
-              }}>
-                <ChainIcon chain={c} size={24} />
-                <span style={{ color: '#e5e7eb', fontSize: 8, fontWeight: 700 }}>{c.shortName}</span>
-                {c.isTestnet
-                  ? <span style={{ color: '#a78bfa', fontSize: 6, fontWeight: 700 }}>TEST</span>
-                  : <span style={{ color: selectedChain.id === c.id ? '#52ffac' : '#353535', fontSize: 6, fontWeight: 700 }}>
-                      {c.isAlchemy ? '7702' : 'EOA'}
-                    </span>
-                }
-              </button>
-            ))}
-          </div>
-          <ChainMarquee />
-        </motion.div>
 
-        {/* ── Balance / Txs / Lightning Card ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.32, delay: 0.18 }}
-          style={{ background: '#111', borderRadius: 16, overflow: 'hidden', border: '1px solid #1a1a1a' }}>
-          {/* Tab bar */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid #1a1a1a' }}>
-            {(['balance', 'transactions', 'lightning'] as Tab[]).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  background: 'none', border: 'none', padding: '10px 0', marginRight: 14,
-                  fontSize: 10, fontWeight: activeTab === tab ? 700 : 400,
-                  color: activeTab === tab ? '#52ffac' : '#c6c6c6',
-                  borderBottom: activeTab === tab ? '2px solid #52ffac' : '2px solid transparent',
-                  cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
-                }}>
-                {tab === 'balance' ? 'Balance' : tab === 'transactions' ? 'Txs' : '⚡ Lightning'}
-              </button>
-            ))}
+          {/* ── Session Heading ── */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+                {wallet.mode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
+              </h2>
+              <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
+                {wallet.mode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
+              </p>
+            </div>
+            <div className="flex items-center justify-between py-4 border-y border-white/5">
+              <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={wallet.isSessionLocked}
+                  onChange={handleSessionToggle}
+                  disabled={sessionToggling || !wallet.isUnlocked}
+                />
+                <span className="slider"></span>
+              </label>
+            </div>
+          </div>
+
+          {/* ── Balance Section ── */}
+          <div className="space-y-6">
+            <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
+            <div className="flex items-end gap-4">
+              <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
+                {isLoadingTokens ? (
+                  <span className="text-on-surface-variant opacity-30">...</span>
+                ) : formatUSD(totalUSD)}
+              </h1>
+              {isRefreshing && (
+                <div className="mb-4" style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
+              )}
+            </div>
+
+            {/* ── Address Card ── */}
+            <div
+              className="bg-white text-black p-8 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
+              onClick={handleCopy}>
+              <div className="flex flex-col">
+                <span className="text-[0.7rem] font-black uppercase tracking-widest opacity-60 mb-2">Active Monolith Address</span>
+                <span className="text-3xl font-black tracking-tighter font-mono">{shortAddr}</span>
+              </div>
+              <span className="material-symbols-outlined text-4xl">{copied ? 'check' : 'content_copy'}</span>
+            </div>
+          </div>
+
+          {/* ── Action Grid ── */}
+          <div className="grid grid-cols-2 gap-4">
             <button
-              onClick={handleRefresh}
-              style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: 6, padding: 5, cursor: 'pointer', display: 'flex', color: '#c6c6c6' }}>
-              <RefreshCw size={10} className={isRefreshing ? 'animate-spin' : ''} />
+              onClick={() => setShowNetworks(true)}
+              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">power</span>
+              <span className="font-black uppercase tracking-widest text-[0.65rem]">Connect</span>
+            </button>
+            <button
+              onClick={() => setShowSend(true)}
+              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">north_east</span>
+              <span className="font-black uppercase tracking-widest text-[0.65rem]">Send</span>
+            </button>
+            <button
+              onClick={() => setShowQR(true)}
+              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">qr_code_2</span>
+              <span className="font-black uppercase tracking-widest text-[0.65rem]">Qr / Receive</span>
+            </button>
+            <button
+              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
+              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">add_card</span>
+              <span className="font-black uppercase tracking-widest text-[0.65rem]">Create New Wallet</span>
             </button>
           </div>
 
-          {/* BALANCE TAB */}
-          {activeTab === 'balance' && (
-            <div style={{ padding: '10px 12px' }}>
-              {isLoadingTokens ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
-                </div>
-              ) : tokens.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '14px 0', color: '#c6c6c6', fontSize: 10 }}>
-                  No assets on {selectedChain.name}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                  {tokens.map((token, i) => {
+          {/* ── Tabs & List ── */}
+          <div className="pt-8">
+            <div className="flex gap-12 mb-8 border-b border-white/5">
+              <button
+                onClick={() => setActiveTab('balance')}
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'balance' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                Balance
+              </button>
+              <button
+                onClick={() => { setActiveTab('transactions'); }}
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'transactions' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab('lightning')}
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'lightning' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                ⚡ Lightning
+              </button>
+              <button onClick={handleRefresh} className="ml-auto pb-4 text-on-surface-variant hover:text-white transition-colors">
+                <span className={`material-symbols-outlined text-base ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
+              </button>
+            </div>
+
+            {/* BALANCE TAB */}
+            {activeTab === 'balance' && (
+              <div className="space-y-3">
+                {isLoadingTokens ? (
+                  <div className="flex justify-center py-12">
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
+                  </div>
+                ) : tokens.length === 0 ? (
+                  <div className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5">
+                    <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">No assets on {selectedChain.name}</p>
+                  </div>
+                ) : (
+                  tokens.map((token, i) => {
                     const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
                     const price = cgId ? (prices[cgId] ?? 0) : 0;
                     const usdVal = parseFloat(token.balance || '0') * price;
                     return (
                       <div key={`${token.contractAddress}-${i}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i > 0 ? '1px solid #1a1a1a' : 'none' }}>
-                        {token.logo
-                          ? <img src={token.logo} alt={token.symbol} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          : (
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <span style={{ color: '#c6c6c6', fontSize: 9, fontWeight: 700 }}>{token.symbol.slice(0, 2)}</span>
+                        className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-colors cursor-pointer">
+                        <div className="flex items-center gap-5">
+                          {token.logo ? (
+                            <img src={token.logo} alt={token.symbol}
+                              className="w-14 h-14 rounded-full object-cover shrink-0"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          ) : (
+                            <div className="w-14 h-14 bg-surface-container-highest rounded-full flex items-center justify-center font-black text-xl shrink-0">
+                              {token.symbol.slice(0, 1)}
                             </div>
-                          )
-                        }
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, color: '#fff', fontSize: 11, fontWeight: 600 }}>{token.symbol}</p>
-                          <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9 }}>{token.name}</p>
+                          )}
+                          <div>
+                            <p className="font-black text-white text-lg">{token.symbol}</p>
+                            <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{token.name}</p>
+                          </div>
                         </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <p style={{ margin: 0, color: '#fff', fontSize: 11, fontWeight: 600 }}>
-                            {hideBalance ? '••••' : `${parseFloat(token.balance) < 0.000001 ? '< 0.000001' : token.balance} ${token.symbol}`}
+                        <div className="text-right">
+                          <p className="font-black text-white text-lg">
+                            {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : token.balance}
                           </p>
-                          <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9 }}>
-                            {price > 0 ? (hideBalance ? '••••' : formatUSD(usdVal)) : 'No price data'}
+                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
+                            {price > 0 ? formatUSD(usdVal) : 'No price data'}
                           </p>
                         </div>
                       </div>
                     );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                  })
+                )}
+              </div>
+            )}
 
-          {/* TRANSACTIONS TAB */}
-          {activeTab === 'transactions' && (
-            <div style={{ padding: '6px 0' }}>
-              {isLoadingTxs ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
-                </div>
-              ) : txs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '16px 12px', color: '#c6c6c6', fontSize: 10 }}>
-                  {selectedChain.isAlchemy ? `No transactions on ${selectedChain.name}` : 'TX history requires Alchemy RPC'}
-                </div>
-              ) : (
-                txs.map((tx) => {
-                  const isOut = tx.direction === 'out';
-                  const date = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
-                  return (
-                    <a key={tx.hash} href={`${selectedChain.explorerUrl}/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', textDecoration: 'none', borderBottom: '1px solid #1a1a1a', transition: 'background 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#1a1a1a')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: isOut ? 'rgba(239,68,68,0.1)' : 'rgba(82,255,172,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {isOut ? <ArrowUpRight size={12} style={{ color: '#ef4444' }} /> : <ArrowDownLeft size={12} style={{ color: '#52ffac' }} />}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, color: '#fff', fontSize: 11, fontWeight: 600 }}>{isOut ? 'Sent' : 'Received'}</p>
-                        <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace' }}>
-                          {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)}
-                        </p>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: isOut ? '#ef4444' : '#52ffac' }}>
-                          {isOut ? '-' : '+'}{tx.value} {tx.asset}
-                        </p>
-                        <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9 }}>{date}</p>
-                      </div>
-                    </a>
-                  );
-                })
-              )}
-            </div>
-          )}
+            {/* TRANSACTIONS TAB */}
+            {activeTab === 'transactions' && (
+              <div className="space-y-3">
+                {isLoadingTxs ? (
+                  <div className="flex justify-center py-12">
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
+                  </div>
+                ) : txs.length === 0 ? (
+                  <div className="flex items-center p-6 bg-surface-container-low rounded-xl border border-white/5">
+                    <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">
+                      {selectedChain.isAlchemy ? `No transactions on ${selectedChain.name}` : 'TX history requires Alchemy RPC'}
+                    </p>
+                  </div>
+                ) : (
+                  txs.map((tx) => {
+                    const isOut = tx.direction === 'out';
+                    const date = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                    return (
+                      <a key={tx.hash} href={`${selectedChain.explorerUrl}/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-colors cursor-pointer no-underline">
+                        <div className="flex items-center gap-5">
+                          <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 ${isOut ? 'bg-red-500/10' : 'bg-tertiary/10'}`}>
+                            {isOut
+                              ? <ArrowUpRight size={20} className="text-red-400" />
+                              : <ArrowDownLeft size={20} className="text-tertiary" />}
+                          </div>
+                          <div>
+                            <p className="font-black text-white text-lg">{isOut ? 'Sent' : 'Received'}</p>
+                            <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold font-mono">
+                              {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-black text-lg ${isOut ? 'text-red-400' : 'text-tertiary'}`}>
+                            {isOut ? '-' : '+'}{tx.value} {tx.asset}
+                          </p>
+                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">{date}</p>
+                        </div>
+                      </a>
+                    );
+                  })
+                )}
+              </div>
+            )}
 
-          {/* LIGHTNING TAB */}
-          {activeTab === 'lightning' && <LightningTab />}
-        </motion.div>
+            {/* LIGHTNING TAB */}
+            {activeTab === 'lightning' && <LightningTab />}
+          </div>
 
-        {/* ── New Session ── */}
-        <button
-          onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#353535', fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '2px 0', alignSelf: 'center' }}>
-          ↺ New Session
-        </button>
+          {/* Chain Marquee */}
+          <div className="pt-4 border-t border-white/5">
+            <ChainMarquee />
+          </div>
 
-      </div>
+        </div>
+      </section>
     </>
   );
 }
