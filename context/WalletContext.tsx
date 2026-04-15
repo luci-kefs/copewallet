@@ -262,21 +262,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!state._v_enc) return null;
     try {
       const hwId = await getHardwareUUID();
-      const { getNextKey } = await import('@/lib/crypto');
-      // Try all plausible key combinations in priority order
-      const keys = [
-        getCurrentKey() + hwId,
-        getCurrentKey(),
-        getNextKey() + hwId,
-        getNextKey(),
-      ];
-      for (const key of keys) {
-        try {
-          const m = decryptData(state._v_enc, key);
-          if (m && m.trim().split(/\s+/).length >= 12) return m;
-        } catch {}
-      }
-      return null;
+      const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
+      return mnemonic || null;
     } catch {
       return null;
     }
@@ -286,21 +273,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const enablePersistentMode = useCallback(async (passphrase: string) => {
     if (!state._v_enc) return;
     const hwId = await getHardwareUUID();
-    const { getNextKey } = await import('@/lib/crypto');
-    const keys = [
-      getCurrentKey() + hwId,
-      getCurrentKey(),
-      getNextKey() + hwId,
-      getNextKey(),
-    ];
-    let mnemonic = '';
-    for (const key of keys) {
-      try {
-        const m = decryptData(state._v_enc, key);
-        if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }
-      } catch {}
-    }
-    if (!mnemonic) throw new Error('Could not decrypt vault');
+    const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
     await persistVault(mnemonic, passphrase, hwId);
     setState((p) => ({ ...p, mode: 'PERSISTENT' }));
   }, [state._v_enc]);

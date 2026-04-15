@@ -50,13 +50,9 @@ export default function CopePage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const wipeRef = useRef(wallet.wipeCopeWallet);
-  useEffect(() => { wipeRef.current = wallet.wipeCopeWallet; });
-
   useEffect(() => {
     generateVisualTheme().then((theme) => injectThemeVariables(theme));
-    // CSS integrity tamper → wipe only, no redirect (redirect reserved for kill-switch)
-    return startCSSIntegrityWatch(() => wipeRef.current());
+    return startCSSIntegrityWatch(() => wallet.wipeCopeWallet());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -67,19 +63,22 @@ export default function CopePage() {
     return stop;
   }, []);
 
-  // Restore session lock on first load — never auto-generate a new wallet
+  // Auto-generate wallet on first load — or restore from session lock
   useEffect(() => {
     (async () => {
       const saved = loadSession();
-      if (!saved) return;
-      try {
-        const hwId = await getHardwareUUID();
-        const mnemonic = decryptData(saved, hwId);
-        if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
-          await wallet.importCopeWallet(mnemonic);
-          wallet.markSessionRestored();
-        }
-      } catch {}
+      if (saved) {
+        try {
+          const hwId = await getHardwareUUID();
+          const mnemonic = decryptData(saved, hwId);
+          if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
+            await wallet.importCopeWallet(mnemonic);
+            wallet.markSessionRestored();
+            return;
+          }
+        } catch {}
+      }
+      wallet.createCopeWallet();
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -134,6 +133,7 @@ export default function CopePage() {
 
   // ── PERSIST SESSION ────────────────────────────────────────────
   const handlePersistSession = async () => {
+    if (!wallet.isUnlocked) return;
     if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
@@ -142,6 +142,7 @@ export default function CopePage() {
       if (!mnemonic) throw new Error('Vault empty');
       await wallet.enablePersistentMode(passphrase);
       const hwId = await getHardwareUUID();
+      // Use stable key (hwId + passphrase only — no rotating session key)
       const encPayload = encryptData(mnemonic, hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
@@ -150,27 +151,11 @@ export default function CopePage() {
   };
 
   const handleInitNewVault = () => {
+    wallet.disableSessionLock();
+    wallet.wipeCopeWallet();
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
-  };
-
-  const handleForgeNewVault = async () => {
-    if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
-    if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
-    setIsProcessing(true); setPersistError('');
-    try {
-      wallet.disableSessionLock();
-      wallet.wipeCopeWallet();
-      await wallet.createCopeWallet();
-      const mnemonic = await wallet.getMnemonicForExport();
-      if (!mnemonic) throw new Error('Vault empty');
-      await wallet.enablePersistentMode(passphrase);
-      const hwId = await getHardwareUUID();
-      const encPayload = encryptData(mnemonic, hwId + passphrase);
-      await embedInPNG(encPayload, 'copewallet');
-      setRightPanel('success');
-    } catch { setPersistError('Operation failed. Try again.'); }
-    finally { setIsProcessing(false); }
+    setTimeout(() => wallet.createCopeWallet(), 100);
   };
 
   const handleFileDrop = async (file: File) => {
@@ -456,7 +441,7 @@ export default function CopePage() {
                   {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
                 </div>
                 <button
-                  onClick={rightPanel === 'new_vault' ? handleForgeNewVault : handlePersistSession}
+                  onClick={handlePersistSession}
                   disabled={isProcessing}
                   className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
                   <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
