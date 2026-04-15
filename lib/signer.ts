@@ -2,8 +2,6 @@
 import { ethers } from 'ethers';
 import { zeroFill } from './crypto';
 import { ScatteredStore, getReassembledData, wipeScatteredStore } from './memory-vault';
-import { getProvider } from './provider';
-
 export async function ephemeralSign(
   store: ScatteredStore,
   transaction: ethers.TransactionRequest
@@ -21,7 +19,8 @@ export async function ephemeralSign(
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
 
-    const wallet = new ethers.Wallet(hexKey, getProvider());
+    // No provider needed for signing — avoids block/parentHash fetches
+    const wallet = new ethers.Wallet(hexKey);
     const signed = await wallet.signTransaction(transaction);
 
     return signed;
