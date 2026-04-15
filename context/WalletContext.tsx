@@ -117,7 +117,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // GHOST: no storage ops permitted below this line (EPHEMERAL mode boundary)
 
   const wipeCopeWallet = useCallback(() => {
-    console.trace('[wipeCopeWallet] called from:');
     // Wipe scattered key store
     if (scatteredKeyRef.current) {
       wipeScatteredStore(scatteredKeyRef.current);
@@ -471,20 +470,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => { try { document.body.removeChild(trap); } catch {} };
   }, [wipeCopeWallet]);
 
-  // Branding self-heal via MutationObserver (Block 7 Task 4)
+  // Branding self-heal via periodic DOM check (Block 7 Task 4)
+  // Polls every 3s — if a brand element existed before but is now gone AND
+  // React hasn't re-added it within the same tick, it was externally removed.
   useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        for (const node of Array.from(mutation.removedNodes)) {
-          const el = node as HTMLElement;
-          if (el.dataset?.aethilm === 'brand') {
-            wipeCopeWallet();
-          }
-        }
+    let knownCount = 0;
+    let graceTicks = 0; // allow 1 tick for React to re-add after state change
+    const id = setInterval(() => {
+      const current = document.querySelectorAll('[data-aethilm="brand"]').length;
+      if (knownCount > 0 && current === 0) {
+        if (graceTicks > 0) { graceTicks--; return; }
+        wipeCopeWallet();
+      } else {
+        if (current > 0) knownCount = current;
+        if (current === 0 && knownCount > 0) graceTicks = 1;
       }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    }, 3000);
+    return () => clearInterval(id);
   }, [wipeCopeWallet]);
 
   // Console honey-trap (Block 12 Task 4)
