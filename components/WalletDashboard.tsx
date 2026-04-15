@@ -16,7 +16,6 @@ import { ephemeralSign } from '@/lib/signer';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
-import { ChainMarquee } from '@/components/ChainMarquee';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
@@ -553,26 +552,24 @@ export function WalletDashboard() {
       <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-12">
 
-          {/* ── Header Actions ── */}
-          <div className="flex justify-between items-center">
-            <button
-              onClick={() => setShowNetworks(true)}
-              className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors">
-              <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
-              <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">{selectedChain.name}</span>
-              <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
-            </button>
-          </div>
-
-          {/* ── Session Heading ── */}
+          {/* ── Session Heading with Chain Selector ── */}
           <div className="space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
-                {wallet.mode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
-              </h2>
-              <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
-                {wallet.mode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
-              </p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+                  {wallet.mode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
+                </h2>
+                <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
+                  {wallet.mode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowNetworks(true)}
+                className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
+                <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
+                <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">{selectedChain.name}</span>
+                <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
+              </button>
             </div>
             <div className="flex items-center justify-between py-4 border-y border-white/5">
               <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
@@ -592,11 +589,16 @@ export function WalletDashboard() {
           <div className="space-y-6">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
-              <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
+              <motion.h1
+                key={totalUSD}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
                 {isLoadingTokens ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
                 ) : formatUSD(totalUSD)}
-              </h1>
+              </motion.h1>
               {isRefreshing && (
                 <div className="mb-4" style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
               )}
@@ -764,10 +766,6 @@ export function WalletDashboard() {
             {activeTab === 'lightning' && <LightningTab />}
           </div>
 
-          {/* Chain Marquee */}
-          <div className="pt-4 border-t border-white/5">
-            <ChainMarquee />
-          </div>
 
         </div>
       </section>

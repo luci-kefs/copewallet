@@ -149,12 +149,12 @@ export default function CopePage() {
     finally { setIsProcessing(false); }
   };
 
-  const handleInitNewVault = () => {
+  const handleInitNewVault = async () => {
     wallet.disableSessionLock();
     wallet.wipeCopeWallet();
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
-    setTimeout(() => wallet.createCopeWallet(), 100);
+    await wallet.createCopeWallet();
   };
 
   const handleFileDrop = async (file: File) => {
@@ -375,10 +375,10 @@ export default function CopePage() {
                   </div>
                   {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
                 </div>
-                <button onClick={handlePersistSession} disabled={isProcessing}
-                  className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
-                  <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
-                  {!isProcessing && <span className="material-symbols-outlined text-2xl">download</span>}
+                <button onClick={handlePersistSession} disabled={isProcessing || !wallet.isUnlocked}
+                  className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing || !wallet.isUnlocked ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
+                  <span>{isProcessing ? 'Processing...' : !wallet.isUnlocked ? 'Generating wallet...' : 'Forge Vault & Download Key'}</span>
+                  {!isProcessing && wallet.isUnlocked && <span className="material-symbols-outlined text-2xl">download</span>}
                 </button>
               </div>
             </motion.div>
