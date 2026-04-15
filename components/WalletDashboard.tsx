@@ -6,7 +6,7 @@ import {
   Copy, Check, X, ExternalLink,
   ArrowUpRight, ArrowDownLeft, Zap, Wifi, WifiOff, AlertCircle, Link,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import CountUp from '@/components/CountUp';
 import { useWallet } from '@/context/WalletContext';
 import { CHAINS, Chain } from '@/lib/chains';
 import { fetchTokenBalances, fetchTxHistory, TokenBalance, TxRecord } from '@/lib/tokens';
@@ -659,33 +659,21 @@ export function WalletDashboard() {
   };
 
   const totalUSD = tokens.reduce((sum, t) => {
-    const price = t.coingeckoId ? (prices[t.coingeckoId] ?? 0) : (prices[selectedChain.coingeckoId] ?? 0);
+    const price = prices[t.coingeckoId ?? ''] ?? prices[selectedChain.coingeckoId] ?? 0;
     return sum + parseFloat(t.balance || '0') * price;
   }, 0);
 
-  // Count-up animation for balance
-  const [displayUSD, setDisplayUSD] = useState(0);
-  const countUpRef = useRef<number | null>(null);
-  const prevUSDRef = useRef(0);
+  // Track previous totalUSD for CountUp from-value
+  const prevTotalUSDRef = useRef(0);
+  const [countFrom, setCountFrom] = useState(0);
+  const [countTo, setCountTo] = useState(0);
+  const [countKey, setCountKey] = useState(0);
   useEffect(() => {
     if (isLoadingTokens) return;
-    const from = prevUSDRef.current;
-    const to = totalUSD;
-    prevUSDRef.current = to;
-    if (countUpRef.current) cancelAnimationFrame(countUpRef.current);
-    if (from === to) { setDisplayUSD(to); return; }
-    const duration = 900; // ms
-    const startTime = performance.now();
-    const tick = (now: number) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayUSD(from + (to - from) * eased);
-      if (progress < 1) countUpRef.current = requestAnimationFrame(tick);
-    };
-    countUpRef.current = requestAnimationFrame(tick);
-    return () => { if (countUpRef.current) cancelAnimationFrame(countUpRef.current); };
+    setCountFrom(prevTotalUSDRef.current);
+    setCountTo(totalUSD);
+    setCountKey(k => k + 1);
+    prevTotalUSDRef.current = totalUSD;
   }, [totalUSD, isLoadingTokens]);
 
   // ── Loading ──
@@ -779,7 +767,19 @@ export function WalletDashboard() {
               <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
                 {isLoadingTokens ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
-                ) : formatUSD(displayUSD)}
+                ) : (
+                  <span>
+                    <span className="text-on-surface-variant opacity-60">$</span>
+                    <CountUp
+                      key={countKey}
+                      from={countFrom}
+                      to={countTo}
+                      separator=","
+                      duration={1.2}
+                      startWhen={!isLoadingTokens}
+                    />
+                  </span>
+                )}
               </h1>
               {isRefreshing && (
                 <div className="mb-4" style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
