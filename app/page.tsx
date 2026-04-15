@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
 import { fetchAssetUrls } from '@/lib/supabase';
 import { startEntropyCollection } from '@/lib/entropy';
-import { GhostCapsule } from '@/components/GhostCapsule';
 import { DevToolsGuard } from '@/components/DevToolsGuard';
 import { WalletDashboard } from '@/components/WalletDashboard';
 import { supabase } from '@/lib/supabase';
@@ -131,21 +130,21 @@ export default function CopePage() {
 
   // ── PERSIST SESSION ────────────────────────────────────────────
   const handlePersistSession = async () => {
-    if (!wallet.isUnlocked) return;
+    if (!wallet.isUnlocked) { setPersistError('Wallet not ready'); return; }
     if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
       const mnemonic = await wallet.getMnemonicForExport();
-      if (!mnemonic) throw new Error('Vault empty');
+      if (!mnemonic) { setPersistError('Could not read wallet — try refreshing'); setIsProcessing(false); return; }
       await wallet.enablePersistentMode(passphrase);
       const hwId = await getHardwareUUID();
-      // Use stable key (hwId + passphrase only — no rotating session key)
-      // so the PNG can be decrypted on any session or device with same passphrase+hwId
       const encPayload = encryptData(mnemonic, hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
-    } catch { setPersistError('Operation failed. Try again.'); }
+    } catch (e) {
+      setPersistError(e instanceof Error ? e.message : 'Operation failed. Try again.');
+    }
     finally { setIsProcessing(false); }
   };
 
@@ -369,11 +368,25 @@ export default function CopePage() {
                   </p>
                 </div>
                 <div className="bg-white rounded-xl p-6 space-y-4">
-                  <div className="bg-neutral-100 rounded-lg px-4 py-1">
-                    <GhostCapsule type="password" placeholder="Vault passphrase (min 8 chars)" onValue={setPassphrase} className="w-full" theme="light" />
+                  <div className="bg-neutral-100 rounded-lg px-4 py-3">
+                    <input
+                      type="password"
+                      placeholder="Vault passphrase (min 8 chars)"
+                      autoComplete="off"
+                      value={passphrase}
+                      onChange={e => setPassphrase(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
+                    />
                   </div>
-                  <div className="bg-neutral-100 rounded-lg px-4 py-1">
-                    <GhostCapsule type="password" placeholder="Confirm passphrase" onValue={setPassphraseConfirm} className="w-full" theme="light" />
+                  <div className="bg-neutral-100 rounded-lg px-4 py-3">
+                    <input
+                      type="password"
+                      placeholder="Confirm passphrase"
+                      autoComplete="off"
+                      value={passphraseConfirm}
+                      onChange={e => setPassphraseConfirm(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
+                    />
                   </div>
                   {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
                 </div>
@@ -412,8 +425,15 @@ export default function CopePage() {
                   <p className="text-on-surface-variant text-sm leading-relaxed">Enter your passphrase and drop the Favicon Key PNG.</p>
                 </div>
                 <div className="bg-white rounded-xl p-6 space-y-4">
-                  <div className="bg-neutral-100 rounded-lg px-4 py-1">
-                    <GhostCapsule type="password" placeholder="Vault passphrase" onValue={setPassphrase} className="w-full" theme="light" />
+                  <div className="bg-neutral-100 rounded-lg px-4 py-3">
+                    <input
+                      type="password"
+                      placeholder="Vault passphrase"
+                      autoComplete="off"
+                      value={passphrase}
+                      onChange={e => setPassphrase(e.target.value)}
+                      className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
+                    />
                   </div>
                   <div
                     ref={dropRef}
