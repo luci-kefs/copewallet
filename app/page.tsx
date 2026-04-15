@@ -44,7 +44,10 @@ export default function CopePage() {
   const logoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchAssetUrls().then(({ logo }) => { setLogoUrl(logo); setIsLoading(false); });
+    fetchAssetUrls()
+      .then(({ logo }) => { setLogoUrl(logo); })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
   const wipeRef = useRef(wallet.wipeCopeWallet);
