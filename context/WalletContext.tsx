@@ -117,6 +117,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // GHOST: no storage ops permitted below this line (EPHEMERAL mode boundary)
 
   const wipeCopeWallet = useCallback(() => {
+    console.trace('[wipeCopeWallet] called from:');
     // Wipe scattered key store
     if (scatteredKeyRef.current) {
       wipeScatteredStore(scatteredKeyRef.current);
