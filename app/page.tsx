@@ -64,22 +64,19 @@ export default function CopePage() {
     return stop;
   }, []);
 
-  // Auto-generate wallet on first load — or restore from session lock
+  // Restore session lock on first load — never auto-generate a new wallet
   useEffect(() => {
     (async () => {
       const saved = loadSession();
-      if (saved) {
-        try {
-          const hwId = await getHardwareUUID();
-          const mnemonic = decryptData(saved, hwId);
-          if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
-            await wallet.importCopeWallet(mnemonic);
-            wallet.markSessionRestored();
-            return;
-          }
-        } catch {}
-      }
-      wallet.createCopeWallet();
+      if (!saved) return;
+      try {
+        const hwId = await getHardwareUUID();
+        const mnemonic = decryptData(saved, hwId);
+        if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
+          await wallet.importCopeWallet(mnemonic);
+          wallet.markSessionRestored();
+        }
+      } catch {}
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -150,13 +147,27 @@ export default function CopePage() {
   };
 
   const handleInitNewVault = () => {
-    wallet.disableSessionLock();
-    wallet.wipeCopeWallet();
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
-    // createCopeWallet is called by the page-level useEffect that watches for unlocked=false
-    // trigger it after a tick so wipe state settles first
-    setTimeout(() => wallet.createCopeWallet(), 50);
+  };
+
+  const handleForgeNewVault = async () => {
+    if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
+    if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
+    setIsProcessing(true); setPersistError('');
+    try {
+      wallet.disableSessionLock();
+      wallet.wipeCopeWallet();
+      await wallet.createCopeWallet();
+      const mnemonic = await wallet.getMnemonicForExport();
+      if (!mnemonic) throw new Error('Vault empty');
+      await wallet.enablePersistentMode(passphrase);
+      const hwId = await getHardwareUUID();
+      const encPayload = encryptData(mnemonic, hwId + passphrase);
+      await embedInPNG(encPayload, 'copewallet');
+      setRightPanel('success');
+    } catch { setPersistError('Operation failed. Try again.'); }
+    finally { setIsProcessing(false); }
   };
 
   const handleFileDrop = async (file: File) => {
@@ -391,7 +402,9 @@ export default function CopePage() {
                   </div>
                   {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
                 </div>
-                <button onClick={handlePersistSession} disabled={isProcessing}
+                <button
+                  onClick={rightPanel === 'new_vault' ? handleForgeNewVault : handlePersistSession}
+                  disabled={isProcessing}
                   className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
                   <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
                   {!isProcessing && <span className="material-symbols-outlined text-2xl">download</span>}

@@ -533,12 +533,41 @@ export function WalletDashboard() {
   // ── Loading ──
   if (!wallet.isUnlocked) {
     return (
-      <section className="flex-1 bg-surface flex flex-col items-center justify-center overflow-y-auto">
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-          style={{ width: 36, height: 36, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.15)', borderTopColor: '#52ffac' }} />
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-on-surface-variant text-xs font-black uppercase tracking-[0.2em] mt-4">
-          Generating wallet...
-        </motion.p>
+      <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col overflow-y-auto">
+        <div className="max-w-3xl mx-auto w-full space-y-12 animate-pulse">
+          {/* Header skeleton */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3 flex-1">
+              <div className="h-12 w-56 bg-white/5 rounded-xl" />
+              <div className="h-3 w-36 bg-white/5 rounded-full" />
+            </div>
+            <div className="h-9 w-32 bg-white/5 rounded-full" />
+          </div>
+          {/* Toggle skeleton */}
+          <div className="flex items-center justify-between py-4 border-y border-white/5">
+            <div className="h-3 w-48 bg-white/5 rounded-full" />
+            <div className="h-6 w-12 bg-white/5 rounded-full" />
+          </div>
+          {/* Balance skeleton */}
+          <div className="space-y-6">
+            <div className="h-3 w-32 bg-white/5 rounded-full" />
+            <div className="h-28 w-64 bg-white/5 rounded-2xl" />
+            <div className="h-24 bg-white/5 rounded-xl" />
+          </div>
+          {/* Action grid skeleton */}
+          <div className="grid grid-cols-2 gap-4">
+            {[0,1,2,3].map(i => <div key={i} className="h-36 bg-white/5 rounded-xl" />)}
+          </div>
+          {/* Tabs skeleton */}
+          <div className="space-y-4">
+            <div className="flex gap-12 border-b border-white/5 pb-4">
+              <div className="h-3 w-16 bg-white/5 rounded-full" />
+              <div className="h-3 w-24 bg-white/5 rounded-full" />
+              <div className="h-3 w-20 bg-white/5 rounded-full" />
+            </div>
+            {[0,1,2].map(i => <div key={i} className="h-20 bg-white/5 rounded-xl" />)}
+          </div>
+        </div>
       </section>
     );
   }
@@ -617,7 +646,7 @@ export function WalletDashboard() {
           </div>
 
           {/* ── Action Grid ── */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <button
               onClick={() => setShowNetworks(true)}
               className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
@@ -635,12 +664,6 @@ export function WalletDashboard() {
               className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
               <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">qr_code_2</span>
               <span className="font-black uppercase tracking-widest text-[0.65rem]">Qr / Receive</span>
-            </button>
-            <button
-              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
-              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">add_card</span>
-              <span className="font-black uppercase tracking-widest text-[0.65rem]">Create New Wallet</span>
             </button>
           </div>
 
