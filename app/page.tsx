@@ -271,7 +271,7 @@ export default function CopePage() {
               <div className="space-y-6">
                 <div className="flex items-center gap-5 text-tertiary">
                   <span className="material-symbols-outlined text-5xl">shield_lock</span>
-                  <h2 className="text-5xl font-black tracking-tighter uppercase italic">Secure Vault</h2>
+                  <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
                 </div>
                 <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs">Your private key guardian</p>
 
@@ -385,7 +385,7 @@ export default function CopePage() {
               className="space-y-8">
               <div className="flex items-center gap-5 text-tertiary">
                 <span className="material-symbols-outlined text-5xl">shield_lock</span>
-                <h2 className="text-5xl font-black tracking-tighter uppercase italic">Secure Vault</h2>
+                <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
               </div>
 
               <button onClick={() => setRightPanel('idle')}
@@ -395,7 +395,7 @@ export default function CopePage() {
 
               <div className="space-y-5">
                 <div>
-                  <h3 className="text-3xl font-black tracking-tighter uppercase italic text-white mb-2">
+                  <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">
                     {rightPanel === 'new_vault' ? 'New Vault' : 'Persist Session'}
                   </h3>
                   <p className="text-on-surface-variant text-sm leading-relaxed">
@@ -442,7 +442,7 @@ export default function CopePage() {
               className="space-y-8">
               <div className="flex items-center gap-5 text-tertiary">
                 <span className="material-symbols-outlined text-5xl">shield_lock</span>
-                <h2 className="text-5xl font-black tracking-tighter uppercase italic">Secure Vault</h2>
+                <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
               </div>
 
               <button onClick={() => setRightPanel('idle')}
@@ -452,7 +452,7 @@ export default function CopePage() {
 
               <div className="space-y-5">
                 <div>
-                  <h3 className="text-3xl font-black tracking-tighter uppercase italic text-white mb-2">Access Vault</h3>
+                  <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">Access Vault</h3>
                   <p className="text-on-surface-variant text-sm leading-relaxed">Enter your passphrase and drop the Favicon Key PNG.</p>
                 </div>
                 <div className="bg-white rounded-xl p-6 space-y-4">
@@ -492,7 +492,7 @@ export default function CopePage() {
                 <span className="material-symbols-outlined text-5xl text-tertiary">verified</span>
               </div>
               <div className="text-center space-y-3">
-                <p className="text-4xl font-black tracking-tighter uppercase italic text-white">Vault Secured</p>
+                <p className="text-4xl font-black tracking-tighter uppercase text-white">Vault Secured</p>
                 <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs mx-auto">
                   Favicon Key PNG downloaded. Store it safely — it is your only key.
                 </p>

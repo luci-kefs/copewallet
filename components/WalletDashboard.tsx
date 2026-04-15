@@ -95,10 +95,11 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="popup-backdrop"
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: '2rem', width: 380, maxWidth: '92vw', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 380, maxWidth: '92vw', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>All Networks</span>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>All Networks</span>
           <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
             <X size={16} />
           </button>
@@ -165,10 +166,11 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="popup-backdrop"
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', padding: '28px 28px', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', padding: '28px 28px', border: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
+          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
             Send {chain.symbol}
           </span>
           <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
@@ -180,7 +182,7 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
             <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '2px solid rgba(82,255,172,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Check size={26} style={{ color: '#52ffac' }} />
             </div>
-            <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase' }}>Broadcast!</span>
+            <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase' }}>Broadcast!</span>
             <span style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{txHash}</span>
             <a href={`${chain.explorerUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
               style={{ color: '#52ffac', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
@@ -189,11 +191,25 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '6px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <GhostCapsule type="text" placeholder="Recipient address (0x...)" onValue={setTo} className="w-full" />
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '10px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <input
+                type="text"
+                placeholder="Recipient address (0x...)"
+                autoComplete="off"
+                value={to}
+                onChange={e => setTo(e.target.value)}
+                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: 'inherit' }}
+              />
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '6px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <GhostCapsule type="text" placeholder={`Amount (${chain.symbol})`} onValue={setAmount} className="w-full" />
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '1rem', padding: '10px 16px', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <input
+                type="text"
+                placeholder={`Amount (${chain.symbol})`}
+                autoComplete="off"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: 'inherit' }}
+              />
             </div>
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
             <button onClick={handleSend} disabled={status === 'signing' || status === 'sending'}
@@ -201,7 +217,7 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
                 background: status === 'signing' || status === 'sending' ? '#1a1a1a' : '#52ffac',
                 color: status === 'signing' || status === 'sending' ? '#c6c6c6' : '#002111',
                 border: 'none', borderRadius: '1rem', padding: '16px',
-                fontSize: 14, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase',
+                fontSize: 14, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase',
                 letterSpacing: '0.05em', cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s', marginTop: 4,
               }}>
@@ -224,10 +240,11 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
   };
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="popup-backdrop"
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: '2rem', width: 320, maxWidth: '92vw', padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 320, maxWidth: '92vw', padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, border: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>Receive</span>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, fontStyle: 'normal', textTransform: 'uppercase', letterSpacing: '-0.02em' }}>Receive</span>
           <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
             <X size={16} />
           </button>
@@ -365,7 +382,7 @@ function LightningTab() {
           {status === 'error' ? <WifiOff size={24} className="text-yellow-400" /> : <Zap size={24} className="text-yellow-400" />}
         </div>
         <div className="text-center">
-          <p className="font-black text-white text-lg uppercase italic tracking-tighter">Lightning Network</p>
+          <p className="font-black text-white text-lg uppercase tracking-tighter">Lightning Network</p>
           <p className="text-on-surface-variant text-xs mt-1 leading-relaxed max-w-xs">
             {status === 'error' ? 'Connection failed. Make sure your node is online and try again.' : 'Connect your WebLN node to send and receive Lightning payments instantly.'}
           </p>
@@ -442,7 +459,7 @@ function LightningTab() {
               <div className="w-12 h-12 rounded-full bg-tertiary/10 border border-tertiary/30 flex items-center justify-center">
                 <Check size={20} className="text-tertiary" />
               </div>
-              <p className="font-black text-white uppercase italic text-base tracking-tighter">Payment Sent!</p>
+              <p className="font-black text-white uppercase text-base tracking-tighter">Payment Sent!</p>
               {payPreimage && <p className="text-on-surface-variant text-[10px] font-mono break-all text-center">Preimage: {payPreimage.slice(0, 20)}...</p>}
               <button onClick={() => { setPayStatus('idle'); setPayReq(''); setPayPreimage(''); }}
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-on-surface-variant font-black">
@@ -608,7 +625,7 @@ export function WalletDashboard() {
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 flex-1">
-                <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
+                <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase text-white">
                   {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
                 </h2>
                 <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
@@ -755,7 +772,7 @@ export function WalletDashboard() {
                         </div>
                         <div className="text-right">
                           <p className="font-black text-white text-lg">
-                            {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : token.balance}
+                            {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(parseFloat(token.balance))}
                           </p>
                           <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
                             {price > 0 ? formatUSD(usdVal) : 'No price data'}

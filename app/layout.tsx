@@ -25,10 +25,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
         />
       </head>
       <body className="bg-black text-white antialiased font-[family-name:var(--font-inter)]">
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            if (typeof document === 'undefined') return;
+            document.fonts.ready.then(function() {
+              document.fonts.load('24px "Material Symbols Outlined"', 'settings').then(function() {
+                document.body.classList.add('icons-ready');
+              }).catch(function() {
+                document.body.classList.add('icons-ready');
+              });
+            });
+            // Fallback — always show after 3s
+            setTimeout(function() { document.body.classList.add('icons-ready'); }, 3000);
+          })();
+        ` }} />
         <WalletProvider>{children}</WalletProvider>
       </body>
     </html>

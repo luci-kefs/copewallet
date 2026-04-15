@@ -34,7 +34,7 @@ body {
   color: #002111;
 }
 
-/* Material Symbols base */
+/* Material Symbols base — hidden until font loaded */
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -52,6 +52,36 @@ body {
   font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
   user-select: none;
+  /* Hide text until font renders — prevents FOUT (flash of unstyled text) */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Added by JS FontFace observer once Material Symbols is ready */
+body.icons-ready .material-symbols-outlined {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Pop-up / modal animations */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+@keyframes fadeOutScale {
+  from { opacity: 1; transform: scale(1)    translateY(0);   }
+  to   { opacity: 0; transform: scale(0.95) translateY(8px); }
+}
+.popup-enter {
+  animation: fadeInScale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.popup-backdrop {
+  animation: fadeIn 0.15s ease forwards;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .monolith-gradient {
