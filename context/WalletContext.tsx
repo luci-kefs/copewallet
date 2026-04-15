@@ -262,8 +262,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!state._v_enc) return null;
     try {
       const hwId = await getHardwareUUID();
-      // Try combined key first (normal path), then plain key (post-rotation fallback)
-      for (const key of [getCurrentKey() + hwId, getCurrentKey()]) {
+      const { getNextKey } = await import('@/lib/crypto');
+      // Try all plausible key combinations in priority order
+      const keys = [
+        getCurrentKey() + hwId,
+        getCurrentKey(),
+        getNextKey() + hwId,
+        getNextKey(),
+      ];
+      for (const key of keys) {
         try {
           const m = decryptData(state._v_enc, key);
           if (m && m.trim().split(/\s+/).length >= 12) return m;
@@ -279,8 +286,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const enablePersistentMode = useCallback(async (passphrase: string) => {
     if (!state._v_enc) return;
     const hwId = await getHardwareUUID();
+    const { getNextKey } = await import('@/lib/crypto');
+    const keys = [
+      getCurrentKey() + hwId,
+      getCurrentKey(),
+      getNextKey() + hwId,
+      getNextKey(),
+    ];
     let mnemonic = '';
-    for (const key of [getCurrentKey() + hwId, getCurrentKey()]) {
+    for (const key of keys) {
       try {
         const m = decryptData(state._v_enc, key);
         if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }

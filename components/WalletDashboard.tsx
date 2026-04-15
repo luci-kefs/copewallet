@@ -492,7 +492,7 @@ export function WalletDashboard() {
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
 
   const handleSessionToggle = async () => {
-    if (sessionToggling || !wallet.isUnlocked) return;
+    if (sessionToggling) return;
     setSessionToggling(true);
     try {
       if (wallet.isSessionLocked) wallet.disableSessionLock();
@@ -620,7 +620,7 @@ export function WalletDashboard() {
                   type="checkbox"
                   checked={wallet.isSessionLocked}
                   onChange={handleSessionToggle}
-                  disabled={sessionToggling || !wallet.isUnlocked}
+                  disabled={sessionToggling}
                 />
                 <span className="slider"></span>
               </label>
