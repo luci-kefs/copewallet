@@ -162,28 +162,15 @@ export default function CopePage() {
     setIsProcessing(true); setAccessError('');
     try {
       const hwId = await getHardwareUUID();
-
-      // Attempt 1: decrypt mnemonic directly from PNG (new key: hwId + passphrase)
-      try {
-        const encPayload = await extractFromPNG(file);
-        const mnemonic = decryptData(encPayload, hwId + passphrase);
-        if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
-          await wallet.importCopeWallet(mnemonic);
-          setRightPanel('success');
-          return;
-        }
-      } catch { /* try next method */ }
-
-      // Attempt 2: IndexedDB shards — same device, PBKDF2 path (old PNGs / re-persist)
-      try {
-        await wallet.unlockPersistentVault(passphrase);
+      const encPayload = await extractFromPNG(file);
+      const mnemonic = decryptData(encPayload, hwId + passphrase);
+      if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
+        await wallet.importCopeWallet(mnemonic);
         setRightPanel('success');
         return;
-      } catch { /* try next method */ }
-
-      // Both failed
+      }
       setAccessError('Wrong passphrase or invalid Key PNG');
-    } catch { setAccessError('Could not read the file'); }
+    } catch { setAccessError('Wrong passphrase or invalid Key PNG'); }
     finally { setIsProcessing(false); }
   };
 
