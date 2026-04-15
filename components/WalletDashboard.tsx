@@ -646,7 +646,7 @@ export function WalletDashboard() {
           </div>
 
           {/* ── Action Grid ── */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <button
               onClick={() => setShowNetworks(true)}
               className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
@@ -664,6 +664,12 @@ export function WalletDashboard() {
               className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
               <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">qr_code_2</span>
               <span className="font-black uppercase tracking-widest text-[0.65rem]">Qr / Receive</span>
+            </button>
+            <button
+              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
+              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">add_card</span>
+              <span className="font-black uppercase tracking-widest text-[0.65rem]">Create New Wallet</span>
             </button>
           </div>
 

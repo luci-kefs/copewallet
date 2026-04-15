@@ -205,6 +205,56 @@ export default function CopePage() {
 
   const extLink = process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? '#';
 
+  if (isLoading) return (
+    <main className="flex flex-col md:flex-row h-screen w-full bg-background text-on-background animate-pulse">
+      {/* Left skeleton */}
+      <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col overflow-y-auto">
+        <div className="max-w-3xl mx-auto w-full space-y-12">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-3 flex-1">
+              <div className="h-12 w-56 bg-white/5 rounded-xl" />
+              <div className="h-3 w-36 bg-white/5 rounded-full" />
+            </div>
+            <div className="h-9 w-32 bg-white/5 rounded-full" />
+          </div>
+          <div className="flex items-center justify-between py-4 border-y border-white/5">
+            <div className="h-3 w-48 bg-white/5 rounded-full" />
+            <div className="h-6 w-12 bg-white/5 rounded-full" />
+          </div>
+          <div className="space-y-6">
+            <div className="h-3 w-32 bg-white/5 rounded-full" />
+            <div className="h-28 w-72 bg-white/5 rounded-2xl" />
+            <div className="h-24 bg-white/5 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[0,1,2,3].map(i => <div key={i} className="h-36 bg-white/5 rounded-xl" />)}
+          </div>
+          <div className="space-y-4">
+            <div className="flex gap-12 border-b border-white/5 pb-4">
+              {[0,1,2].map(i => <div key={i} className="h-3 w-16 bg-white/5 rounded-full" />)}
+            </div>
+            {[0,1,2].map(i => <div key={i} className="h-20 bg-white/5 rounded-xl" />)}
+          </div>
+        </div>
+      </section>
+      {/* Right skeleton */}
+      <section className="flex-1 bg-surface-container-lowest p-8 md:p-16 flex flex-col gap-8 border-t md:border-t-0 md:border-l border-white/10">
+        <div className="space-y-4">
+          <div className="h-12 w-64 bg-white/5 rounded-xl" />
+          <div className="h-3 w-44 bg-white/5 rounded-full" />
+          <div className="h-28 bg-white/5 rounded-xl mt-4" />
+        </div>
+        <div className="space-y-4">
+          <div className="h-24 bg-white/5 rounded-xl" />
+          <div className="h-24 bg-white/5 rounded-xl" />
+          <div className="h-24 bg-white/5 rounded-xl" />
+        </div>
+        <div className="h-48 bg-white/5 rounded-xl" />
+        <div className="h-56 bg-white/5 rounded-2xl" />
+      </section>
+    </main>
+  );
+
   return (
     <main className="flex flex-col md:flex-row h-screen w-full bg-background text-on-background">
       <DevToolsGuard
