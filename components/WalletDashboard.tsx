@@ -478,7 +478,17 @@ export function WalletDashboard() {
   const [everUnlocked, setEverUnlocked] = useState(false);
   useEffect(() => { if (wallet.isUnlocked) setEverUnlocked(true); }, [wallet.isUnlocked]);
 
-  const address = wallet.activeAddress;
+  // Freeze last known address/mode so UI doesn't blank during transient wipe
+  const [frozenAddress, setFrozenAddress] = useState<string | null>(null);
+  const [frozenMode, setFrozenMode] = useState(wallet.mode);
+  useEffect(() => {
+    if (wallet.isUnlocked && wallet.activeAddress) {
+      setFrozenAddress(wallet.activeAddress);
+      setFrozenMode(wallet.mode);
+    }
+  }, [wallet.isUnlocked, wallet.activeAddress, wallet.mode]);
+
+  const address = wallet.activeAddress ?? frozenAddress;
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
 
   const handleSessionToggle = async () => {
@@ -589,10 +599,10 @@ export function WalletDashboard() {
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 flex-1">
                 <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-white">
-                  {wallet.mode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
+                  {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
                 </h2>
                 <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
-                  {wallet.mode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
+                  {frozenMode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
                 </p>
               </div>
               <button
