@@ -47,11 +47,15 @@ export default function CopePage() {
     fetchAssetUrls().then(({ logo }) => { setLogoUrl(logo); setIsLoading(false); });
   }, []);
 
+  const wipeRef = useRef(wallet.wipeCopeWallet);
+  useEffect(() => { wipeRef.current = wallet.wipeCopeWallet; });
+
   useEffect(() => {
     generateVisualTheme().then((theme) => injectThemeVariables(theme));
     // CSS integrity tamper → wipe only, no redirect (redirect reserved for kill-switch)
-    return startCSSIntegrityWatch(() => wallet.wipeCopeWallet());
-  }, [wallet]);
+    return startCSSIntegrityWatch(() => wipeRef.current());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { return startNetworkWatch(); }, []);
 
