@@ -10,7 +10,6 @@ import { startEntropyCollection } from '@/lib/entropy';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { DevToolsGuard } from '@/components/DevToolsGuard';
 import { WalletDashboard } from '@/components/WalletDashboard';
-import { CardSpotlight } from '@/components/CardSpotlight';
 import { supabase } from '@/lib/supabase';
 import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } from '@/lib/visual-entropy';
 import { startNetworkWatch } from '@/lib/network-profile';
@@ -223,53 +222,53 @@ export default function CopePage() {
       {/* ── LEFT — WALLET DASHBOARD ── */}
       <div style={{ flex: 1, overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <WalletDashboard />
-        {/* Temporary zone warning — pinned to bottom */}
-        <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
-          <div style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.18)', borderRadius: 12, padding: '7px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, flexShrink: 0 }}>⚠️</span>
-            <div>
-              <p style={{ color: '#fbbf24', fontSize: 10, fontWeight: 700, margin: '0 0 1px', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Temporary Session</p>
-              <p style={{ color: '#78350f', fontSize: 9, margin: 0, lineHeight: 1.4, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
-                RAM only — refreshing wipes this wallet. Save it in <strong style={{ color: '#d97706' }}>Secure Vault →</strong>
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* ── RIGHT — SECURE VAULT ── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', background: '#000', height: '100vh' }}>
-        <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 8, minHeight: '100%' }}>
+        <div style={{ padding: '14px 14px', display: 'flex', flexDirection: 'column', gap: 8, minHeight: '100%' }}>
 
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <div>
-              <h2 style={{ color: '#f9fafb', fontSize: 16, fontWeight: 800, margin: 0, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Secure Vault</h2>
-              <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Your private key guardian</p>
-            </div>
+          {/* Brand logo (top-right) */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
             <div ref={logoRef} data-aethilm="brand" onClick={handleLogoPanic} style={{ cursor: 'pointer' }}>
-              {isLoading ? <div style={{ width: 28, height: 28 }} /> :
+              {isLoading ? <div style={{ width: 24, height: 24 }} /> :
                logoUrl && !logoError
-                ? <Image src={logoUrl} alt="Cope Wallet" width={28} height={28} style={{ objectFit: 'contain' }} onError={() => setLogoError(true)} />
-                : <Shield size={24} style={{ color: '#4b5563' }} />}
+                ? <Image src={logoUrl} alt="Cope Wallet" width={24} height={24} style={{ objectFit: 'contain' }} onError={() => setLogoError(true)} />
+                : <Shield size={20} style={{ color: '#353535' }} />}
             </div>
           </div>
-          {/* Permanent zone note */}
-          <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: 12, padding: '7px 12px', marginBottom: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, flexShrink: 0 }}>🔐</span>
-            <div>
-              <p style={{ color: '#22c55e', fontSize: 10, fontWeight: 700, margin: 0, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Permanent Zone</p>
-              <p style={{ color: '#166534', fontSize: 9, margin: 0, lineHeight: 1.4, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Persist your session here to keep your wallet across refreshes.</p>
-            </div>
+
+          {/* Vault heading */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingBottom: 10, borderBottom: '1px solid #1a1a1a' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 40, color: '#52ffac' }}>shield_lock</span>
+            <h2 style={{ fontSize: 20, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', color: '#fff', margin: 0, letterSpacing: '-0.01em' }}>
+              Secure Vault
+            </h2>
+            <p style={{ color: '#c6c6c6', fontSize: 9, margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              Your Private Key Guardian
+            </p>
           </div>
+
+          {/* Volatile session warning */}
+          {wallet.mode !== 'PERSISTENT' && rightPanel === 'idle' && (
+            <div style={{ background: '#93000a', borderRadius: 12, padding: '9px 12px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#ffdad6', flexShrink: 0, marginTop: 1 }}>warning</span>
+              <div>
+                <p style={{ color: '#ffdad6', fontSize: 10, fontWeight: 700, margin: '0 0 1px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Temporary Session</p>
+                <p style={{ color: '#ffdad6', fontSize: 9, margin: 0, opacity: 0.85, lineHeight: 1.4 }}>
+                  RAM only — refreshing wipes this wallet. Persist it below.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* ── IDLE ── */}
           {rightPanel === 'idle' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { icon: <Download size={15} />, title: 'Persist Current Session', sub: 'Hardware Lock → PNG Key download', onClick: () => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }, disabled: !wallet.isUnlocked },
-                { icon: <RefreshCw size={15} />, title: 'Initialize New Secure Vault', sub: 'Wipe current session & start fresh', onClick: handleInitNewVault },
-                { icon: <Upload size={15} />, title: 'Access Existing Vault', sub: 'Drop your Favicon Key PNG', onClick: () => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); } },
+                { iconName: 'save', title: 'Persist Current Session', sub: 'Hardware Lock → PNG Key download', onClick: () => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }, disabled: !wallet.isUnlocked },
+                { iconName: 'add_circle', title: 'Initialize New Vault', sub: 'Wipe current session & start fresh', onClick: handleInitNewVault, disabled: false },
+                { iconName: 'lock_open', title: 'Access Existing Vault', sub: 'Drop your Favicon Key PNG', onClick: () => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); }, disabled: false },
               ].map((card, i) => (
                 <motion.div key={card.title} initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: i * 0.06 }}>
                   <VaultCard {...card} />
@@ -277,17 +276,17 @@ export default function CopePage() {
               ))}
 
               {/* Vault status */}
-              <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '10px 14px', marginTop: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
-                <p style={{ color: '#374151', fontSize: 8, letterSpacing: '0.12em', fontWeight: 700, margin: '0 0 6px', textTransform: 'uppercase' }}>Vault Status</p>
+              <div style={{ background: '#0d0d0d', borderRadius: 12, padding: '10px 14px', marginTop: 2, border: '1px solid #1a1a1a' }}>
+                <p style={{ color: '#353535', fontSize: 8, letterSpacing: '0.14em', fontWeight: 700, margin: '0 0 8px', textTransform: 'uppercase' }}>Vault Status</p>
                 {[
-                  { label: 'Mode', value: wallet.mode === 'PERSISTENT' ? '● Persistent' : '○ Volatile', color: wallet.mode === 'PERSISTENT' ? '#22c55e' : '#6b7280' },
-                  { label: 'Session', value: wallet.isUnlocked ? 'Active' : 'Idle', color: wallet.isUnlocked ? '#22c55e' : '#6b7280' },
-                  { label: 'Key Rotation', value: wallet.isPulseActive ? 'Rotating' : 'Active', color: wallet.isPulseActive ? '#f59e0b' : '#22c55e' },
-                  { label: 'Saved Vault', value: wallet.hasPersisted ? 'Found' : 'None', color: wallet.hasPersisted ? '#60a5fa' : '#6b7280' },
-                ].map(row => (
-                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                    <span style={{ color: '#4b5563', fontSize: 10 }}>{row.label}</span>
-                    <span style={{ color: row.color, fontSize: 10, fontWeight: 600 }}>{row.value}</span>
+                  { label: 'Mode', value: wallet.mode === 'PERSISTENT' ? '● Persistent' : '○ Volatile', color: wallet.mode === 'PERSISTENT' ? '#52ffac' : '#c6c6c6' },
+                  { label: 'Session', value: wallet.isUnlocked ? 'Active' : 'Idle', color: wallet.isUnlocked ? '#52ffac' : '#c6c6c6' },
+                  { label: 'Key Rotation', value: wallet.isPulseActive ? 'Rotating' : 'Active', color: wallet.isPulseActive ? '#facc15' : '#52ffac' },
+                  { label: 'Saved Vault', value: wallet.hasPersisted ? 'Found' : 'None', color: wallet.hasPersisted ? '#60a5fa' : '#353535' },
+                ].map((row, idx, arr) => (
+                  <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: idx < arr.length - 1 ? '1px solid #1a1a1a' : 'none' }}>
+                    <span style={{ color: '#c6c6c6', fontSize: 9 }}>{row.label}</span>
+                    <span style={{ color: row.color, fontSize: 9, fontWeight: 700 }}>{row.value}</span>
                   </div>
                 ))}
               </div>
@@ -295,7 +294,7 @@ export default function CopePage() {
               {/* Wipe session */}
               {wallet.isUnlocked && (
                 <button onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 100); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontSize: 9, display: 'flex', alignItems: 'center', gap: 3, padding: '2px 0', letterSpacing: '0.06em' }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#353535', fontSize: 8, display: 'flex', alignItems: 'center', gap: 3, padding: '2px 0', letterSpacing: '0.08em', textTransform: 'uppercase', alignSelf: 'center' }}>
                   <Lock size={8} /> Wipe &amp; Reset Session
                 </button>
               )}
@@ -307,27 +306,27 @@ export default function CopePage() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
               style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={() => setRightPanel('idle')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c6c6c6', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
                 ← Back
               </button>
-              <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ background: '#111', borderRadius: 16, padding: '14px 16px', border: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
-                  <h3 style={{ color: '#111827', fontSize: 13, fontWeight: 700, margin: '0 0 3px' }}>
-                    {rightPanel === 'new_vault' ? 'New Secure Vault' : 'Persist Session'}
+                  <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: '0 0 4px', letterSpacing: '-0.01em' }}>
+                    {rightPanel === 'new_vault' ? 'New Vault' : 'Persist Session'}
                   </h3>
-                  <p style={{ color: '#9ca3af', fontSize: 10, margin: 0, lineHeight: 1.4 }}>
+                  <p style={{ color: '#c6c6c6', fontSize: 10, margin: 0, lineHeight: 1.4 }}>
                     Set a passphrase. A Favicon Key PNG will be downloaded.
                   </p>
                 </div>
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '4px 12px' }}>
+                <div style={{ background: '#f9fafb', borderRadius: 10, padding: '4px 12px' }}>
                   <GhostCapsule type="password" placeholder="Vault passphrase (min 8 chars)" onValue={setPassphrase} className="w-full" theme="light" />
                 </div>
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '4px 12px' }}>
+                <div style={{ background: '#f9fafb', borderRadius: 10, padding: '4px 12px' }}>
                   <GhostCapsule type="password" placeholder="Confirm passphrase" onValue={setPassphraseConfirm} className="w-full" theme="light" />
                 </div>
-                {persistError && <p style={{ color: '#ef4444', fontSize: 10, margin: 0 }}>{persistError}</p>}
+                {persistError && <p style={{ color: '#ffdad6', fontSize: 10, margin: 0 }}>{persistError}</p>}
                 <button onClick={handlePersistSession} disabled={isProcessing}
-                  style={{ background: isProcessing ? '#e5e7eb' : '#111827', color: isProcessing ? '#9ca3af' : '#fff', border: 'none', borderRadius: 8, padding: '10px', fontSize: 12, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}>
+                  style={{ background: isProcessing ? '#1a1a1a' : '#52ffac', color: isProcessing ? '#c6c6c6' : '#000', border: 'none', borderRadius: 10, padding: '11px', fontSize: 12, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: isProcessing ? 'not-allowed' : 'pointer' }}>
                   {isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}
                 </button>
               </div>
@@ -339,15 +338,15 @@ export default function CopePage() {
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
               style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button onClick={() => setRightPanel('idle')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c6c6c6', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
                 ← Back
               </button>
-              <div style={{ background: '#fff', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ background: '#111', borderRadius: 16, padding: '14px 16px', border: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
-                  <h3 style={{ color: '#111827', fontSize: 13, fontWeight: 700, margin: '0 0 3px' }}>Access Existing Vault</h3>
-                  <p style={{ color: '#9ca3af', fontSize: 10, margin: 0, lineHeight: 1.4 }}>Enter your passphrase and drop the Favicon Key PNG.</p>
+                  <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: '0 0 4px', letterSpacing: '-0.01em' }}>Access Vault</h3>
+                  <p style={{ color: '#c6c6c6', fontSize: 10, margin: 0, lineHeight: 1.4 }}>Enter your passphrase and drop the Favicon Key PNG.</p>
                 </div>
-                <div style={{ background: '#f9fafb', borderRadius: 8, padding: '4px 12px' }}>
+                <div style={{ background: '#f9fafb', borderRadius: 10, padding: '4px 12px' }}>
                   <GhostCapsule type="password" placeholder="Vault passphrase" onValue={setPassphrase} className="w-full" theme="light" />
                 </div>
                 <div ref={dropRef}
@@ -355,13 +354,13 @@ export default function CopePage() {
                   onDragLeave={() => setDragOver(false)}
                   onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileDrop(f); }}
                   onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/png'; i.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleFileDrop(f); }; i.click(); }}
-                  style={{ border: `1.5px dashed ${dragOver ? '#6b7280' : '#d1d5db'}`, borderRadius: 8, padding: '20px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, cursor: 'pointer', background: dragOver ? '#f9fafb' : 'transparent' }}>
-                  <Upload size={18} style={{ color: '#9ca3af' }} />
-                  <p style={{ color: '#374151', fontSize: 11, margin: 0, fontWeight: 500 }}>Drop Favicon Key PNG</p>
-                  <p style={{ color: '#9ca3af', fontSize: 10, margin: 0 }}>or click to browse</p>
+                  style={{ border: `1.5px dashed ${dragOver ? '#52ffac' : '#353535'}`, borderRadius: 10, padding: '20px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer', background: dragOver ? 'rgba(82,255,172,0.04)' : 'transparent', transition: 'all 0.15s' }}>
+                  <Upload size={18} style={{ color: '#c6c6c6' }} />
+                  <p style={{ color: '#fff', fontSize: 11, margin: 0, fontWeight: 700 }}>Drop Favicon Key PNG</p>
+                  <p style={{ color: '#c6c6c6', fontSize: 9, margin: 0 }}>or click to browse</p>
                 </div>
-                {isProcessing && <p style={{ color: '#6b7280', fontSize: 10, textAlign: 'center' }}>Decoding...</p>}
-                {accessError && <p style={{ color: '#ef4444', fontSize: 10, margin: 0 }}>{accessError}</p>}
+                {isProcessing && <p style={{ color: '#c6c6c6', fontSize: 10, textAlign: 'center' }}>Decoding...</p>}
+                {accessError && <p style={{ color: '#ffdad6', fontSize: 10, margin: 0 }}>{accessError}</p>}
               </div>
             </motion.div>
           )}
@@ -369,16 +368,16 @@ export default function CopePage() {
           {/* ── SUCCESS ── */}
           {rightPanel === 'success' && (
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }}>
-              <div style={{ background: '#fff', borderRadius: 14, padding: '22px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Check size={20} style={{ color: '#16a34a' }} />
+              <div style={{ background: '#111', borderRadius: 16, padding: '24px 16px', border: '1px solid #1a1a1a', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '1.5px solid rgba(82,255,172,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={22} style={{ color: '#52ffac' }} />
                 </div>
-                <p style={{ color: '#111827', fontSize: 14, fontWeight: 700, margin: 0 }}>Vault Secured</p>
-                <p style={{ color: '#9ca3af', fontSize: 10, textAlign: 'center', margin: 0, lineHeight: 1.5, maxWidth: 200 }}>
+                <p style={{ color: '#fff', fontSize: 15, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: 0, letterSpacing: '-0.01em' }}>Vault Secured</p>
+                <p style={{ color: '#c6c6c6', fontSize: 10, textAlign: 'center', margin: 0, lineHeight: 1.5, maxWidth: 200 }}>
                   Favicon Key PNG downloaded. Store it safely — it is your only key.
                 </p>
                 <button onClick={() => setRightPanel('idle')}
-                  style={{ background: '#111827', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 11, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
+                  style={{ background: '#52ffac', color: '#000', border: 'none', borderRadius: 10, padding: '8px 22px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: 'pointer', marginTop: 4 }}>
                   ← Return
                 </button>
               </div>
@@ -388,7 +387,7 @@ export default function CopePage() {
           {/* Footer */}
           <div style={{ marginTop: 'auto', paddingTop: 12 }}>
             <a href={extLink} target="_blank" rel="noopener noreferrer" data-aethilm="brand"
-              style={{ color: '#1f2937', fontSize: 8, letterSpacing: '0.15em', textDecoration: 'none', display: 'block', textAlign: 'center' }}>
+              style={{ color: '#353535', fontSize: 8, letterSpacing: '0.15em', textDecoration: 'none', display: 'block', textAlign: 'center', textTransform: 'uppercase' }}>
               Made With Cope by{'\u200c'} Aethi{'\u200c'}lm
             </a>
           </div>
@@ -401,19 +400,26 @@ export default function CopePage() {
 }
 
 // ─── Vault Card ───────────────────────────────────────────────────────────────
-function VaultCard({ icon, title, sub, onClick, disabled = false }: {
-  icon: React.ReactNode; title: string; sub: string; onClick: () => void; disabled?: boolean;
+function VaultCard({ iconName, title, sub, onClick, disabled = false }: {
+  iconName: string; title: string; sub: string; onClick: () => void; disabled?: boolean;
 }) {
   return (
-    <CardSpotlight onClick={disabled ? undefined : onClick} disabled={disabled} radius={200} color="rgba(255,255,255,0.05)"
-      style={{ background: '#0d0d0d', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-      <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#9ca3af' }}>
-        {icon}
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      style={{
+        background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 14,
+        padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+        width: '100%', cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.4 : 1, textAlign: 'left', transition: 'border-color 0.15s',
+      }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1a1a1a', border: '1px solid #353535', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#52ffac' }}>{iconName}</span>
       </div>
       <div>
-        <p style={{ color: '#f3f4f6', fontSize: 11, fontWeight: 600, margin: 0 }}>{title}</p>
-        <p style={{ color: '#4b5563', fontSize: 9, margin: '2px 0 0' }}>{sub}</p>
+        <p style={{ color: '#fff', fontSize: 11, fontWeight: 700, margin: 0 }}>{title}</p>
+        <p style={{ color: '#c6c6c6', fontSize: 9, margin: '2px 0 0' }}>{sub}</p>
       </div>
-    </CardSpotlight>
+    </button>
   );
 }

@@ -24,10 +24,10 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              "style-src 'self' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com",
               "img-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://assets.coingecko.com https://coin-images.coingecko.com data: blob:",
-              "font-src 'self'",
+              "font-src 'self' https://fonts.gstatic.com",
               "frame-ancestors 'none'",
             ].join('; '),
           },

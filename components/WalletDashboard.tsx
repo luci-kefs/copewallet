@@ -5,7 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import {
   Send, Copy, History, RefreshCw, Check, X,
   ExternalLink, ArrowUpRight, ArrowDownLeft, Eye, EyeOff,
-  Zap, ChevronRight, Wifi, WifiOff, AlertCircle, Link,
+  Zap, Wifi, WifiOff, AlertCircle, Link,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
@@ -17,9 +17,7 @@ import { ephemeralSign } from '@/lib/signer';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
-import { FloatingDock } from '@/components/FloatingDock';
 import { ChainMarquee } from '@/components/ChainMarquee';
-import { CardSpotlight } from '@/components/CardSpotlight';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
@@ -66,7 +64,7 @@ function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
           {svgPath}
         </svg>
       ) : (
-        <span style={{ color: chain.color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+        <span style={{ color: chain.color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1 }}>
           {chain.shortName.slice(0, 3)}
         </span>
       )}
@@ -88,27 +86,26 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
     <button
       onClick={() => { onSelect(c); onClose(); }}
       style={{
-        background: selected.id === c.id ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.04)',
-        border: selected.id === c.id ? `1.5px solid ${c.color}88` : '1px solid rgba(255,255,255,0.08)',
+        background: selected.id === c.id ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
+        border: selected.id === c.id ? `1.5px solid #52ffac44` : '1px solid rgba(255,255,255,0.07)',
         borderRadius: 12, padding: '12px 8px',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-        cursor: 'pointer', position: 'relative', transition: 'all 0.15s',
-        width: '100%',
+        cursor: 'pointer', position: 'relative', transition: 'all 0.15s', width: '100%',
       }}>
       {selected.id === c.id && (
         <div style={{
           position: 'absolute', top: 7, right: 7,
-          width: 7, height: 7, borderRadius: '50%', background: '#22c55e',
+          width: 7, height: 7, borderRadius: '50%', background: '#52ffac',
         }} />
       )}
       <ChainIcon chain={c} size={34} />
       <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 700 }}>{c.symbol}</span>
-      <span style={{ color: '#9ca3af', fontSize: 9 }}>{c.name}</span>
+      <span style={{ color: '#c6c6c6', fontSize: 9 }}>{c.name}</span>
       {c.isTestnet
         ? <span style={{ background: '#4c1d9533', color: '#a78bfa', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>TESTNET</span>
         : c.isAlchemy
-          ? <span style={{ background: '#1e40af33', color: '#93c5fd', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>7702</span>
-          : <span style={{ background: '#374151', color: '#9ca3af', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>EOA</span>
+          ? <span style={{ background: 'rgba(82,255,172,0.1)', color: '#52ffac', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>GASLESS</span>
+          : <span style={{ background: '#353535', color: '#c6c6c6', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 600 }}>EOA</span>
       }
     </button>
   );
@@ -116,39 +113,40 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
   return (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{
-        background: '#111', borderRadius: 16, width: 360, maxWidth: '92vw',
+        background: '#111', borderRadius: 24, width: 360, maxWidth: '92vw',
         maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.1)',
         boxShadow: '0 24px 64px rgba(0,0,0,0.8)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>All Networks</span>
-          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>All Networks</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
             <X size={16} />
           </button>
         </div>
         <div style={{ overflowY: 'auto', padding: '16px 20px', flex: 1 }}>
-          <p style={{ color: '#6b7280', fontSize: 9, letterSpacing: '0.12em', fontWeight: 600, marginBottom: 10 }}>
-            EVM SMART WALLETS (GASLESS) ⓘ
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase' }}>
+            Smart Wallets (Gasless) ⓘ
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
             {smart.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#6b7280', fontSize: 9, letterSpacing: '0.12em', fontWeight: 600, marginBottom: 10 }}>
-            EVM EOA WALLETS ⓘ
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 10, textTransform: 'uppercase' }}>
+            EOA Wallets ⓘ
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             {eoa.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#6b7280', fontSize: 9, letterSpacing: '0.12em', fontWeight: 600, marginBottom: 10, marginTop: 4 }}>
-            TESTNETS (FREE)
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 10, marginTop: 16, textTransform: 'uppercase' }}>
+            Testnets (Free)
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
             {testnets.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#4b5563', fontSize: 9, textAlign: 'center' }}>
-            {CHAINS.length} networks
+          <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>
+            {CHAINS.length} networks supported
           </p>
         </div>
       </div>
@@ -188,48 +186,49 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: 16, width: 360, maxWidth: '92vw', padding: 20, boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: 24, width: 360, maxWidth: '92vw', padding: 20, border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <span style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>Send {chain.symbol}</span>
-          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
+          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>Send {chain.symbol}</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}>
             <X size={16} />
           </button>
         </div>
         {status === 'done' ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '20px 0' }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#16a34a22', border: '1.5px solid #16a34a66', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Check size={22} style={{ color: '#22c55e' }} />
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '1.5px solid rgba(82,255,172,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={22} style={{ color: '#52ffac' }} />
             </div>
-            <span style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>Broadcast!</span>
-            <span style={{ color: '#6b7280', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{txHash}</span>
+            <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase' }}>Broadcast!</span>
+            <span style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{txHash}</span>
             <a href={`${chain.explorerUrl}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
-              style={{ color: '#60a5fa', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+              style={{ color: '#52ffac', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
               View on Explorer <ExternalLink size={10} />
             </a>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '4px 12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '4px 12px', border: '1px solid rgba(255,255,255,0.07)' }}>
               <GhostCapsule type="text" placeholder={`Recipient address (0x...)`} onValue={setTo} className="w-full" />
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 10, padding: '4px 12px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: '4px 12px', border: '1px solid rgba(255,255,255,0.07)' }}>
               <GhostCapsule type="text" placeholder={`Amount (${chain.symbol})`} onValue={setAmount} className="w-full" />
             </div>
-            {errMsg && <span style={{ color: '#f87171', fontSize: 10 }}>{errMsg}</span>}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 8 }}>
+            {errMsg && <span style={{ color: '#ffdad6', fontSize: 10 }}>{errMsg}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
               <ChainIcon chain={chain} size={18} />
-              <span style={{ color: '#9ca3af', fontSize: 10 }}>Network: {chain.name}</span>
-              <span style={{ color: '#374151', fontSize: 9, marginLeft: 'auto' }}>Stealth delay active</span>
+              <span style={{ color: '#c6c6c6', fontSize: 10 }}>Network: {chain.name}</span>
+              <span style={{ color: '#353535', fontSize: 9, marginLeft: 'auto' }}>Stealth delay active</span>
             </div>
             <button
               onClick={handleSend}
               disabled={status === 'signing' || status === 'sending'}
               style={{
-                background: status === 'signing' || status === 'sending' ? '#374151' : '#fff',
-                color: status === 'signing' || status === 'sending' ? '#9ca3af' : '#000',
-                border: 'none', borderRadius: 10, padding: '12px', fontSize: 13,
-                fontWeight: 600, cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
+                background: status === 'signing' || status === 'sending' ? '#1a1a1a' : '#52ffac',
+                color: status === 'signing' || status === 'sending' ? '#c6c6c6' : '#000',
+                border: 'none', borderRadius: 12, padding: '13px', fontSize: 13,
+                fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '0.03em',
+                cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s',
               }}>
               {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${chain.symbol}`}
@@ -251,23 +250,23 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
   };
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#111', borderRadius: 22, width: 300, maxWidth: '92vw', padding: '22px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, boxShadow: '0 32px 80px rgba(0,0,0,0.9)' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#111', borderRadius: 24, width: 300, maxWidth: '92vw', padding: '22px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 32px 80px rgba(0,0,0,0.9)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <span style={{ color: '#fff', fontSize: 14, fontWeight: 800, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Receive</span>
-          <button onClick={onClose} style={{ color: '#6b7280', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, padding: 7, cursor: 'pointer', display: 'flex' }}><X size={14} /></button>
+          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>Receive</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10, padding: 7, cursor: 'pointer', display: 'flex' }}><X size={14} /></button>
         </div>
         <div style={{ background: '#fff', borderRadius: 16, padding: 14 }}>
           <QRCodeSVG value={address} size={180} level="M" />
         </div>
-        <p style={{ color: '#9ca3af', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0, padding: '0 4px' }}>
+        <p style={{ color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0, padding: '0 4px' }}>
           {address}
         </p>
         <button onClick={copy}
-          style={{ background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '7px 16px', fontSize: 10, color: copied ? '#22c55e' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
+          style={{ background: copied ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${copied ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 10, padding: '8px 18px', fontSize: 10, color: copied ? '#52ffac' : '#c6c6c6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700 }}>
           {copied ? <><Check size={11} /> Copied!</> : <><Copy size={11} /> Copy Address</>}
         </button>
-        <p style={{ color: '#374151', fontSize: 9, textAlign: 'center', margin: 0 }}>
+        <p style={{ color: '#353535', fontSize: 9, textAlign: 'center', margin: 0 }}>
           Send only EVM-compatible assets to this address
         </p>
       </div>
@@ -278,7 +277,6 @@ function QRModal({ address, onClose }: { address: string; onClose: () => void })
 // ─── Lightning Tab ────────────────────────────────────────────────────────────
 type LnStatus = 'idle' | 'connecting' | 'connected' | 'error';
 type LnSubTab = 'receive' | 'send';
-
 interface WebLNNode { alias?: string; pubkey?: string; color?: string; }
 
 function LightningTab() {
@@ -286,16 +284,12 @@ function LightningTab() {
   const [nodeInfo, setNodeInfo] = useState<WebLNNode | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [subTab, setSubTab] = useState<LnSubTab>('receive');
-
-  // Receive
   const [recvAmount, setRecvAmount] = useState('');
   const [recvMemo, setRecvMemo] = useState('');
   const [invoice, setInvoice] = useState('');
   const [invoiceCopied, setInvoiceCopied] = useState(false);
   const [genLoading, setGenLoading] = useState(false);
   const [genError, setGenError] = useState('');
-
-  // Send
   const [payReq, setPayReq] = useState('');
   const [payStatus, setPayStatus] = useState<'idle' | 'paying' | 'done' | 'error'>('idle');
   const [payError, setPayError] = useState('');
@@ -316,9 +310,7 @@ function LightningTab() {
         if (bal?.balance != null) setBalance(bal.balance);
       } catch {}
       setStatus('connected');
-    } catch {
-      setStatus('error');
-    }
+    } catch { setStatus('error'); }
   };
 
   const makeInvoice = async () => {
@@ -354,15 +346,15 @@ function LightningTab() {
     }
   };
 
-  // ── No WebLN installed ──
+  // ── No WebLN ──
   if (!hasWebLN) {
     return (
       <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ background: '#fef9c3', borderRadius: 10, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <AlertCircle size={14} style={{ color: '#ca8a04', flexShrink: 0, marginTop: 1 }} />
+        <div style={{ background: 'rgba(250,204,21,0.07)', border: '1px solid rgba(250,204,21,0.2)', borderRadius: 12, padding: '10px 12px', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <AlertCircle size={14} style={{ color: '#facc15', flexShrink: 0, marginTop: 1 }} />
           <div>
-            <p style={{ color: '#92400e', fontSize: 11, fontWeight: 600, margin: '0 0 2px' }}>No Lightning provider detected</p>
-            <p style={{ color: '#92400e', fontSize: 10, margin: 0, lineHeight: 1.5 }}>
+            <p style={{ color: '#facc15', fontSize: 11, fontWeight: 700, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>No Lightning Provider</p>
+            <p style={{ color: '#c6c6c6', fontSize: 10, margin: 0, lineHeight: 1.5 }}>
               Install a WebLN-compatible browser extension to enable Lightning payments.
             </p>
           </div>
@@ -372,38 +364,38 @@ function LightningTab() {
           { name: 'Zeus', desc: 'Connect your own LND / Core Lightning node', badge: 'Self-custody' },
           { name: 'Mutiny Wallet', desc: 'Browser-native Lightning + on-chain wallet', badge: 'PWA' },
         ].map(p => (
-          <div key={p.name} style={{ background: '#0d0d0d', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1c1c1c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div key={p.name} style={{ background: '#0d0d0d', borderRadius: 12, padding: '10px 12px', border: '1px solid #1a1a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Zap size={14} style={{ color: '#facc15' }} />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: '#f3f4f6', fontSize: 11, fontWeight: 600 }}>{p.name}</span>
-                <span style={{ background: '#1e3a8a33', color: '#93c5fd', fontSize: 8, padding: '1px 6px', borderRadius: 4, fontWeight: 600 }}>{p.badge}</span>
+                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>{p.name}</span>
+                <span style={{ background: 'rgba(82,255,172,0.1)', color: '#52ffac', fontSize: 8, padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>{p.badge}</span>
               </div>
-              <p style={{ color: '#6b7280', fontSize: 9, margin: '2px 0 0' }}>{p.desc}</p>
+              <p style={{ color: '#c6c6c6', fontSize: 9, margin: '2px 0 0' }}>{p.desc}</p>
             </div>
-            <Link size={12} style={{ color: '#374151', flexShrink: 0 }} />
+            <Link size={12} style={{ color: '#353535', flexShrink: 0 }} />
           </div>
         ))}
-        <p style={{ color: '#374151', fontSize: 9, textAlign: 'center' }}>After installing, reload this page to activate Lightning.</p>
+        <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>After installing, reload this page to activate Lightning.</p>
       </div>
     );
   }
 
-  // ── Not connected yet ──
+  // ── Not connected ──
   if (status === 'idle' || status === 'error') {
     return (
-      <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef9c3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {status === 'error' ? <WifiOff size={20} style={{ color: '#ca8a04' }} /> : <Zap size={20} style={{ color: '#ca8a04' }} />}
+      <div style={{ padding: '18px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(250,204,21,0.1)', border: '1px solid rgba(250,204,21,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {status === 'error' ? <WifiOff size={20} style={{ color: '#facc15' }} /> : <Zap size={20} style={{ color: '#facc15' }} />}
         </div>
-        <p style={{ color: '#f3f4f6', fontSize: 12, fontWeight: 600, margin: 0 }}>Lightning Network</p>
-        <p style={{ color: '#6b7280', fontSize: 10, textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
+        <p style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: 0 }}>Lightning Network</p>
+        <p style={{ color: '#c6c6c6', fontSize: 10, textAlign: 'center', margin: 0, lineHeight: 1.5 }}>
           {status === 'error' ? 'Connection failed. Make sure your node is online and try again.' : 'Connect your WebLN node to send and receive Lightning payments instantly.'}
         </p>
         <button onClick={connect}
-          style={{ background: '#facc15', color: '#000', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+          style={{ background: '#facc15', color: '#000', border: 'none', borderRadius: 10, padding: '9px 22px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
           <Wifi size={12} /> Connect Node
         </button>
       </div>
@@ -413,10 +405,10 @@ function LightningTab() {
   // ── Connecting ──
   if (status === 'connecting') {
     return (
-      <div style={{ padding: '14px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+      <div style={{ padding: '18px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
         <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-          style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(250,204,21,0.2)', borderTopColor: '#facc15' }} />
-        <p style={{ color: '#6b7280', fontSize: 10 }}>Requesting permission...</p>
+          style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(250,204,21,0.15)', borderTopColor: '#facc15' }} />
+        <p style={{ color: '#c6c6c6', fontSize: 10 }}>Requesting permission...</p>
       </div>
     );
   }
@@ -424,15 +416,12 @@ function LightningTab() {
   // ── Connected ──
   return (
     <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Node info card */}
       <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '8px 12px', border: '1px solid rgba(250,204,21,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', flexShrink: 0, animation: 'pulse-dot 2s ease-in-out infinite' }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ color: '#f3f4f6', fontSize: 11, fontWeight: 600, margin: 0 }}>
-            {nodeInfo?.alias || 'Lightning Node'}
-          </p>
+          <p style={{ color: '#fff', fontSize: 11, fontWeight: 700, margin: 0 }}>{nodeInfo?.alias || 'Lightning Node'}</p>
           {nodeInfo?.pubkey && (
-            <p style={{ color: '#6b7280', fontSize: 8, fontFamily: 'monospace', margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ color: '#c6c6c6', fontSize: 8, fontFamily: 'monospace', margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {nodeInfo.pubkey.slice(0, 20)}...{nodeInfo.pubkey.slice(-8)}
             </p>
           )}
@@ -440,42 +429,40 @@ function LightningTab() {
         {balance != null && (
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <p style={{ color: '#facc15', fontSize: 12, fontWeight: 700, margin: 0 }}>{balance.toLocaleString()}</p>
-            <p style={{ color: '#6b7280', fontSize: 8, margin: 0 }}>sats</p>
+            <p style={{ color: '#c6c6c6', fontSize: 8, margin: 0 }}>sats</p>
           </div>
         )}
       </div>
 
-      {/* Sub-tab bar */}
-      <div style={{ display: 'flex', gap: 4, background: '#0d0d0d', borderRadius: 8, padding: 3 }}>
+      <div style={{ display: 'flex', gap: 4, background: '#0d0d0d', borderRadius: 8, padding: 3, border: '1px solid #1a1a1a' }}>
         {(['receive', 'send'] as LnSubTab[]).map(t => (
           <button key={t} onClick={() => { setSubTab(t); setPayStatus('idle'); setInvoice(''); }}
-            style={{ flex: 1, background: subTab === t ? '#1c1c1c' : 'none', border: subTab === t ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent', borderRadius: 6, padding: '5px 0', fontSize: 10, fontWeight: subTab === t ? 600 : 400, color: subTab === t ? '#f3f4f6' : '#6b7280', cursor: 'pointer', textTransform: 'capitalize' }}>
+            style={{ flex: 1, background: subTab === t ? '#1a1a1a' : 'none', border: subTab === t ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent', borderRadius: 6, padding: '5px 0', fontSize: 10, fontWeight: subTab === t ? 700 : 400, color: subTab === t ? '#52ffac' : '#c6c6c6', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             {t === 'receive' ? '↓ Receive' : '↑ Send'}
           </button>
         ))}
       </div>
 
-      {/* RECEIVE */}
       {subTab === 'receive' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: '3px 10px' }}>
-            <GhostCapsule type="text" placeholder="Amount (sats)" onValue={setRecvAmount} className="w-full" theme="light" />
+          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <GhostCapsule type="text" placeholder="Amount (sats)" onValue={setRecvAmount} className="w-full" />
           </div>
-          <div style={{ background: '#f9fafb', borderRadius: 8, padding: '3px 10px' }}>
-            <GhostCapsule type="text" placeholder="Memo (optional)" onValue={setRecvMemo} className="w-full" theme="light" />
+          <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <GhostCapsule type="text" placeholder="Memo (optional)" onValue={setRecvMemo} className="w-full" />
           </div>
-          {genError && <p style={{ color: '#ef4444', fontSize: 9, margin: 0 }}>{genError}</p>}
+          {genError && <p style={{ color: '#ffdad6', fontSize: 9, margin: 0 }}>{genError}</p>}
           <button onClick={makeInvoice} disabled={genLoading}
-            style={{ background: genLoading ? '#374151' : '#facc15', color: genLoading ? '#9ca3af' : '#000', border: 'none', borderRadius: 8, padding: '8px', fontSize: 11, fontWeight: 700, cursor: genLoading ? 'not-allowed' : 'pointer' }}>
+            style={{ background: genLoading ? '#1a1a1a' : '#facc15', color: genLoading ? '#c6c6c6' : '#000', border: 'none', borderRadius: 10, padding: '9px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: genLoading ? 'not-allowed' : 'pointer' }}>
             {genLoading ? 'Generating...' : 'Generate Invoice'}
           </button>
           {invoice && (
-            <div style={{ background: '#0d0d0d', borderRadius: 8, padding: '8px 10px', border: '1px solid rgba(250,204,21,0.2)' }}>
-              <p style={{ color: '#6b7280', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', margin: '0 0 6px', lineHeight: 1.4 }}>
+            <div style={{ background: '#0d0d0d', borderRadius: 10, padding: '8px 10px', border: '1px solid rgba(250,204,21,0.2)' }}>
+              <p style={{ color: '#c6c6c6', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', margin: '0 0 6px', lineHeight: 1.4 }}>
                 {invoice.slice(0, 60)}...
               </p>
               <button onClick={copyInvoice}
-                style={{ background: invoiceCopied ? '#16a34a22' : 'rgba(255,255,255,0.06)', border: `1px solid ${invoiceCopied ? '#16a34a44' : 'rgba(255,255,255,0.08)'}`, borderRadius: 6, padding: '5px 10px', fontSize: 9, color: invoiceCopied ? '#22c55e' : '#9ca3af', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                style={{ background: invoiceCopied ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.06)', border: `1px solid ${invoiceCopied ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 6, padding: '5px 10px', fontSize: 9, color: invoiceCopied ? '#52ffac' : '#c6c6c6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 700 }}>
                 {invoiceCopied ? <><Check size={10} /> Copied!</> : <><Copy size={10} /> Copy Full Invoice</>}
               </button>
             </div>
@@ -483,37 +470,36 @@ function LightningTab() {
         </div>
       )}
 
-      {/* SEND */}
       {subTab === 'send' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {payStatus === 'done' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-              <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#16a34a22', border: '1px solid #16a34a44', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Check size={18} style={{ color: '#22c55e' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '10px 0' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '1px solid rgba(82,255,172,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Check size={20} style={{ color: '#52ffac' }} />
               </div>
-              <p style={{ color: '#f3f4f6', fontSize: 12, fontWeight: 600, margin: 0 }}>Payment Sent!</p>
+              <p style={{ color: '#fff', fontSize: 13, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', margin: 0 }}>Payment Sent!</p>
               {payPreimage && (
-                <p style={{ color: '#6b7280', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0 }}>
+                <p style={{ color: '#c6c6c6', fontSize: 8, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center', margin: 0 }}>
                   Preimage: {payPreimage.slice(0, 20)}...
                 </p>
               )}
               <button onClick={() => { setPayStatus('idle'); setPayReq(''); setPayPreimage(''); }}
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 14px', fontSize: 10, color: '#9ca3af', cursor: 'pointer' }}>
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '6px 16px', fontSize: 10, color: '#c6c6c6', cursor: 'pointer', fontWeight: 600 }}>
                 Send Another
               </button>
             </div>
           ) : (
             <>
-              <div style={{ background: '#f9fafb', borderRadius: 8, padding: '3px 10px' }}>
-                <GhostCapsule type="text" placeholder="Paste BOLT11 invoice (lnbc...)" onValue={setPayReq} className="w-full" theme="light" />
+              <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <GhostCapsule type="text" placeholder="Paste BOLT11 invoice (lnbc...)" onValue={setPayReq} className="w-full" />
               </div>
-              {payError && <p style={{ color: '#ef4444', fontSize: 9, margin: 0 }}>{payError}</p>}
+              {payError && <p style={{ color: '#ffdad6', fontSize: 9, margin: 0 }}>{payError}</p>}
               <button onClick={payInvoice} disabled={payStatus === 'paying' || !payReq.trim()}
-                style={{ background: payStatus === 'paying' ? '#374151' : '#facc15', color: payStatus === 'paying' ? '#9ca3af' : '#000', border: 'none', borderRadius: 8, padding: '8px', fontSize: 11, fontWeight: 700, cursor: payStatus === 'paying' || !payReq.trim() ? 'not-allowed' : 'pointer' }}>
+                style={{ background: payStatus === 'paying' ? '#1a1a1a' : '#facc15', color: payStatus === 'paying' ? '#c6c6c6' : '#000', border: 'none', borderRadius: 10, padding: '9px', fontSize: 11, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', cursor: payStatus === 'paying' || !payReq.trim() ? 'not-allowed' : 'pointer' }}>
                 {payStatus === 'paying' ? 'Sending...' : '⚡ Pay Invoice'}
               </button>
-              <p style={{ color: '#374151', fontSize: 8, textAlign: 'center', margin: 0 }}>
-                Supports BOLT11 invoices • Powered by WebLN
+              <p style={{ color: '#353535', fontSize: 8, textAlign: 'center', margin: 0 }}>
+                Supports BOLT11 invoices · Powered by WebLN
               </p>
             </>
           )}
@@ -558,7 +544,6 @@ export function WalletDashboard() {
     }
   };
 
-  // Load token balances
   const loadTokens = useCallback(async () => {
     if (!address) return;
     setIsLoadingTokens(true);
@@ -573,21 +558,16 @@ export function WalletDashboard() {
         const p = await getPrices(cgIds);
         setPrices(p);
       }
-    } finally {
-      setIsLoadingTokens(false);
-    }
+    } finally { setIsLoadingTokens(false); }
   }, [address, selectedChain.id]);
 
-  // Load TX history
   const loadTxs = useCallback(async () => {
     if (!address) return;
     setIsLoadingTxs(true);
     try {
       const history = await fetchTxHistory(address, selectedChain.id);
       setTxs(history);
-    } finally {
-      setIsLoadingTxs(false);
-    }
+    } finally { setIsLoadingTxs(false); }
   }, [address, selectedChain.id]);
 
   useEffect(() => {
@@ -615,30 +595,18 @@ export function WalletDashboard() {
     return sum + parseFloat(t.balance || '0') * price;
   }, 0);
 
-  // Featured 4 chains for the quick row
   const featuredChains = CHAINS.slice(0, 4);
 
-  const dockItems = [
-    { label: 'QR / Receive', icon: <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="5" y="5" width="3" height="3" fill="currentColor"/><rect x="16" y="5" width="3" height="3" fill="currentColor"/><rect x="5" y="16" width="3" height="3" fill="currentColor"/><path d="M14 14h3v3m0 4v-4h4M14 21h4"/></svg>, onClick: () => setShowQR(true), color: '#059669' },
-    { label: 'Send', icon: <Send size={18} />, onClick: () => setShowSend(true) },
-    { label: copied ? 'Copied!' : 'Copy Addr', icon: copied ? <Check size={18} /> : <Copy size={18} />, onClick: handleCopy },
-    { label: 'History', icon: <History size={18} />, onClick: () => setActiveTab('transactions'), active: activeTab === 'transactions' },
-    { label: 'New Session', icon: <RefreshCw size={18} />, onClick: () => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); } },
-  ];
-
+  // ── Loading state ──
   if (!wallet.isUnlocked) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12 }}>
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-          style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.08)', borderTopColor: 'rgba(255,255,255,0.5)' }}
+          style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.15)', borderTopColor: '#52ffac' }}
         />
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          style={{ color: '#6b7280', fontSize: 12 }}
-        >
+        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ color: '#c6c6c6', fontSize: 11, letterSpacing: '0.08em' }}>
           Generating wallet...
         </motion.span>
       </div>
@@ -651,159 +619,203 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <div style={{ background: 'transparent', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* ── Header ── */}
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
-          style={{ textAlign: 'center', paddingBottom: 2 }}>
-          <h2 style={{ color: '#f9fafb', fontSize: 15, fontWeight: 800, margin: 0, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>New Session</h2>
-          <p style={{ color: '#6b7280', fontSize: 10, margin: '2px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>Volatile wallet — RAM only</p>
+        {/* ── Network Pill ── */}
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setShowNetworks(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#1a1a1a', border: '1px solid #353535', borderRadius: 100, padding: '5px 12px 5px 6px', cursor: 'pointer' }}>
+            <ChainIcon chain={selectedChain} size={22} />
+            <span style={{ color: '#fff', fontSize: 10, fontWeight: 700 }}>{selectedChain.name}</span>
+            <span style={{ color: '#52ffac', fontSize: 11, lineHeight: 1, marginLeft: 1 }}>▾</span>
+          </button>
+          <span style={{
+            background: selectedChain.isTestnet ? '#4c1d9533' : selectedChain.isAlchemy ? 'rgba(82,255,172,0.1)' : '#353535',
+            color: selectedChain.isTestnet ? '#a78bfa' : selectedChain.isAlchemy ? '#52ffac' : '#c6c6c6',
+            fontSize: 8, padding: '2px 9px', borderRadius: 20, fontWeight: 700, letterSpacing: '0.08em',
+          }}>
+            {selectedChain.isTestnet ? 'TESTNET' : selectedChain.isAlchemy ? 'GASLESS' : 'EOA'}
+          </span>
         </motion.div>
 
-        {/* ── Address Card (white) ── */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}
-          style={{ background: '#fff', borderRadius: 18, padding: '10px 16px', textAlign: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
-            <span style={{ color: '#374151', fontSize: 11, fontWeight: 700, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>{selectedChain.name} Wallet</span>
-            <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 8, padding: '2px 8px', borderRadius: 20, fontWeight: 700, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>GasLess / EIP-7702</span>
-          </div>
-          <p style={{ color: '#1e3a8a', fontSize: 13, fontWeight: 800, letterSpacing: '0.04em', margin: 0, fontFamily: 'monospace', cursor: 'pointer' }} onClick={handleCopy}>
-            {shortAddr}
+        {/* ── Session Heading ── */}
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.03 }}>
+          <h2 style={{
+            fontSize: 26, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase',
+            color: '#fff', margin: 0, letterSpacing: '-0.02em', lineHeight: 1.05,
+          }}>
+            {wallet.mode === 'PERSISTENT' ? 'Persistent\nSession' : 'New\nSession'}
+          </h2>
+          <p style={{ color: '#c6c6c6', fontSize: 9, margin: '4px 0 0', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            {wallet.mode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile · RAM Only'}
           </p>
-          <p style={{ color: '#9ca3af', fontSize: 8, margin: '3px 0 0', fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
-            {wallet.mode === 'PERSISTENT' ? '● Persistent mode' : '○ Volatile — wipes on close'}
-          </p>
-          {/* Session lock toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 8, paddingTop: 7, borderTop: '1px solid #f3f4f6' }}>
-            <span style={{ color: '#6b7280', fontSize: 9, fontFamily: "'SF Pro Rounded', 'Inter', system-ui, sans-serif" }}>
-              Keep session on refresh
+        </motion.div>
+
+        {/* ── Session Lock Toggle ── */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2, delay: 0.06 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, borderTop: '1px solid #1a1a1a' }}>
+          <span style={{ color: '#c6c6c6', fontSize: 9, flex: 1, letterSpacing: '0.04em' }}>Keep session on refresh</span>
+          <button
+            onClick={handleSessionToggle}
+            disabled={sessionToggling || !wallet.isUnlocked}
+            aria-label="Toggle session lock"
+            style={{
+              width: 44, height: 24, borderRadius: 12,
+              background: wallet.isSessionLocked ? '#52ffac' : '#353535',
+              border: 'none',
+              cursor: sessionToggling || !wallet.isUnlocked ? 'not-allowed' : 'pointer',
+              position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0,
+              opacity: !wallet.isUnlocked ? 0.4 : 1,
+            }}>
+            <div style={{
+              position: 'absolute', top: 3, left: wallet.isSessionLocked ? 23 : 3,
+              width: 18, height: 18, borderRadius: '50%',
+              background: wallet.isSessionLocked ? '#000' : '#fff',
+              transition: 'left 0.2s',
+            }} />
+          </button>
+        </motion.div>
+
+        {/* ── Balance ── */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.08 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <span style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700 }}>
+              Total Curated Value
             </span>
-            <button
-              onClick={handleSessionToggle}
-              disabled={sessionToggling || !wallet.isUnlocked}
-              aria-label="Toggle session lock"
-              style={{
-                width: 34, height: 18, borderRadius: 9,
-                background: wallet.isSessionLocked ? '#16a34a' : '#d1d5db',
-                border: 'none', cursor: sessionToggling || !wallet.isUnlocked ? 'not-allowed' : 'pointer',
-                position: 'relative', transition: 'background 0.2s', flexShrink: 0, padding: 0,
-                opacity: !wallet.isUnlocked ? 0.4 : 1,
-              }}>
-              <div style={{
-                position: 'absolute', top: 2, left: wallet.isSessionLocked ? 18 : 2,
-                width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
+            <button onClick={() => setHideBalance(!hideBalance)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#353535', padding: 0, display: 'flex' }}>
+              {hideBalance ? <Eye size={11} /> : <EyeOff size={11} />}
             </button>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: '#52ffac', fontSize: 30, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.02em', lineHeight: 1 }}>
+              {hideBalance ? '••••' : formatUSD(totalUSD)}
+            </span>
+            {isLoadingTokens && (
+              <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+            )}
+          </div>
         </motion.div>
 
-        {/* ── Floating Dock ── */}
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}>
-          <FloatingDock items={dockItems} />
+        {/* ── Address Card ── */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.1 }}
+          style={{ background: '#fff', borderRadius: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ color: '#9ca3af', fontSize: 8, margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+              {selectedChain.isAlchemy ? 'Smart Wallet · EIP-7702' : 'EOA Wallet'}
+            </p>
+            <span style={{ color: '#000', fontSize: 12, fontWeight: 700, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: '0.02em' }} onClick={handleCopy}>
+              {shortAddr}
+            </span>
+          </div>
+          <button onClick={handleCopy} style={{ background: copied ? '#dcfce7' : '#f3f4f6', border: 'none', borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, color: copied ? '#16a34a' : '#6b7280' }}>
+            {copied ? <><Check size={10} /><span style={{ fontSize: 9, fontWeight: 700 }}>Copied!</span></> : <Copy size={11} />}
+          </button>
         </motion.div>
 
-        {/* ── Networks (dark card) ── */}
+        {/* ── 2×2 Action Grid ── */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.12 }}
+          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {[
+            { icon: 'qr_code_2', label: 'RECEIVE', sub: 'Show QR code', onClick: () => setShowQR(true), accent: '#52ffac' },
+            { icon: 'send', label: 'SEND', sub: `Transfer ${selectedChain.symbol}`, onClick: () => setShowSend(true), accent: '#fff' },
+            { icon: 'content_copy', label: copied ? 'COPIED!' : 'COPY ADDR', sub: 'Copy to clipboard', onClick: handleCopy, accent: copied ? '#52ffac' : '#fff' },
+            { icon: 'bolt', label: 'LIGHTNING', sub: 'WebLN payments', onClick: () => setActiveTab('lightning'), accent: activeTab === 'lightning' ? '#facc15' : '#fff' },
+          ].map((item) => (
+            <button key={item.label} onClick={item.onClick} style={{
+              background: '#1a1a1a',
+              border: `1px solid ${item.accent === '#52ffac' || item.accent === '#facc15' ? item.accent + '33' : '#353535'}`,
+              borderRadius: 14, padding: '12px 10px',
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+              cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s',
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: item.accent, lineHeight: 1 }}>
+                {item.icon}
+              </span>
+              <div>
+                <p style={{ color: '#fff', fontSize: 10, fontWeight: 900, letterSpacing: '0.06em', margin: 0 }}>{item.label}</p>
+                <p style={{ color: '#c6c6c6', fontSize: 8, margin: '2px 0 0' }}>{item.sub}</p>
+              </div>
+            </button>
+          ))}
+        </motion.div>
+
+        {/* ── Quick Switch Networks ── */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
-          style={{ background: '#0d0d0d', borderRadius: 14, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}
-        >
+          style={{ background: '#0d0d0d', borderRadius: 14, padding: '10px 12px', border: '1px solid #1a1a1a' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#f9fafb', fontSize: 12, fontWeight: 600 }}>More Networks</span>
+            <span style={{ color: '#c6c6c6', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Quick Switch</span>
             <button
               onClick={() => setShowNetworks(true)}
-              style={{ color: '#6b7280', background: 'none', border: 'none', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
-              See List <ChevronRight size={12} />
+              style={{ color: '#52ffac', background: 'none', border: 'none', fontSize: 9, cursor: 'pointer', fontWeight: 700, letterSpacing: '0.06em' }}>
+              All Networks →
             </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, marginBottom: 8 }}>
-            {featuredChains.map((c, i) => (
-              <motion.button key={c.id}
-                initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.18 + i * 0.04 }}
-                whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedChain(c)}
-                style={{
-                  background: selectedChain.id === c.id ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)',
-                  border: selectedChain.id === c.id ? `1px solid ${c.color}55` : '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: 8, padding: '7px 4px',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer',
-                }}>
-                <ChainIcon chain={c} size={28} />
-                <span style={{ color: '#e5e7eb', fontSize: 9, fontWeight: 700 }}>{c.name}</span>
+            {featuredChains.map((c) => (
+              <button key={c.id} onClick={() => setSelectedChain(c)} style={{
+                background: selectedChain.id === c.id ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
+                border: selectedChain.id === c.id ? '1px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 8, padding: '6px 4px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, cursor: 'pointer',
+              }}>
+                <ChainIcon chain={c} size={24} />
+                <span style={{ color: '#e5e7eb', fontSize: 8, fontWeight: 700 }}>{c.shortName}</span>
                 {c.isTestnet
-                  ? <span style={{ background: '#4c1d9533', color: '#a78bfa', fontSize: 6, padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>TESTNET</span>
-                  : <span style={{ color: c.color, fontSize: 7, fontWeight: 600 }}>Gasless</span>
+                  ? <span style={{ color: '#a78bfa', fontSize: 6, fontWeight: 700 }}>TEST</span>
+                  : <span style={{ color: selectedChain.id === c.id ? '#52ffac' : '#353535', fontSize: 6, fontWeight: 700 }}>
+                      {c.isAlchemy ? '7702' : 'EOA'}
+                    </span>
                 }
-                <span style={{ color: '#374151', fontSize: 6 }}>{c.isTestnet ? 'Free ETH' : 'EIP-7702'}</span>
-              </motion.button>
+              </button>
             ))}
           </div>
-          {/* Chain marquee ticker */}
           <ChainMarquee />
         </motion.div>
 
-        {/* ── Balance / Transactions Card (white) ── */}
+        {/* ── Balance / Txs / Lightning Card ── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.22 }}
-          style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}
-        >
+          transition={{ duration: 0.32, delay: 0.18 }}
+          style={{ background: '#111', borderRadius: 16, overflow: 'hidden', border: '1px solid #1a1a1a' }}>
           {/* Tab bar */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid #1a1a1a' }}>
             {(['balance', 'transactions', 'lightning'] as Tab[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 style={{
-                  background: 'none', border: 'none', padding: '9px 0', marginRight: 14,
-                  fontSize: 11, fontWeight: activeTab === tab ? 700 : 400,
-                  color: activeTab === tab ? '#111827' : '#9ca3af',
-                  borderBottom: activeTab === tab ? '2px solid #111827' : '2px solid transparent',
-                  cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  background: 'none', border: 'none', padding: '10px 0', marginRight: 14,
+                  fontSize: 10, fontWeight: activeTab === tab ? 700 : 400,
+                  color: activeTab === tab ? '#52ffac' : '#c6c6c6',
+                  borderBottom: activeTab === tab ? '2px solid #52ffac' : '2px solid transparent',
+                  cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase',
+                  whiteSpace: 'nowrap',
                 }}>
                 {tab === 'balance' ? 'Balance' : tab === 'transactions' ? 'Txs' : '⚡ Lightning'}
               </button>
             ))}
             <button
               onClick={handleRefresh}
-              style={{ marginLeft: 'auto', background: '#f9fafb', border: 'none', borderRadius: 7, padding: 5, cursor: 'pointer', display: 'flex', color: '#374151' }}>
-              <RefreshCw size={11} className={isRefreshing ? 'animate-spin' : ''} />
+              style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: 6, padding: 5, cursor: 'pointer', display: 'flex', color: '#c6c6c6' }}>
+              <RefreshCw size={10} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
           </div>
 
           {/* BALANCE TAB */}
           {activeTab === 'balance' && (
             <div style={{ padding: '10px 12px' }}>
-              {/* Total balance row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 1 }}>
-                    <span style={{ color: '#6b7280', fontSize: 9 }}>Total Balance</span>
-                    <button
-                      onClick={() => setHideBalance(!hideBalance)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex', padding: 0 }}>
-                      {hideBalance ? <Eye size={10} /> : <EyeOff size={10} />}
-                    </button>
-                  </div>
-                  <span style={{ color: '#111827', fontSize: 22, fontWeight: 800 }}>
-                    {hideBalance ? '••••' : formatUSD(totalUSD)}
-                  </span>
-                </div>
-                <span style={{ background: '#dcfce7', color: '#16a34a', fontSize: 9, padding: '3px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600, marginTop: 3 }}>
-                  ↗ Live
-                </span>
-              </div>
-
-              {/* Token list */}
               {isLoadingTokens ? (
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : tokens.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '12px 0', color: '#9ca3af', fontSize: 10 }}>
+                <div style={{ textAlign: 'center', padding: '14px 0', color: '#c6c6c6', fontSize: 10 }}>
                   No assets on {selectedChain.name}
                 </div>
               ) : (
@@ -814,24 +826,24 @@ export function WalletDashboard() {
                     const usdVal = parseFloat(token.balance || '0') * price;
                     return (
                       <div key={`${token.contractAddress}-${i}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i > 0 ? '1px solid #f3f4f6' : 'none' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: i > 0 ? '1px solid #1a1a1a' : 'none' }}>
                         {token.logo
                           ? <img src={token.logo} alt={token.symbol} style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                           : (
-                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <span style={{ color: '#374151', fontSize: 9, fontWeight: 700 }}>{token.symbol.slice(0, 2)}</span>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <span style={{ color: '#c6c6c6', fontSize: 9, fontWeight: 700 }}>{token.symbol.slice(0, 2)}</span>
                             </div>
                           )
                         }
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, color: '#111827', fontSize: 11, fontWeight: 600 }}>{token.symbol}</p>
-                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>{token.name.toUpperCase()}</p>
+                          <p style={{ margin: 0, color: '#fff', fontSize: 11, fontWeight: 600 }}>{token.symbol}</p>
+                          <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9 }}>{token.name}</p>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <p style={{ margin: 0, color: '#111827', fontSize: 11, fontWeight: 600 }}>
+                          <p style={{ margin: 0, color: '#fff', fontSize: 11, fontWeight: 600 }}>
                             {hideBalance ? '••••' : `${parseFloat(token.balance) < 0.000001 ? '< 0.000001' : token.balance} ${token.symbol}`}
                           </p>
-                          <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>
+                          <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9 }}>
                             {price > 0 ? (hideBalance ? '••••' : formatUSD(usdVal)) : 'No price data'}
                           </p>
                         </div>
@@ -848,10 +860,10 @@ export function WalletDashboard() {
             <div style={{ padding: '6px 0' }}>
               {isLoadingTxs ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid #e5e7eb', borderTopColor: '#374151', animation: 'spin 1s linear infinite' }} />
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
                 </div>
               ) : txs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '16px 12px', color: '#9ca3af', fontSize: 10 }}>
+                <div style={{ textAlign: 'center', padding: '16px 12px', color: '#c6c6c6', fontSize: 10 }}>
                   {selectedChain.isAlchemy ? `No transactions on ${selectedChain.name}` : 'TX history requires Alchemy RPC'}
                 </div>
               ) : (
@@ -860,23 +872,23 @@ export function WalletDashboard() {
                   const date = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
                   return (
                     <a key={tx.hash} href={`${selectedChain.explorerUrl}/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer"
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', textDecoration: 'none', borderBottom: '1px solid #f9fafb', transition: 'background 0.1s' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', textDecoration: 'none', borderBottom: '1px solid #1a1a1a', transition: 'background 0.1s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#1a1a1a')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: isOut ? '#fef2f2' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {isOut ? <ArrowUpRight size={12} style={{ color: '#ef4444' }} /> : <ArrowDownLeft size={12} style={{ color: '#22c55e' }} />}
+                      <div style={{ width: 28, height: 28, borderRadius: '50%', background: isOut ? 'rgba(239,68,68,0.1)' : 'rgba(82,255,172,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {isOut ? <ArrowUpRight size={12} style={{ color: '#ef4444' }} /> : <ArrowDownLeft size={12} style={{ color: '#52ffac' }} />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, color: '#111827', fontSize: 11, fontWeight: 600 }}>{isOut ? 'Sent' : 'Received'}</p>
-                        <p style={{ margin: 0, color: '#9ca3af', fontSize: 9, fontFamily: 'monospace' }}>
+                        <p style={{ margin: 0, color: '#fff', fontSize: 11, fontWeight: 600 }}>{isOut ? 'Sent' : 'Received'}</p>
+                        <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9, fontFamily: 'monospace' }}>
                           {tx.hash.slice(0, 10)}...{tx.hash.slice(-4)}
                         </p>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: isOut ? '#ef4444' : '#22c55e' }}>
+                        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: isOut ? '#ef4444' : '#52ffac' }}>
                           {isOut ? '-' : '+'}{tx.value} {tx.asset}
                         </p>
-                        <p style={{ margin: 0, color: '#9ca3af', fontSize: 9 }}>{date}</p>
+                        <p style={{ margin: 0, color: '#c6c6c6', fontSize: 9 }}>{date}</p>
                       </div>
                     </a>
                   );
@@ -888,6 +900,14 @@ export function WalletDashboard() {
           {/* LIGHTNING TAB */}
           {activeTab === 'lightning' && <LightningTab />}
         </motion.div>
+
+        {/* ── New Session ── */}
+        <button
+          onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#353535', fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', padding: '2px 0', alignSelf: 'center' }}>
+          ↺ New Session
+        </button>
+
       </div>
     </>
   );
