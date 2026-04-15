@@ -474,6 +474,9 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionToggling, setSessionToggling] = useState(false);
+  // Track whether wallet was ever unlocked — if yes, never show skeleton again
+  const [everUnlocked, setEverUnlocked] = useState(false);
+  useEffect(() => { if (wallet.isUnlocked) setEverUnlocked(true); }, [wallet.isUnlocked]);
 
   const address = wallet.activeAddress;
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
@@ -531,7 +534,7 @@ export function WalletDashboard() {
   }, 0);
 
   // ── Loading ──
-  if (!wallet.isUnlocked) {
+  if (!wallet.isUnlocked && !everUnlocked) {
     return (
       <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-12 animate-pulse">
