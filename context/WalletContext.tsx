@@ -262,8 +262,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!state._v_enc) return null;
     try {
       const hwId = await getHardwareUUID();
-      const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
-      return mnemonic || null;
+      for (const k of [getCurrentKey() + hwId, getCurrentKey()]) {
+        try {
+          const m = decryptData(state._v_enc, k);
+          if (m && m.trim().split(/\s+/).length >= 12) return m;
+        } catch {}
+      }
+      return null;
     } catch {
       return null;
     }
@@ -273,7 +278,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const enablePersistentMode = useCallback(async (passphrase: string) => {
     if (!state._v_enc) return;
     const hwId = await getHardwareUUID();
-    const mnemonic = decryptData(state._v_enc, getCurrentKey() + hwId);
+    let mnemonic = '';
+    for (const k of [getCurrentKey() + hwId, getCurrentKey()]) {
+      try {
+        const m = decryptData(state._v_enc, k);
+        if (m && m.trim().split(/\s+/).length >= 12) { mnemonic = m; break; }
+      } catch {}
+    }
+    if (!mnemonic) throw new Error('Vault empty');
     await persistVault(mnemonic, passphrase, hwId);
     setState((p) => ({ ...p, mode: 'PERSISTENT' }));
   }, [state._v_enc]);

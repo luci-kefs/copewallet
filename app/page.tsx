@@ -133,7 +133,6 @@ export default function CopePage() {
 
   // ── PERSIST SESSION ────────────────────────────────────────────
   const handlePersistSession = async () => {
-    if (!wallet.isUnlocked) return;
     if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
@@ -142,11 +141,10 @@ export default function CopePage() {
       if (!mnemonic) throw new Error('Vault empty');
       await wallet.enablePersistentMode(passphrase);
       const hwId = await getHardwareUUID();
-      // Use stable key (hwId + passphrase only — no rotating session key)
       const encPayload = encryptData(mnemonic, hwId + passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
-    } catch { setPersistError('Operation failed. Try again.'); }
+    } catch (e) { setPersistError(e instanceof Error ? e.message : 'Operation failed. Try again.'); }
     finally { setIsProcessing(false); }
   };
 
