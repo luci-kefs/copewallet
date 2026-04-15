@@ -148,7 +148,17 @@ function SendModal({ chain, onClose }: { chain: Chain; onClose: () => void }) {
       setTxHash(sent.hash);
       setStatus('done');
     } catch (e: unknown) {
-      setErrMsg(e instanceof Error ? e.message : 'Transaction failed');
+      let msg = 'Transaction failed';
+      if (e instanceof Error) {
+        // Extract short reason — strip JSON blobs
+        const raw = e.message;
+        const reasonMatch = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i)
+          || raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
+        if (reasonMatch) msg = reasonMatch[1].trim();
+        else if (raw.length <= 120) msg = raw;
+        else msg = raw.slice(0, 120) + '…';
+      }
+      setErrMsg(msg);
       setStatus('error');
     }
   };
