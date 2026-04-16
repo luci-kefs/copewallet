@@ -137,9 +137,18 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [dec, setDec] = useState('');
   const [selectedChain, setSelectedChain] = useState<Chain>(defaultChain);
   const [networkOpen, setNetworkOpen] = useState(false);
+  const [chainTokens, setChainTokens] = useState<TokenBalance[]>(tokens);
   const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
+
+  // Re-fetch tokens whenever selected chain changes
+  useEffect(() => {
+    if (!wallet.activeAddress) return;
+    fetchTokenBalances(wallet.activeAddress, selectedChain.id)
+      .then(toks => setChainTokens(toks))
+      .catch(() => setChainTokens([]));
+  }, [selectedChain.id, wallet.activeAddress]);
 
   const amountStr = `${whole || '0'}.${dec || '0'}`;
   const amountNum = parseFloat(amountStr);
@@ -156,10 +165,10 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
     if (!ethers.isAddress(to)) { setErrMsg('Invalid address'); return; }
     if (!amountNum || amountNum <= 0 || isNaN(amountNum)) { setErrMsg('Invalid amount'); return; }
     // Check native balance on selected chain before signing
-    const nativeToken = tokens.find(t => t.contractAddress === 'native');
+    const nativeToken = chainTokens.find(t => t.contractAddress === 'native');
     const nativeBal = parseFloat(nativeToken?.balance ?? '0');
     if (nativeBal < amountNum) {
-      setErrMsg(`Insufficient balance on ${selectedChain.name} — have ${nativeBal.toFixed(6)} ${selectedChain.symbol}`);
+      setErrMsg(`Secili Networkta Bakiye Yetersiz`);
       return;
     }
     setStatus('signing'); setErrMsg('');
@@ -623,6 +632,11 @@ export function WalletDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionToggling, setSessionToggling] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
+  // All chains token data for balance tab display
+  type ChainTokens = { chain: Chain; toks: TokenBalance[]; p: Record<string,number> };
+  const [allChainTokens, setAllChainTokens] = useState<ChainTokens[]>([]);
+  // Whether user has manually selected a chain (null = not yet selected)
+  const [manualChain, setManualChain] = useState<Chain | null>(null);
   // Track whether wallet was ever unlocked — if yes, never show skeleton again
   const [everUnlocked, setEverUnlocked] = useState(false);
   useEffect(() => { if (wallet.isUnlocked) setEverUnlocked(true); }, [wallet.isUnlocked]);
@@ -696,6 +710,7 @@ export function WalletDashboard() {
     ).then(results => {
       const total = results.reduce((s, r) => s + r.usd, 0);
       setAllChainsTotal(total);
+      setAllChainTokens(results.map(r => ({ chain: r.chain, toks: r.toks, p: r.p })));
       if (doAutoSelect) {
         const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
         if (best && best.usd > 0) {
@@ -800,7 +815,7 @@ export function WalletDashboard() {
   return (
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
-      {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={setSelectedChain} onClose={() => setShowNetworks(false)} />}
+      {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); }} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
       <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
@@ -821,7 +836,9 @@ export function WalletDashboard() {
                 onClick={() => setShowNetworks(true)}
                 className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
                 <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
-                <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">{selectedChain.name}</span>
+                <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">
+                  {manualChain ? manualChain.name : 'Network'}
+                </span>
                 <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
               </button>
             </div>
@@ -950,50 +967,112 @@ export function WalletDashboard() {
             {/* BALANCE TAB */}
             {activeTab === 'balance' && (
               <div className="space-y-3">
-                {isLoadingTokens ? (
+                {/* Current network — always shown when manually selected, highlighted */}
+                {manualChain && (() => {
+                  const ct = allChainTokens.find(x => x.chain.id === manualChain.id);
+                  const ctToks = ct?.toks ?? tokens;
+                  const ctP = ct?.p ?? prices;
+                  const nativeTok = ctToks.find(t => t.contractAddress === 'native');
+                  const nativeBal = parseFloat(nativeTok?.balance ?? '0');
+                  const nativeUsd = nativeBal * (ctP[manualChain.coingeckoId] ?? 0);
+                  return (
+                    <div className="slide-up rounded-xl border overflow-hidden mb-1"
+                      style={{ borderColor: `${manualChain.color}55`, background: `${manualChain.color}0a` }}>
+                      <div className="flex items-center gap-3 px-5 py-2" style={{ borderBottom: `1px solid ${manualChain.color}22` }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: `${manualChain.color}30`, overflow: 'hidden', flexShrink: 0 }}>
+                          {manualChain.logoUrl && <img src={manualChain.logoUrl} width={18} height={18} alt={manualChain.shortName} style={{ objectFit: 'cover' }} />}
+                        </div>
+                        <span className="text-[0.6rem] font-black uppercase tracking-widest" style={{ color: manualChain.color }}>{manualChain.name} — Current Network</span>
+                      </div>
+                      <div className="flex items-center justify-between px-6 py-4">
+                        <div>
+                          <p className="font-black text-white text-lg">{manualChain.symbol}</p>
+                          <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{manualChain.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-black text-white text-lg">{nativeBal < 0.000001 && nativeBal > 0 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(nativeBal)}</p>
+                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">{nativeUsd > 0 ? formatUSD(nativeUsd) : '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* All chains with non-zero balance */}
+                {isLoadingTotal ? (
                   <div className="flex justify-center py-12">
                     <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
                   </div>
-                ) : tokens.filter(t => parseFloat(t.balance || '0') > 0).length === 0 ? (
-                  <div className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5">
-                    <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">No assets on {selectedChain.name}</p>
-                  </div>
-                ) : (
-                  tokens.filter(t => parseFloat(t.balance || '0') > 0).map((token, i) => {
-                    const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
-                    const price = cgId ? (prices[cgId] ?? 0) : 0;
-                    const usdVal = parseFloat(token.balance || '0') * price;
-                    return (
-                      <div key={`${token.contractAddress}-${i}`}
-                        className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
-                        style={{ animationDelay: `${i * 60}ms` }}>
-                        <div className="flex items-center gap-5">
-                          {token.logo ? (
-                            <img src={token.logo} alt={token.symbol}
-                              className="w-14 h-14 rounded-full object-cover shrink-0"
-                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          ) : (
-                            <div className="w-14 h-14 bg-surface-container-highest rounded-full flex items-center justify-center font-black text-xl shrink-0">
-                              {token.symbol.slice(0, 1)}
+                ) : allChainTokens.length > 0 ? (
+                  allChainTokens.flatMap(({ chain: c, toks, p }, ci) =>
+                    toks.filter(t => parseFloat(t.balance || '0') > 0).map((token, i) => {
+                      const cgId = token.coingeckoId ?? c.coingeckoId;
+                      const price = cgId ? (p[cgId] ?? 0) : 0;
+                      const usdVal = parseFloat(token.balance || '0') * price;
+                      const isCurrentNet = manualChain?.id === c.id;
+                      return (
+                        <div key={`${c.id}-${token.contractAddress}-${i}`}
+                          className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
+                          style={{ animationDelay: `${(ci * 3 + i) * 40}ms`, opacity: isCurrentNet ? 0.5 : 1 }}>
+                          <div className="flex items-center gap-5">
+                            {token.logo ? (
+                              <img src={token.logo} alt={token.symbol} className="w-14 h-14 rounded-full object-cover shrink-0"
+                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            ) : (
+                              <div className="w-14 h-14 bg-surface-container-highest rounded-full flex items-center justify-center font-black text-xl shrink-0">
+                                {token.symbol.slice(0, 1)}
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-black text-white text-lg">{token.symbol}</p>
+                              <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{c.name}</p>
                             </div>
-                          )}
-                          <div>
-                            <p className="font-black text-white text-lg">{token.symbol}</p>
-                            <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{token.name}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-white text-lg">
+                              {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(parseFloat(token.balance))}
+                            </p>
+                            <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
+                              {price > 0 ? formatUSD(usdVal) : '—'}
+                            </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-black text-white text-lg">
-                            {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(parseFloat(token.balance))}
-                          </p>
-                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
-                            {price > 0 ? formatUSD(usdVal) : 'No price data'}
-                          </p>
+                      );
+                    })
+                  )
+                ) : tokens.filter(t => parseFloat(t.balance || '0') > 0).map((token, i) => {
+                  const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
+                  const price = cgId ? (prices[cgId] ?? 0) : 0;
+                  const usdVal = parseFloat(token.balance || '0') * price;
+                  return (
+                    <div key={`${token.contractAddress}-${i}`}
+                      className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
+                      style={{ animationDelay: `${i * 60}ms` }}>
+                      <div className="flex items-center gap-5">
+                        {token.logo ? (
+                          <img src={token.logo} alt={token.symbol} className="w-14 h-14 rounded-full object-cover shrink-0"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <div className="w-14 h-14 bg-surface-container-highest rounded-full flex items-center justify-center font-black text-xl shrink-0">
+                            {token.symbol.slice(0, 1)}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-black text-white text-lg">{token.symbol}</p>
+                          <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{token.name}</p>
                         </div>
                       </div>
-                    );
-                  })
-                )}
+                      <div className="text-right">
+                        <p className="font-black text-white text-lg">
+                          {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(parseFloat(token.balance))}
+                        </p>
+                        <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
+                          {price > 0 ? formatUSD(usdVal) : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
