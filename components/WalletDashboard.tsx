@@ -796,17 +796,9 @@ export function WalletDashboard() {
                           style={{ fontSize: 'inherit', background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, color: 'rgba(255,255,255,0.25)', letterSpacing: '-0.02em' }}>
                           •••
                         </button>
-                        {/* Always-visible decimal part */}
+                        {/* Always-visible decimal — format as 2-digit cents string */}
                         <span style={{ color: 'rgba(255,255,255,0.4)' }}>.</span>
-                        <CountUp
-                          key={countKey + '_dec'}
-                          from={parseFloat((countFrom % 1).toFixed(2))}
-                          to={parseFloat((countTo % 1).toFixed(2))}
-                          duration={2.5}
-                          minDecimals={2}
-                          startWhen={!isLoadingTokens}
-                          className="opacity-40"
-                        />
+                        <span className="opacity-40">{String(Math.round((countTo % 1) * 100)).padStart(2, '0')}</span>
                       </span>
                     )}
                   </span>

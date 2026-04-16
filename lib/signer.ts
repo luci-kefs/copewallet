@@ -2,6 +2,7 @@
 import { ethers } from 'ethers';
 import { zeroFill } from './crypto';
 import { ScatteredStore, getReassembledData, wipeScatteredStore } from './memory-vault';
+
 export async function ephemeralSign(
   store: ScatteredStore,
   transaction: ethers.TransactionRequest
@@ -14,26 +15,36 @@ export async function ephemeralSign(
     const encoder = new TextEncoder();
     keyBytes = encoder.encode(rawKey);
 
-    // Create wallet from private key bytes
     const hexKey = '0x' + Array.from(keyBytes)
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
 
-    // No provider needed for signing — avoids block/parentHash fetches
-    // Strip 'from' field — ethers v6 triggers populateTransaction (block fetch) if 'from' is present
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { from: _from, ...cleanTx } = transaction as ethers.TransactionRequest & { from?: string };
-    const wallet = new ethers.Wallet(hexKey);
-    const signed = await wallet.signTransaction(cleanTx);
+    // Build a concrete ethers.Transaction (avoids any populateTransaction path)
+    const tx = ethers.Transaction.from({
+      to:                   transaction.to as string,
+      value:                transaction.value ?? 0n,
+      nonce:                transaction.nonce as number,
+      gasLimit:             transaction.gasLimit ?? 21000n,
+      maxFeePerGas:         transaction.maxFeePerGas as bigint,
+      maxPriorityFeePerGas: transaction.maxPriorityFeePerGas as bigint,
+      chainId:              transaction.chainId as bigint | number,
+      type:                 2,
+      accessList:           [],
+      data:                 transaction.data ?? '0x',
+    });
 
-    return signed;
+    // Sign the serialized unsigned tx directly — zero provider interaction
+    const signingKey = new ethers.SigningKey(hexKey);
+    const digest = ethers.keccak256(tx.unsignedSerialized);
+    const sig = signingKey.sign(digest);
+    tx.signature = sig;
+
+    return tx.serialized;
   } finally {
-    // Zero-fill immediately after signing — Block 28 Task 1
     if (keyBytes) {
       zeroFill(keyBytes);
       keyBytes = null;
     }
-    // Wipe the assembled store reference
     wipeScatteredStore(store);
   }
 }
