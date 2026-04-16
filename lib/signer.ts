@@ -10,14 +10,12 @@ export async function ephemeralSign(
   let keyBytes: Uint8Array | null = null;
 
   try {
-    // Reassemble private key into Uint8Array — never as a persistent string
+    // Reassemble private key — already a 0x-prefixed hex string
     const rawKey = getReassembledData(store);
-    const encoder = new TextEncoder();
-    keyBytes = encoder.encode(rawKey);
+    const hexKey = rawKey.startsWith('0x') ? rawKey : '0x' + rawKey;
 
-    const hexKey = '0x' + Array.from(keyBytes)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+    // Keep a wipe-able byte copy for zero-fill in finally
+    keyBytes = new Uint8Array(Buffer.from(hexKey.slice(2), 'hex'));
 
     // Build a concrete ethers.Transaction (avoids any populateTransaction path)
     const tx = ethers.Transaction.from({
