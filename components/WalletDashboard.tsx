@@ -778,14 +778,7 @@ export function WalletDashboard() {
                     <span className="text-on-surface-variant opacity-60">$</span>
                     {/* Show full balance or masked: "24.63..." */}
                     {showFullBalance ? (
-                      <CountUp
-                        key={countKey}
-                        from={countFrom}
-                        to={countTo}
-                        separator=","
-                        duration={2.5}
-                        startWhen={!isLoadingTokens}
-                      />
+                      <span>{countTo.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</span>
                     ) : (
                       <span className="flex items-baseline gap-0">
                         {/* Whole number + first 2 decimals always visible */}
