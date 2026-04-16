@@ -20,8 +20,11 @@ export async function ephemeralSign(
       .join('');
 
     // No provider needed for signing — avoids block/parentHash fetches
+    // Strip 'from' field — ethers v6 triggers populateTransaction (block fetch) if 'from' is present
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { from: _from, ...cleanTx } = transaction as ethers.TransactionRequest & { from?: string };
     const wallet = new ethers.Wallet(hexKey);
-    const signed = await wallet.signTransaction(transaction);
+    const signed = await wallet.signTransaction(cleanTx);
 
     return signed;
   } finally {

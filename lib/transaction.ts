@@ -69,5 +69,6 @@ export async function buildMaskedTransaction(
     gasLimit: 21000n,
     type: 2,
     chainId,
+    accessList: [],
   };
 }
