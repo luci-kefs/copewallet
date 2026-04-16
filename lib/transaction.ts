@@ -80,10 +80,34 @@ export async function fireDummyEchoes(): Promise<void> {
   }
 }
 
-// Estimate network fee in ETH (maxFeePerGas × gasLimit)
-export async function estimateFee(chainId = 1, isErc20 = false): Promise<{ eth: string; wei: bigint }> {
+// Estimate network fee — uses eth_estimateGas when tx params known, fallback otherwise
+export async function estimateFee(
+  chainId = 1,
+  isErc20 = false,
+  txParams?: { from: string; to: string; value?: bigint; data?: string }
+): Promise<{ eth: string; wei: bigint }> {
+  const provider = getProvider(chainId);
   const { maxFeePerGas } = await getMaskedGasPrice(chainId);
-  const gasLimit = isErc20 ? 100000n : 21000n;
+
+  let gasLimit: bigint;
+  if (txParams) {
+    try {
+      const estimated = await provider.send('eth_estimateGas', [{
+        from: txParams.from,
+        to: txParams.to,
+        value: txParams.value ? '0x' + txParams.value.toString(16) : '0x0',
+        data: txParams.data ?? '0x',
+      }]) as string;
+      gasLimit = BigInt(estimated);
+      // Add 20% buffer so tx doesn't run out of gas
+      gasLimit = gasLimit * 12n / 10n;
+    } catch {
+      gasLimit = isErc20 ? 100000n : 21000n;
+    }
+  } else {
+    gasLimit = isErc20 ? 100000n : 21000n;
+  }
+
   const wei = maxFeePerGas * gasLimit;
   const eth = ethers.formatEther(wei);
   return { eth, wei };

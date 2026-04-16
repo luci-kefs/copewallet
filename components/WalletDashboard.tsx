@@ -145,6 +145,9 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [errMsg, setErrMsg] = useState('');
   const [feeEth, setFeeEth] = useState<string | null>(null);
   const [feeUsd, setFeeUsd] = useState<number | null>(null);
+  const [feeLoading, setFeeLoading] = useState(false);
+  const feeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nativePriceRef = useRef<number>(0);
 
   // Re-fetch tokens whenever selected chain changes
   useEffect(() => {
@@ -152,26 +155,75 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
     fetchTokenBalances(wallet.activeAddress, selectedChain.id)
       .then(toks => {
         setChainTokens(toks);
-        // Auto-select first token with balance, or native
         const withBal = toks.filter(t => parseFloat(t.balance || '0') > 0);
         setSelectedToken(withBal[0] ?? toks.find(t => t.contractAddress === 'native') ?? toks[0] ?? null);
       })
       .catch(() => { setChainTokens([]); setSelectedToken(null); });
   }, [selectedChain.id, wallet.activeAddress]);
 
-  // Estimate fee when chain or token type changes
+  // Cache native token price for fee USD conversion
   useEffect(() => {
-    setFeeEth(null); setFeeUsd(null);
-    const isErc20 = !!(selectedToken && selectedToken.contractAddress !== 'native');
-    estimateFee(selectedChain.id, isErc20).then(({ eth }) => {
-      setFeeEth(parseFloat(eth).toFixed(8).replace(/\.?0+$/, '') || '0');
-      // Fee is always paid in native token (ETH, MATIC, etc.)
-      getPrices([selectedChain.coingeckoId]).then(p => {
-        const nativePrice = p[selectedChain.coingeckoId] ?? 0;
-        setFeeUsd(parseFloat(eth) * nativePrice);
-      }).catch(() => {});
+    getPrices([selectedChain.coingeckoId]).then(p => {
+      nativePriceRef.current = p[selectedChain.coingeckoId] ?? 0;
     }).catch(() => {});
-  }, [selectedChain.id, selectedToken?.contractAddress]);
+  }, [selectedChain.id]);
+
+  // Real-time fee estimation — debounced 500ms, uses eth_estimateGas when params known
+  const refreshFee = useCallback((
+    toAddr: string, amtStr: string, token: TokenBalance | null, chain: Chain, fromAddr: string
+  ) => {
+    if (feeTimerRef.current) clearTimeout(feeTimerRef.current);
+    const isErc20 = !!(token && token.contractAddress !== 'native');
+
+    // Build txParams if we have enough info for eth_estimateGas
+    let txParams: Parameters<typeof estimateFee>[2];
+    const validTo = ethers.isAddress(toAddr);
+    const amt = parseFloat(amtStr);
+    if (validTo && amt > 0 && fromAddr) {
+      try {
+        if (isErc20 && token && token.contractAddress !== 'native') {
+          const amountRaw = ethers.parseUnits(amtStr, token.decimals ?? 18);
+          const addr = toAddr.toLowerCase().replace('0x', '').padStart(64, '0');
+          const amtHex = amountRaw.toString(16).padStart(64, '0');
+          txParams = {
+            from: fromAddr,
+            to: token.contractAddress as string,
+            value: 0n,
+            data: '0xa9059cbb' + addr + amtHex,
+          };
+        } else {
+          txParams = {
+            from: fromAddr,
+            to: toAddr,
+            value: ethers.parseEther(amtStr),
+          };
+        }
+      } catch { txParams = undefined; }
+    }
+
+    setFeeLoading(true);
+    feeTimerRef.current = setTimeout(async () => {
+      try {
+        const { eth } = await estimateFee(chain.id, isErc20, txParams);
+        const ethNum = parseFloat(eth);
+        const formatted = ethNum < 0.000001 ? ethNum.toExponential(2) : ethNum.toFixed(8).replace(/\.?0+$/, '');
+        setFeeEth(formatted);
+        setFeeUsd(ethNum * nativePriceRef.current);
+      } catch {
+        setFeeEth(null); setFeeUsd(null);
+      } finally {
+        setFeeLoading(false);
+      }
+    }, 500);
+  }, []);
+
+  // Trigger fee refresh on any relevant change
+  useEffect(() => {
+    if (!wallet.activeAddress) return;
+    const amtStr = `${whole || '0'}.${dec || '0'}`;
+    refreshFee(to, amtStr, selectedToken, selectedChain, wallet.activeAddress);
+    return () => { if (feeTimerRef.current) clearTimeout(feeTimerRef.current); };
+  }, [to, whole, dec, selectedToken?.contractAddress, selectedChain.id, wallet.activeAddress]);
 
   const isNative = !selectedToken || selectedToken.contractAddress === 'native';
   const amountStr = `${whole || '0'}.${dec || '0'}`;
@@ -382,19 +434,24 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
               <span style={{ color: '#666', fontSize: 10, fontWeight: 900, marginLeft: 6, flexShrink: 0 }}>{tokenSymbol}</span>
             </div>
 
-            {/* Network fee estimate */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 4px' }}>
+            {/* Network fee — live from eth_estimateGas */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 4px' }}>
               <span style={{ fontSize: 10, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Network Fee</span>
-              {feeEth === null ? (
-                <span style={{ fontSize: 10, color: '#444', fontWeight: 700 }}>Estimating...</span>
-              ) : (
-                <span style={{ fontSize: 10, fontWeight: 900, color: '#888' }}>
-                  ~{feeEth} {selectedChain.symbol}
-                  {feeUsd !== null && feeUsd > 0 && (
-                    <span style={{ color: '#555', marginLeft: 5 }}>({formatUSD(feeUsd)})</span>
-                  )}
-                </span>
-              )}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {feeLoading && (
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', border: '1.5px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+                )}
+                {feeEth !== null ? (
+                  <span style={{ fontSize: 10, fontWeight: 900, color: ethers.isAddress(to) && amountNum > 0 ? '#ccc' : '#666' }}>
+                    ~{feeEth} {selectedChain.symbol}
+                    {feeUsd !== null && feeUsd > 0 && (
+                      <span style={{ color: '#555', marginLeft: 5 }}>({formatUSD(feeUsd)})</span>
+                    )}
+                  </span>
+                ) : (
+                  !feeLoading && <span style={{ fontSize: 10, color: '#444', fontWeight: 700 }}>—</span>
+                )}
+              </span>
             </div>
 
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
