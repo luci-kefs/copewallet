@@ -776,9 +776,8 @@ export function WalletDashboard() {
                 ) : (
                   <span className="flex items-baseline gap-0">
                     <span className="text-on-surface-variant opacity-60">$</span>
-                    {/* Whole part hidden behind ••• until tapped, decimal always visible */}
+                    {/* Show full balance or masked: "24.63..." */}
                     {showFullBalance ? (
-                      // Full balance with separator
                       <CountUp
                         key={countKey}
                         from={countFrom}
@@ -789,16 +788,26 @@ export function WalletDashboard() {
                       />
                     ) : (
                       <span className="flex items-baseline gap-0">
-                        {/* ••• tappable whole-number mask */}
+                        {/* Whole number + first 2 decimals always visible */}
+                        <CountUp
+                          key={countKey + '_vis'}
+                          from={Math.floor(countFrom)}
+                          to={Math.floor(countTo)}
+                          separator=","
+                          duration={2.5}
+                          startWhen={!isLoadingTokens}
+                        />
+                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>.</span>
+                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>
+                          {String(Math.round((countTo % 1) * 100)).padStart(2, '0')}
+                        </span>
+                        {/* ... tap to reveal rest */}
                         <button
                           onClick={() => setShowFullBalance(true)}
-                          className="hover:opacity-60 transition-opacity font-black"
-                          style={{ fontSize: 'inherit', background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1, color: 'rgba(255,255,255,0.25)', letterSpacing: '-0.02em' }}>
-                          •••
+                          className="hover:opacity-80 transition-opacity font-black"
+                          style={{ fontSize: '0.55em', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 0 2px', lineHeight: 1, color: 'rgba(255,255,255,0.3)', letterSpacing: '-0.02em', alignSelf: 'flex-end', marginBottom: '0.15em' }}>
+                          ...
                         </button>
-                        {/* Always-visible decimal — format as 2-digit cents string */}
-                        <span style={{ color: 'rgba(255,255,255,0.4)' }}>.</span>
-                        <span className="opacity-40">{String(Math.round((countTo % 1) * 100)).padStart(2, '0')}</span>
                       </span>
                     )}
                   </span>
