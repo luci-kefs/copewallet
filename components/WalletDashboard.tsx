@@ -133,10 +133,10 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
 }) {
   const wallet = useWallet();
   const [to, setTo] = useState('');
-  // Split decimal: whole part + decimal part entered separately
   const [whole, setWhole] = useState('');
   const [dec, setDec] = useState('');
   const [selectedChain, setSelectedChain] = useState<Chain>(defaultChain);
+  const [networkOpen, setNetworkOpen] = useState(false);
   const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -169,14 +169,26 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
       setStatus('done');
     } catch (e: unknown) {
       let msg = 'Transaction failed';
-      if (e instanceof Error) {
-        const raw = e.message;
-        const reasonMatch = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i)
-          || raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
-        if (reasonMatch) msg = reasonMatch[1].trim();
-        else if (raw.length <= 120) msg = raw;
-        else msg = raw.slice(0, 120) + '…';
-      }
+      try {
+        // e.message may be an object (ethers ServerError) — always stringify safely
+        const raw = e instanceof Error ? e.message : String(e);
+        // Try to extract human reason from JSON embedded in error string
+        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            const inner = parsed?.error?.message ?? parsed?.message ?? parsed?.reason;
+            if (typeof inner === 'string' && inner.length < 200) { msg = inner; }
+            else msg = 'Transaction rejected by network';
+          } catch { msg = raw.slice(0, 120) + (raw.length > 120 ? '…' : ''); }
+        } else {
+          const reasonMatch = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i)
+            ?? raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
+          if (reasonMatch) msg = reasonMatch[1].trim();
+          else if (raw.length <= 120) msg = raw;
+          else msg = raw.slice(0, 120) + '…';
+        }
+      } catch { /* keep default msg */ }
       setErrMsg(msg);
       setStatus('error');
     }
@@ -222,43 +234,49 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {/* Network selector — scrollable list */}
-            <div style={{ ...boxStyle, padding: '12px 14px', maxHeight: 180, overflowY: 'auto' }}>
-              <p style={{ color: '#555', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Network</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {CHAINS.filter(c => !c.isTestnet).map(c => {
-                  const active = selectedChain.id === c.id;
-                  return (
-                    <button key={c.id} onClick={() => setSelectedChain(c)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '8px 10px', borderRadius: '0.65rem',
-                        border: 'none',
-                        background: active ? `${c.color}18` : 'transparent',
-                        cursor: 'pointer', transition: 'background 0.1s', textAlign: 'left', width: '100%',
-                        outline: active ? `1.5px solid ${c.color}55` : 'none',
-                      }}>
-                      {/* Logo */}
-                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: `${c.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                        {c.logoUrl ? (
-                          <img src={c.logoUrl} alt={c.shortName} width={26} height={26}
-                            style={{ objectFit: 'cover', borderRadius: '50%' }}
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        ) : (
-                          <svg viewBox="0 0 24 24" width={14} height={14} fill={c.color}>
+            {/* Network selector — dropdown */}
+            <div style={{ position: 'relative' }}>
+              {/* Trigger button */}
+              <button onClick={() => setNetworkOpen(o => !o)}
+                style={{ ...boxStyle, width: '100%', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: networkOpen ? '1px solid rgba(255,255,255,0.2)' : boxStyle.border }}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', background: `${selectedChain.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {selectedChain.logoUrl
+                    ? <img src={selectedChain.logoUrl} alt={selectedChain.shortName} width={26} height={26} style={{ objectFit: 'cover' }} />
+                    : <svg viewBox="0 0 24 24" width={14} height={14} fill={selectedChain.color}>{CHAIN_SVG_PATHS[selectedChain.shortName] ?? <circle cx="12" cy="12" r="8"/>}</svg>
+                  }
+                </div>
+                <span style={{ flex: 1, textAlign: 'left', fontSize: 13, fontWeight: 700, color: '#fff' }}>{selectedChain.name}</span>
+                <span style={{ fontSize: 10, color: '#555', fontWeight: 900 }}>{selectedChain.symbol}</span>
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth={2.5} strokeLinecap="round" style={{ transform: networkOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {/* Dropdown list */}
+              {networkOpen && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                  {CHAINS.filter(c => !c.isTestnet).map(c => {
+                    const active = selectedChain.id === c.id;
+                    return (
+                      <button key={c.id}
+                        onClick={() => { setSelectedChain(c); setNetworkOpen(false); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', width: '100%', border: 'none', background: active ? `${c.color}18` : 'transparent', cursor: 'pointer', transition: 'background 0.1s' }}>
+                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${c.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {c.logoUrl
+                            ? <img src={c.logoUrl} alt={c.shortName} width={24} height={24} style={{ objectFit: 'cover' }}
+                                onError={e => { const t = e.target as HTMLImageElement; t.style.display='none'; if(t.nextSibling) (t.nextSibling as HTMLElement).style.display='flex'; }} />
+                            : null}
+                          <svg viewBox="0 0 24 24" width={13} height={13} fill={c.color} style={{ display: c.logoUrl ? 'none' : 'block' }}>
                             {CHAIN_SVG_PATHS[c.shortName] ?? <circle cx="12" cy="12" r="8"/>}
                           </svg>
-                        )}
-                      </div>
-                      {/* Name */}
-                      <span style={{ fontSize: 12, fontWeight: 700, color: active ? c.color : '#ccc', flex: 1 }}>{c.name}</span>
-                      {/* Symbol badge */}
-                      <span style={{ fontSize: 9, fontWeight: 900, color: active ? c.color : '#555', letterSpacing: '0.05em' }}>{c.symbol}</span>
-                      {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
-                    </button>
-                  );
-                })}
-              </div>
+                        </div>
+                        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: active ? c.color : '#ccc', textAlign: 'left' }}>{c.name}</span>
+                        <span style={{ fontSize: 9, fontWeight: 900, color: active ? c.color : '#444' }}>{c.symbol}</span>
+                        {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.color }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Recipient */}
@@ -696,6 +714,7 @@ export function WalletDashboard() {
   }, 0);
   // Use all-chains total when available, otherwise fall back to current chain
   const displayTotal = allChainsTotal ?? chainTotalUSD;
+  const isLoadingTotal = allChainsTotal === null && wallet.isUnlocked;
 
   // Track previous for CountUp from-value
   const prevTotalUSDRef = useRef(0);
@@ -704,7 +723,7 @@ export function WalletDashboard() {
   const [countKey, setCountKey] = useState(0);
   const [showFullBalance, setShowFullBalance] = useState(false);
   useEffect(() => {
-    if (isLoadingTokens) return;
+    if (isLoadingTotal) return;
     setCountFrom(prevTotalUSDRef.current);
     setCountTo(displayTotal);
     setCountKey(k => k + 1);
@@ -800,7 +819,7 @@ export function WalletDashboard() {
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
               <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
-                {isLoadingTokens ? (
+                {isLoadingTotal ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
                 ) : (
                   <span className="flex items-baseline gap-0">
@@ -968,7 +987,9 @@ export function WalletDashboard() {
                 ) : (
                   txs.map((tx) => {
                     const isOut = tx.direction === 'out';
-                    const date = tx.timestamp ? new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                    const txDate = tx.timestamp ? new Date(tx.timestamp) : null;
+                    const date = txDate ? txDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                    const time = txDate ? txDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
                     return (
                       <a key={tx.hash} href={`${selectedChain.explorerUrl}/tx/${tx.hash}`} target="_blank" rel="noopener noreferrer"
                         className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-colors cursor-pointer no-underline">
@@ -989,7 +1010,7 @@ export function WalletDashboard() {
                           <p className={`font-black text-lg ${isOut ? 'text-red-400' : 'text-tertiary'}`}>
                             {isOut ? '-' : '+'}{tx.value} {tx.asset}
                           </p>
-                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">{date}</p>
+                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">{date}{time ? ` · ${time}` : ''}</p>
                         </div>
                       </a>
                     );
