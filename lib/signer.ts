@@ -39,10 +39,10 @@ export async function ephemeralSign(
 
     return tx.serialized;
   } finally {
+    // Zero-fill the key bytes — but keep the store intact for reuse
     if (keyBytes) {
       zeroFill(keyBytes);
       keyBytes = null;
     }
-    wipeScatteredStore(store);
   }
 }
