@@ -27,8 +27,10 @@ export class GhostProvider extends ethers.JsonRpcProvider {
       throw new Error('Network Syncing...');
     }
 
-    const result = await response.json();
-    return result;
+    const json = await response.json();
+    // Proxy returns full JSON-RPC envelope { id, jsonrpc, result } — unwrap for ethers
+    if (json && typeof json === 'object' && 'result' in json) return json.result;
+    return json;
   }
 }
 
