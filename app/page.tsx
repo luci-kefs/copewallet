@@ -38,6 +38,14 @@ export default function CopePage() {
   const [dragOver, setDragOver] = useState(false);
   const [accessError, setAccessError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [vaultDrawerOpen, setVaultDrawerOpen] = useState(false);
+  const [drawerClosing, setDrawerClosing] = useState(false);
+
+  const openVault = () => setVaultDrawerOpen(true);
+  const closeVault = () => {
+    setDrawerClosing(true);
+    setTimeout(() => { setVaultDrawerOpen(false); setDrawerClosing(false); }, 260);
+  };
 
   const dropRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
@@ -87,7 +95,6 @@ export default function CopePage() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl) return;
     let cancelled = false;
-    // Single one-shot REST check — no realtime WebSocket spam
     fetch(`${supabaseUrl}/rest/v1/vault_status?id=eq.1&select=is_killed`, {
       headers: {
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
@@ -102,7 +109,7 @@ export default function CopePage() {
           window.location.replace(process.env.NEXT_PUBLIC_EXTERNAL_LINK ?? 'https://google.com');
         }
       })
-      .catch(() => {}); // ignore network errors silently
+      .catch(() => {});
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -227,6 +234,258 @@ export default function CopePage() {
     </main>
   );
 
+  // Vault panel content — shared between desktop sidebar and mobile drawer
+  const VaultContent = (
+    <section className="flex-1 bg-surface-container-lowest p-8 md:p-16 flex flex-col relative overflow-hidden border-t md:border-t-0 md:border-l border-white/10 overflow-y-auto">
+      {/* Background Decorative Texture */}
+      <div className="absolute inset-0 monolith-gradient pointer-events-none" />
+
+      <div className="relative z-10 flex flex-col h-full justify-between gap-12 max-w-3xl mx-auto w-full">
+
+        {/* ── IDLE ── */}
+        {rightPanel === 'idle' && (
+          <>
+            {/* Vault Header */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-5 text-tertiary">
+                <span className="material-symbols-outlined text-5xl">shield_lock</span>
+                <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
+              </div>
+              <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs">Your private key guardian</p>
+
+              {/* Permanent Zone Alert */}
+              <div className="bg-error-container p-8 rounded-xl flex items-start gap-6 border border-white/5 mt-4">
+                <span className="material-symbols-outlined text-on-error-container text-3xl">warning</span>
+                <div>
+                  <p className="font-black text-on-error-container uppercase tracking-[0.2em] text-[0.65rem] mb-2">Permanent Zone Alert</p>
+                  <p className="text-sm text-on-error-container/90 leading-relaxed font-medium">
+                    All session data is encrypted with a rolling ephemeral key. Once the session ends, unvaulted assets become inaccessible without hardware verification.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Zone */}
+            <div className="space-y-5">
+              <button
+                onClick={() => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }}
+                disabled={!wallet.isUnlocked}
+                className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-10 rounded-xl flex justify-between items-center transition-all shadow-[0_20px_50px_rgba(82,255,172,0.1)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed">
+                <div className="flex items-center gap-8">
+                  <span className="material-symbols-outlined text-5xl">verified_user</span>
+                  <span className="text-3xl font-black tracking-tighter uppercase text-left">Persist Current Session</span>
+                </div>
+                <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
+              </button>
+
+              <button
+                onClick={handleInitNewVault}
+                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]">
+                <div className="flex items-center gap-8">
+                  <span className="material-symbols-outlined text-5xl">add_moderator</span>
+                  <span className="text-3xl font-black tracking-tighter uppercase text-left">Initialize New Vault</span>
+                </div>
+                <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
+              </button>
+
+              <button
+                onClick={() => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); }}
+                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]">
+                <div className="flex items-center gap-8">
+                  <span className="material-symbols-outlined text-5xl">key</span>
+                  <span className="text-3xl font-black tracking-tighter uppercase text-left">Access Existing Vault</span>
+                </div>
+                <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
+              </button>
+            </div>
+
+            {/* Status Table */}
+            <div className="bg-white/5 rounded-xl overflow-hidden border border-white/5 backdrop-blur-xl">
+              <div className="px-8 py-5 border-b border-white/10 bg-white/[0.02]">
+                <p className="text-[0.7rem] font-black uppercase tracking-[0.3em] text-on-surface-variant">System Diagnostics</p>
+              </div>
+              <div className="divide-y divide-white/5">
+                <div className="flex justify-between items-center px-8 py-5">
+                  <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Vault Mode</span>
+                  <span className={`px-4 py-1.5 text-[10px] font-black rounded-full uppercase tracking-[0.2em] border border-white/10 ${wallet.mode === 'PERSISTENT' ? 'bg-tertiary/10 text-tertiary border-tertiary/20' : 'bg-surface-variant text-white'}`}>
+                    {wallet.mode === 'PERSISTENT' ? 'Persistent' : 'Volatile'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center px-8 py-5">
+                  <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Session Status</span>
+                  <span className={`text-xs font-black uppercase tracking-[0.2em] ${wallet.isUnlocked ? 'text-tertiary' : 'text-white'}`}>
+                    {wallet.isUnlocked ? 'Active' : 'Idle'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center px-8 py-5">
+                  <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Key Rotation</span>
+                  <span className={`text-xs font-black uppercase tracking-[0.2em] ${wallet.isPulseActive ? 'text-yellow-400' : 'text-tertiary'}`}>
+                    {wallet.isPulseActive ? 'Rotating' : 'Active'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center px-8 py-5">
+                  <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Saved Vault</span>
+                  <span className={`text-xs font-black uppercase tracking-[0.2em] ${wallet.hasPersisted ? 'text-blue-400' : 'text-on-surface-variant'}`}>
+                    {wallet.hasPersisted ? 'Found' : 'None Detected'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Visual Anchor */}
+            <div className="w-full h-56 rounded-2xl overflow-hidden relative grayscale hover:grayscale-0 transition-all duration-1000 border border-white/10">
+              {/* Brand logo clickable area (panic trigger) */}
+              <div ref={logoRef} data-aethilm="brand" onClick={handleLogoPanic} className="absolute inset-0 cursor-pointer z-10">
+                {logoUrl && !logoError && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="Cope Wallet" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4 }} onError={() => setLogoError(true)} />
+                )}
+              </div>
+              <img
+                alt="Encryption visualization"
+                className="w-full h-full object-cover opacity-40"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV3rq0CBGGIjwUWM3L1b8JPDzLlg1fqKTm7Z1IXPglOv1hxAsNZnbqDgpnF5oetmxLAT8XIDpVAmeYQh6D9OQXCq5g3jmI8XFn6VLyLdFpVTBCEH4v4UV7H8iyy1DgGYwIFYeG8qhxAqCpcBI2JbSoCHwr4iK-hN2Fu-e0VX6N4b9yOdDoRaqiVmiUxdVKX2_DS2uUflmw_9zHKvYgqQe5slou1PZ7Fjy6bYpPbt8LzxfveI2OBKz-Sh5R6tGh-dLVNyZh_63flbA"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+            </div>
+
+            {/* Footer */}
+            <a href={extLink} target="_blank" rel="noopener noreferrer" data-aethilm="brand"
+              className="text-surface-variant text-[0.6rem] tracking-[0.15em] no-underline text-center uppercase self-center">
+              Made With Cope by{'\u200c'} Aethi{'\u200c'}lm
+            </a>
+          </>
+        )}
+
+        {/* ── PERSIST / NEW VAULT FORM ── */}
+        {(rightPanel === 'persist_confirm' || rightPanel === 'new_vault') && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+            className="space-y-8">
+            <div className="flex items-center gap-5 text-tertiary">
+              <span className="material-symbols-outlined text-5xl">shield_lock</span>
+              <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
+            </div>
+
+            <button onClick={() => setRightPanel('idle')}
+              className="flex items-center gap-2 text-on-surface-variant hover:text-white transition-colors font-black uppercase tracking-widest text-xs">
+              <span className="material-symbols-outlined text-base">arrow_back</span> Back
+            </button>
+
+            <div className="space-y-5">
+              <div>
+                <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">
+                  {rightPanel === 'new_vault' ? 'New Vault' : 'Persist Session'}
+                </h3>
+                <p className="text-on-surface-variant text-sm leading-relaxed">
+                  Set a passphrase. A Favicon Key PNG will be downloaded to your device.
+                </p>
+              </div>
+              <div className="bg-white rounded-xl p-6 space-y-4">
+                <div className="bg-neutral-100 rounded-lg px-4 py-3">
+                  <input
+                    type="password"
+                    placeholder="Vault passphrase (min 8 chars)"
+                    autoComplete="off"
+                    value={passphrase}
+                    onChange={e => setPassphrase(e.target.value)}
+                    className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
+                  />
+                </div>
+                <div className="bg-neutral-100 rounded-lg px-4 py-3">
+                  <input
+                    type="password"
+                    placeholder="Confirm passphrase"
+                    autoComplete="off"
+                    value={passphraseConfirm}
+                    onChange={e => setPassphraseConfirm(e.target.value)}
+                    className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
+                  />
+                </div>
+                {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
+              </div>
+              <button
+                onClick={handlePersistSession}
+                disabled={isProcessing}
+                className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
+                <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
+                {!isProcessing && <span className="material-symbols-outlined text-2xl">download</span>}
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── ACCESS VAULT FORM ── */}
+        {rightPanel === 'access_vault' && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+            className="space-y-8">
+            <div className="flex items-center gap-5 text-tertiary">
+              <span className="material-symbols-outlined text-5xl">shield_lock</span>
+              <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
+            </div>
+
+            <button onClick={() => setRightPanel('idle')}
+              className="flex items-center gap-2 text-on-surface-variant hover:text-white transition-colors font-black uppercase tracking-widest text-xs">
+              <span className="material-symbols-outlined text-base">arrow_back</span> Back
+            </button>
+
+            <div className="space-y-5">
+              <div>
+                <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">Access Vault</h3>
+                <p className="text-on-surface-variant text-sm leading-relaxed">Enter your passphrase and drop the Favicon Key PNG.</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 space-y-4">
+                <div className="bg-neutral-100 rounded-lg px-4 py-3">
+                  <input
+                    type="password"
+                    placeholder="Vault passphrase"
+                    autoComplete="off"
+                    value={passphrase}
+                    onChange={e => setPassphrase(e.target.value)}
+                    className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
+                  />
+                </div>
+                <div
+                  ref={dropRef}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileDrop(f); }}
+                  onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/png'; i.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleFileDrop(f); }; i.click(); }}
+                  className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-all ${dragOver ? 'border-tertiary bg-tertiary/5' : 'border-neutral-300'}`}>
+                  <Upload size={24} className="text-neutral-400" />
+                  <p className="font-black text-neutral-800 text-sm uppercase tracking-widest">Drop Favicon Key PNG</p>
+                  <p className="text-neutral-400 text-xs">or click to browse</p>
+                </div>
+                {isProcessing && <p className="text-neutral-500 text-xs text-center font-bold uppercase tracking-widest">Decoding...</p>}
+                {accessError && <p className="text-red-500 text-xs font-bold">{accessError}</p>}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── SUCCESS ── */}
+        {rightPanel === 'success' && (
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }}
+            className="flex flex-col items-center justify-center h-full gap-10">
+            <div className="w-24 h-24 rounded-full bg-tertiary/10 border-2 border-tertiary/40 flex items-center justify-center">
+              <span className="material-symbols-outlined text-5xl text-tertiary">verified</span>
+            </div>
+            <div className="text-center space-y-3">
+              <p className="text-4xl font-black tracking-tighter uppercase text-white">Vault Secured</p>
+              <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs mx-auto">
+                Favicon Key PNG downloaded. Store it safely — it is your only key.
+              </p>
+            </div>
+            <button onClick={() => setRightPanel('idle')}
+              className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-xl active:scale-[0.98] transition-transform">
+              ← Return
+            </button>
+          </motion.div>
+        )}
+
+      </div>
+    </section>
+  );
+
   return (
     <main className="flex flex-col md:flex-row h-screen w-full bg-background text-on-background">
       <DevToolsGuard
@@ -254,258 +513,47 @@ export default function CopePage() {
       {/* Key rotation pulse */}
       {wallet.isPulseActive && <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 1, background: '#fff', opacity: 0.04, zIndex: 40 }} />}
 
-      {/* ── LEFT — WALLET DASHBOARD ── */}
-      <WalletDashboard />
+      {/* ── MOBILE NAVBAR (hidden on md+) ── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-5"
+        style={{ height: 56, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <span className="text-white font-black uppercase tracking-tighter text-base">Cope Wallet</span>
+        <button
+          onClick={() => vaultDrawerOpen ? closeVault() : openVault()}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)', background: vaultDrawerOpen ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', transition: 'all 0.2s' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#52ffac' }}>shield_lock</span>
+          <span style={{ fontSize: 10, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Secure Vault</span>
+          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="rgba(82,255,172,0.7)" strokeWidth={2.5} strokeLinecap="round"
+            style={{ transform: vaultDrawerOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      </div>
 
-      {/* ── RIGHT — SECURE VAULT ── */}
-      <section className="flex-1 bg-surface-container-lowest p-8 md:p-16 flex flex-col relative overflow-hidden border-t md:border-t-0 md:border-l border-white/10 overflow-y-auto">
-        {/* Background Decorative Texture */}
-        <div className="absolute inset-0 monolith-gradient pointer-events-none"></div>
-
-        <div className="relative z-10 flex flex-col h-full justify-between gap-12 max-w-3xl mx-auto w-full">
-
-          {/* ── IDLE ── */}
-          {rightPanel === 'idle' && (
-            <>
-              {/* Vault Header */}
-              <div className="space-y-6">
-                <div className="flex items-center gap-5 text-tertiary">
-                  <span className="material-symbols-outlined text-5xl">shield_lock</span>
-                  <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
-                </div>
-                <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs">Your private key guardian</p>
-
-                {/* Permanent Zone Alert */}
-                <div className="bg-error-container p-8 rounded-xl flex items-start gap-6 border border-white/5 mt-4">
-                  <span className="material-symbols-outlined text-on-error-container text-3xl">warning</span>
-                  <div>
-                    <p className="font-black text-on-error-container uppercase tracking-[0.2em] text-[0.65rem] mb-2">Permanent Zone Alert</p>
-                    <p className="text-sm text-on-error-container/90 leading-relaxed font-medium">
-                      All session data is encrypted with a rolling ephemeral key. Once the session ends, unvaulted assets become inaccessible without hardware verification.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Interactive Zone */}
-              <div className="space-y-5">
-                <button
-                  onClick={() => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }}
-                  disabled={!wallet.isUnlocked}
-                  className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-10 rounded-xl flex justify-between items-center transition-all shadow-[0_20px_50px_rgba(82,255,172,0.1)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed">
-                  <div className="flex items-center gap-8">
-                    <span className="material-symbols-outlined text-5xl">verified_user</span>
-                    <span className="text-3xl font-black tracking-tighter uppercase text-left">Persist Current Session</span>
-                  </div>
-                  <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
-                </button>
-
-                <button
-                  onClick={handleInitNewVault}
-                  className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]">
-                  <div className="flex items-center gap-8">
-                    <span className="material-symbols-outlined text-5xl">add_moderator</span>
-                    <span className="text-3xl font-black tracking-tighter uppercase text-left">Initialize New Vault</span>
-                  </div>
-                  <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
-                </button>
-
-                <button
-                  onClick={() => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); }}
-                  className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]">
-                  <div className="flex items-center gap-8">
-                    <span className="material-symbols-outlined text-5xl">key</span>
-                    <span className="text-3xl font-black tracking-tighter uppercase text-left">Access Existing Vault</span>
-                  </div>
-                  <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
-                </button>
-              </div>
-
-              {/* Status Table */}
-              <div className="bg-white/5 rounded-xl overflow-hidden border border-white/5 backdrop-blur-xl">
-                <div className="px-8 py-5 border-b border-white/10 bg-white/[0.02]">
-                  <p className="text-[0.7rem] font-black uppercase tracking-[0.3em] text-on-surface-variant">System Diagnostics</p>
-                </div>
-                <div className="divide-y divide-white/5">
-                  <div className="flex justify-between items-center px-8 py-5">
-                    <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Vault Mode</span>
-                    <span className={`px-4 py-1.5 text-[10px] font-black rounded-full uppercase tracking-[0.2em] border border-white/10 ${wallet.mode === 'PERSISTENT' ? 'bg-tertiary/10 text-tertiary border-tertiary/20' : 'bg-surface-variant text-white'}`}>
-                      {wallet.mode === 'PERSISTENT' ? 'Persistent' : 'Volatile'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center px-8 py-5">
-                    <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Session Status</span>
-                    <span className={`text-xs font-black uppercase tracking-[0.2em] ${wallet.isUnlocked ? 'text-tertiary' : 'text-white'}`}>
-                      {wallet.isUnlocked ? 'Active' : 'Idle'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center px-8 py-5">
-                    <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Key Rotation</span>
-                    <span className={`text-xs font-black uppercase tracking-[0.2em] ${wallet.isPulseActive ? 'text-yellow-400' : 'text-tertiary'}`}>
-                      {wallet.isPulseActive ? 'Rotating' : 'Active'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center px-8 py-5">
-                    <span className="text-xs font-bold uppercase text-on-surface-variant tracking-widest">Saved Vault</span>
-                    <span className={`text-xs font-black uppercase tracking-[0.2em] ${wallet.hasPersisted ? 'text-blue-400' : 'text-on-surface-variant'}`}>
-                      {wallet.hasPersisted ? 'Found' : 'None Detected'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Visual Anchor */}
-              <div className="w-full h-56 rounded-2xl overflow-hidden relative grayscale hover:grayscale-0 transition-all duration-1000 border border-white/10">
-                {/* Brand logo clickable area (panic trigger) */}
-                <div ref={logoRef} data-aethilm="brand" onClick={handleLogoPanic} className="absolute inset-0 cursor-pointer z-10">
-                  {logoUrl && !logoError && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={logoUrl} alt="Cope Wallet" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4 }} onError={() => setLogoError(true)} />
-                  )}
-                </div>
-                <img
-                  alt="Encryption visualization"
-                  className="w-full h-full object-cover opacity-40"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV3rq0CBGGIjwUWM3L1b8JPDzLlg1fqKTm7Z1IXPglOv1hxAsNZnbqDgpnF5oetmxLAT8XIDpVAmeYQh6D9OQXCq5g3jmI8XFn6VLyLdFpVTBCEH4v4UV7H8iyy1DgGYwIFYeG8qhxAqCpcBI2JbSoCHwr4iK-hN2Fu-e0VX6N4b9yOdDoRaqiVmiUxdVKX2_DS2uUflmw_9zHKvYgqQe5slou1PZ7Fjy6bYpPbt8LzxfveI2OBKz-Sh5R6tGh-dLVNyZh_63flbA"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent"></div>
-              </div>
-
-              {/* Footer */}
-              <a href={extLink} target="_blank" rel="noopener noreferrer" data-aethilm="brand"
-                className="text-surface-variant text-[0.6rem] tracking-[0.15em] no-underline text-center uppercase self-center">
-                Made With Cope by{'\u200c'} Aethi{'\u200c'}lm
-              </a>
-            </>
-          )}
-
-          {/* ── PERSIST / NEW VAULT FORM ── */}
-          {(rightPanel === 'persist_confirm' || rightPanel === 'new_vault') && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
-              className="space-y-8">
-              <div className="flex items-center gap-5 text-tertiary">
-                <span className="material-symbols-outlined text-5xl">shield_lock</span>
-                <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
-              </div>
-
-              <button onClick={() => setRightPanel('idle')}
-                className="flex items-center gap-2 text-on-surface-variant hover:text-white transition-colors font-black uppercase tracking-widest text-xs">
-                <span className="material-symbols-outlined text-base">arrow_back</span> Back
-              </button>
-
-              <div className="space-y-5">
-                <div>
-                  <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">
-                    {rightPanel === 'new_vault' ? 'New Vault' : 'Persist Session'}
-                  </h3>
-                  <p className="text-on-surface-variant text-sm leading-relaxed">
-                    Set a passphrase. A Favicon Key PNG will be downloaded to your device.
-                  </p>
-                </div>
-                <div className="bg-white rounded-xl p-6 space-y-4">
-                  <div className="bg-neutral-100 rounded-lg px-4 py-3">
-                    <input
-                      type="password"
-                      placeholder="Vault passphrase (min 8 chars)"
-                      autoComplete="off"
-                      value={passphrase}
-                      onChange={e => setPassphrase(e.target.value)}
-                      className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
-                    />
-                  </div>
-                  <div className="bg-neutral-100 rounded-lg px-4 py-3">
-                    <input
-                      type="password"
-                      placeholder="Confirm passphrase"
-                      autoComplete="off"
-                      value={passphraseConfirm}
-                      onChange={e => setPassphraseConfirm(e.target.value)}
-                      className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
-                    />
-                  </div>
-                  {persistError && <p className="text-red-500 text-xs font-bold">{persistError}</p>}
-                </div>
-                <button
-                  onClick={handlePersistSession}
-                  disabled={isProcessing}
-                  className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
-                  <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
-                  {!isProcessing && <span className="material-symbols-outlined text-2xl">download</span>}
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── ACCESS VAULT FORM ── */}
-          {rightPanel === 'access_vault' && (
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
-              className="space-y-8">
-              <div className="flex items-center gap-5 text-tertiary">
-                <span className="material-symbols-outlined text-5xl">shield_lock</span>
-                <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
-              </div>
-
-              <button onClick={() => setRightPanel('idle')}
-                className="flex items-center gap-2 text-on-surface-variant hover:text-white transition-colors font-black uppercase tracking-widest text-xs">
-                <span className="material-symbols-outlined text-base">arrow_back</span> Back
-              </button>
-
-              <div className="space-y-5">
-                <div>
-                  <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">Access Vault</h3>
-                  <p className="text-on-surface-variant text-sm leading-relaxed">Enter your passphrase and drop the Favicon Key PNG.</p>
-                </div>
-                <div className="bg-white rounded-xl p-6 space-y-4">
-                  <div className="bg-neutral-100 rounded-lg px-4 py-3">
-                    <input
-                      type="password"
-                      placeholder="Vault passphrase"
-                      autoComplete="off"
-                      value={passphrase}
-                      onChange={e => setPassphrase(e.target.value)}
-                      className="w-full bg-transparent border-none outline-none text-neutral-900 text-sm placeholder-neutral-400"
-                    />
-                  </div>
-                  <div
-                    ref={dropRef}
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileDrop(f); }}
-                    onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/png'; i.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleFileDrop(f); }; i.click(); }}
-                    className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-all ${dragOver ? 'border-tertiary bg-tertiary/5' : 'border-neutral-300'}`}>
-                    <Upload size={24} className="text-neutral-400" />
-                    <p className="font-black text-neutral-800 text-sm uppercase tracking-widest">Drop Favicon Key PNG</p>
-                    <p className="text-neutral-400 text-xs">or click to browse</p>
-                  </div>
-                  {isProcessing && <p className="text-neutral-500 text-xs text-center font-bold uppercase tracking-widest">Decoding...</p>}
-                  {accessError && <p className="text-red-500 text-xs font-bold">{accessError}</p>}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ── SUCCESS ── */}
-          {rightPanel === 'success' && (
-            <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }}
-              className="flex flex-col items-center justify-center h-full gap-10">
-              <div className="w-24 h-24 rounded-full bg-tertiary/10 border-2 border-tertiary/40 flex items-center justify-center">
-                <span className="material-symbols-outlined text-5xl text-tertiary">verified</span>
-              </div>
-              <div className="text-center space-y-3">
-                <p className="text-4xl font-black tracking-tighter uppercase text-white">Vault Secured</p>
-                <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs mx-auto">
-                  Favicon Key PNG downloaded. Store it safely — it is your only key.
-                </p>
-              </div>
-              <button onClick={() => setRightPanel('idle')}
-                className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-xl active:scale-[0.98] transition-transform">
-                ← Return
-              </button>
-            </motion.div>
-          )}
-
+      {/* ── MOBILE VAULT DRAWER (hidden on md+) ── */}
+      {(vaultDrawerOpen || drawerClosing) && (
+        <div className="md:hidden fixed inset-0 z-20" style={{ top: 56 }}>
+          <div
+            onClick={closeVault}
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            className={drawerClosing ? 'fade-in' : 'popup-backdrop'}
+          />
+          <div
+            className={drawerClosing ? 'drawer-exit' : 'drawer-enter'}
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, overflowY: 'auto', background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            {VaultContent}
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* ── LEFT — WALLET DASHBOARD ── */}
+      <div className="flex-1 md:flex-1 flex flex-col min-h-0">
+        <WalletDashboard />
+      </div>
+
+      {/* ── RIGHT — SECURE VAULT (desktop only) ── */}
+      <div className="hidden md:flex flex-1">
+        {VaultContent}
+      </div>
 
       <style>{`@keyframes loadgrow { from { width: 1%; } to { width: 100%; } }`}</style>
     </main>

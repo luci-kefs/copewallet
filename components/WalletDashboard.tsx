@@ -773,7 +773,7 @@ export function WalletDashboard() {
   // ── Loading ──
   if (!wallet.isUnlocked && !everUnlocked) {
     return (
-      <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col overflow-y-auto">
+      <section className="flex-1 pt-[72px] px-8 pb-8 md:p-16 bg-surface flex flex-col overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-12 animate-pulse">
           {/* Header skeleton */}
           <div className="flex items-start justify-between gap-4">
@@ -818,7 +818,7 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); }} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
 
-      <section className="flex-1 p-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
+      <section className="flex-1 pt-[72px] px-8 pb-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-12">
 
           {/* ── Session Heading with Chain Selector ── */}
