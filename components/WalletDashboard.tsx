@@ -155,6 +155,13 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
     if (!wallet.activeAddress || !wallet.scatteredKeyStore) { setErrMsg('Wallet not ready'); return; }
     if (!ethers.isAddress(to)) { setErrMsg('Invalid address'); return; }
     if (!amountNum || amountNum <= 0 || isNaN(amountNum)) { setErrMsg('Invalid amount'); return; }
+    // Check native balance on selected chain before signing
+    const nativeToken = tokens.find(t => t.contractAddress === 'native');
+    const nativeBal = parseFloat(nativeToken?.balance ?? '0');
+    if (nativeBal < amountNum) {
+      setErrMsg(`Insufficient balance on ${selectedChain.name} — have ${nativeBal.toFixed(6)} ${selectedChain.symbol}`);
+      return;
+    }
     setStatus('signing'); setErrMsg('');
     try {
       const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id);
@@ -260,7 +267,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
               </button>
               {/* Dropdown list */}
               {networkOpen && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                <div className="popup-enter" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
                   {CHAINS.map(c => {
                     const active = selectedChain.id === c.id;
                     return (
@@ -719,11 +726,13 @@ export function WalletDashboard() {
     const price = prices[t.coingeckoId ?? ''] ?? prices[selectedChain.coingeckoId] ?? 0;
     return sum + parseFloat(t.balance || '0') * price;
   }, 0);
-  // Use all-chains total when available, otherwise fall back to current chain
-  const displayTotal = allChainsTotal ?? chainTotalUSD;
+  // After initial load: show selected chain's USD. Before: show all-chains total loading.
   const isLoadingTotal = allChainsTotal === null && wallet.isUnlocked;
+  // Once allChainsTotal resolves, display selected chain's USD for network-switch UX
+  const displayTotal = isLoadingTotal ? 0 : chainTotalUSD;
 
-  // Track previous for CountUp from-value
+  // CountUp fires ONCE on initial load — not on manual network changes
+  const countUpFiredRef = useRef(false);
   const prevTotalUSDRef = useRef(0);
   const [countFrom, setCountFrom] = useState(0);
   const [countTo, setCountTo] = useState(0);
@@ -731,11 +740,20 @@ export function WalletDashboard() {
   const [showFullBalance, setShowFullBalance] = useState(false);
   useEffect(() => {
     if (isLoadingTotal) return;
-    setCountFrom(prevTotalUSDRef.current);
-    setCountTo(displayTotal);
-    setCountKey(k => k + 1);
-    prevTotalUSDRef.current = displayTotal;
-  }, [displayTotal, isLoadingTokens]);
+    if (!countUpFiredRef.current) {
+      // First time: animate from 0 to initial total
+      countUpFiredRef.current = true;
+      setCountFrom(0);
+      setCountTo(chainTotalUSD);
+      setCountKey(1);
+      prevTotalUSDRef.current = chainTotalUSD;
+    } else {
+      // Manual network switch: just update display value, no animation
+      setCountFrom(chainTotalUSD);
+      setCountTo(chainTotalUSD);
+      prevTotalUSDRef.current = chainTotalUSD;
+    }
+  }, [chainTotalUSD, isLoadingTotal]);
 
   // ── Loading ──
   if (!wallet.isUnlocked && !everUnlocked) {
@@ -822,7 +840,7 @@ export function WalletDashboard() {
           </div>
 
           {/* ── Balance Section ── */}
-          <div className="space-y-6">
+          <div className="space-y-6 fade-in">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
               <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
@@ -947,7 +965,8 @@ export function WalletDashboard() {
                     const usdVal = parseFloat(token.balance || '0') * price;
                     return (
                       <div key={`${token.contractAddress}-${i}`}
-                        className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-colors cursor-pointer">
+                        className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
+                        style={{ animationDelay: `${i * 60}ms` }}>
                         <div className="flex items-center gap-5">
                           {token.logo ? (
                             <img src={token.logo} alt={token.symbol}
