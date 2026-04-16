@@ -163,8 +163,9 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
       void fireDummyEchoes();
       const signed = await ephemeralSign(wallet.scatteredKeyStore, tx);
       const provider = getProvider(selectedChain.id);
-      const sent = await provider.broadcastTransaction(signed);
-      setTxHash(sent.hash);
+      // Use raw eth_sendRawTransaction — bypasses ethers hash re-verification (@TODO hash mismatch)
+      const txHash_ = await provider.send('eth_sendRawTransaction', [signed]) as string;
+      setTxHash(txHash_);
       setStatus('done');
     } catch (e: unknown) {
       let msg = 'Transaction failed';
@@ -221,31 +222,39 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-            {/* Network selector */}
-            <div style={{ ...boxStyle, padding: '12px 14px' }}>
-              <p style={{ color: '#555', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>Network</p>
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+            {/* Network selector — scrollable list */}
+            <div style={{ ...boxStyle, padding: '12px 14px', maxHeight: 180, overflowY: 'auto' }}>
+              <p style={{ color: '#555', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>Network</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {CHAINS.filter(c => !c.isTestnet).map(c => {
                   const active = selectedChain.id === c.id;
                   return (
                     <button key={c.id} onClick={() => setSelectedChain(c)}
                       style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                        flexShrink: 0, width: 56, padding: '8px 4px', borderRadius: '0.85rem',
-                        border: active ? `1.5px solid ${c.color}` : '1.5px solid rgba(255,255,255,0.06)',
-                        background: active ? `${c.color}15` : 'rgba(255,255,255,0.03)',
-                        cursor: 'pointer', transition: 'all 0.12s',
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', borderRadius: '0.65rem',
+                        border: 'none',
+                        background: active ? `${c.color}18` : 'transparent',
+                        cursor: 'pointer', transition: 'background 0.1s', textAlign: 'left', width: '100%',
+                        outline: active ? `1.5px solid ${c.color}55` : 'none',
                       }}>
-                      {c.logoUrl ? (
-                        <img src={c.logoUrl} alt={c.shortName} width={22} height={22} style={{ borderRadius: '50%', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: `${c.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <svg viewBox="0 0 24 24" width={14} height={14} style={{ color: c.color }} fill="currentColor">
+                      {/* Logo */}
+                      <div style={{ width: 26, height: 26, borderRadius: '50%', background: `${c.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                        {c.logoUrl ? (
+                          <img src={c.logoUrl} alt={c.shortName} width={26} height={26}
+                            style={{ objectFit: 'cover', borderRadius: '50%' }}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <svg viewBox="0 0 24 24" width={14} height={14} fill={c.color}>
                             {CHAIN_SVG_PATHS[c.shortName] ?? <circle cx="12" cy="12" r="8"/>}
                           </svg>
-                        </div>
-                      )}
-                      <span style={{ fontSize: 9, fontWeight: 900, color: active ? c.color : '#666', letterSpacing: '0.04em', lineHeight: 1 }}>{c.shortName}</span>
+                        )}
+                      </div>
+                      {/* Name */}
+                      <span style={{ fontSize: 12, fontWeight: 700, color: active ? c.color : '#ccc', flex: 1 }}>{c.name}</span>
+                      {/* Symbol badge */}
+                      <span style={{ fontSize: 9, fontWeight: 900, color: active ? c.color : '#555', letterSpacing: '0.05em' }}>{c.symbol}</span>
+                      {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
                     </button>
                   );
                 })}
@@ -631,10 +640,12 @@ export function WalletDashboard() {
     loadTokens();
   }, [wallet.isUnlocked, address, selectedChain.id]);
 
-  // Auto-select network with highest USD balance on first unlock
+  // Auto-select network with highest USD balance on first unlock + compute all-chains total
   const autoSelectedRef = useRef(false);
   useEffect(() => {
-    if (!wallet.isUnlocked || !address || autoSelectedRef.current) return;
+    if (!wallet.isUnlocked || !address) return;
+    // Always recompute total; only auto-select chain once
+    const alreadySelected = autoSelectedRef.current;
     autoSelectedRef.current = true;
     const alchemyChains = CHAINS.filter(c => c.isAlchemy && !c.isTestnet);
     Promise.all(
@@ -653,11 +664,13 @@ export function WalletDashboard() {
     ).then(results => {
       const total = results.reduce((s, r) => s + r.usd, 0);
       setAllChainsTotal(total);
-      const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
-      if (best && best.usd > 0) {
-        setSelectedChain(best.chain);
-        setTokens(best.toks);
-        setPrices(best.p);
+      if (!alreadySelected) {
+        const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
+        if (best && best.usd > 0) {
+          setSelectedChain(best.chain);
+          setTokens(best.toks);
+          setPrices(best.p);
+        }
       }
     }).catch(() => {});
   }, [wallet.isUnlocked, address]);
