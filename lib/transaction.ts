@@ -2,26 +2,48 @@
 import { ethers } from 'ethers';
 import { getProvider } from './provider';
 
+// Chain-specific gas fallbacks (gwei) — used when RPC call fails
+const GAS_FALLBACKS: Record<number, { base: string; priority: string }> = {
+  1:        { base: '20',    priority: '1'      }, // Ethereum
+  8453:     { base: '0.005', priority: '0.001'  }, // Base
+  42161:    { base: '0.01',  priority: '0.001'  }, // Arbitrum
+  10:       { base: '0.005', priority: '0.001'  }, // Optimism
+  137:      { base: '50',    priority: '30'     }, // Polygon
+  324:      { base: '0.05',  priority: '0.01'   }, // zkSync
+  59144:    { base: '0.05',  priority: '0.01'   }, // Linea
+  534352:   { base: '0.05',  priority: '0.01'   }, // Scroll
+  81457:    { base: '0.005', priority: '0.001'  }, // Blast
+  56:       { base: '3',     priority: '1'      }, // BNB
+  43114:    { base: '25',    priority: '2'      }, // Avalanche
+  11155111: { base: '10',    priority: '1'      }, // Sepolia
+  84532:    { base: '0.005', priority: '0.001'  }, // Base Sepolia
+  421614:   { base: '0.01',  priority: '0.001'  }, // Arb Sepolia
+};
+const DEFAULT_FALLBACK = { base: '10', priority: '1' };
+
 // Gas price jitter (Block 19 Task 1)
 export async function getMaskedGasPrice(chainId = 1): Promise<{
   maxFeePerGas: bigint;
   maxPriorityFeePerGas: bigint;
 }> {
   const provider = getProvider(chainId);
+  const fb = GAS_FALLBACKS[chainId] ?? DEFAULT_FALLBACK;
 
-  // Use raw RPC calls — avoids getFeeData() which parses block headers (parentHash issue in ethers v6)
   let baseFee: bigint;
   let priority: bigint;
   try {
-    const [gasPriceHex, priorityHex] = await Promise.all([
-      provider.send('eth_gasPrice', []) as Promise<string>,
-      provider.send('eth_maxPriorityFeePerGas', []) as Promise<string>,
-    ]);
+    // Try both calls; if priority fails fall back gracefully
+    const gasPriceHex = await (provider.send('eth_gasPrice', []) as Promise<string>);
     baseFee = BigInt(gasPriceHex);
-    priority = BigInt(priorityHex);
+    try {
+      const priorityHex = await (provider.send('eth_maxPriorityFeePerGas', []) as Promise<string>);
+      priority = BigInt(priorityHex);
+    } catch {
+      priority = ethers.parseUnits(fb.priority, 'gwei');
+    }
   } catch {
-    baseFee = ethers.parseUnits('20', 'gwei');
-    priority = ethers.parseUnits('1', 'gwei');
+    baseFee = ethers.parseUnits(fb.base, 'gwei');
+    priority = ethers.parseUnits(fb.priority, 'gwei');
   }
 
   // Add tiny random fractional jitter (0–100 wei)
