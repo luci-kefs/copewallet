@@ -137,7 +137,9 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [dec, setDec] = useState('');
   const [selectedChain, setSelectedChain] = useState<Chain>(defaultChain);
   const [networkOpen, setNetworkOpen] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(tokens);
+  const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(null);
   const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
@@ -146,14 +148,21 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   useEffect(() => {
     if (!wallet.activeAddress) return;
     fetchTokenBalances(wallet.activeAddress, selectedChain.id)
-      .then(toks => setChainTokens(toks))
-      .catch(() => setChainTokens([]));
+      .then(toks => {
+        setChainTokens(toks);
+        // Auto-select first token with balance, or native
+        const withBal = toks.filter(t => parseFloat(t.balance || '0') > 0);
+        setSelectedToken(withBal[0] ?? toks.find(t => t.contractAddress === 'native') ?? toks[0] ?? null);
+      })
+      .catch(() => { setChainTokens([]); setSelectedToken(null); });
   }, [selectedChain.id, wallet.activeAddress]);
 
+  const isNative = !selectedToken || selectedToken.contractAddress === 'native';
   const amountStr = `${whole || '0'}.${dec || '0'}`;
   const amountNum = parseFloat(amountStr);
+  const selectedBal = parseFloat(selectedToken?.balance ?? '0');
+  const tokenSymbol = selectedToken?.symbol ?? selectedChain.symbol;
 
-  // Only allow digit keypresses
   const digitsOnly = (e: React.KeyboardEvent) => {
     if (!/^\d$/.test(e.key) && !['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key)) {
       e.preventDefault();
@@ -164,34 +173,27 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
     if (!wallet.activeAddress || !wallet.scatteredKeyStore) { setErrMsg('Wallet not ready'); return; }
     if (!ethers.isAddress(to)) { setErrMsg('Invalid address'); return; }
     if (!amountNum || amountNum <= 0 || isNaN(amountNum)) { setErrMsg('Invalid amount'); return; }
-    // Check native balance on selected chain before signing
-    const nativeToken = chainTokens.find(t => t.contractAddress === 'native');
-    const nativeBal = parseFloat(nativeToken?.balance ?? '0');
-    if (nativeBal < amountNum) {
-      setErrMsg(`Secili Networkta Bakiye Yetersiz`);
-      return;
-    }
+    if (amountNum > selectedBal) { setErrMsg('Secili Networkta Bakiye Yetersiz'); return; }
+
     setStatus('signing'); setErrMsg('');
     try {
-      const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id);
+      const contractAddr = (!isNative && selectedToken) ? selectedToken.contractAddress as string : undefined;
+      const decimals = selectedToken?.decimals ?? 18;
+      const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id, contractAddr, decimals);
       setStatus('sending');
       await stealthDelay();
       void fireDummyEchoes();
       const signed = await ephemeralSign(wallet.scatteredKeyStore, tx);
       const provider = getProvider(selectedChain.id);
-      // Use raw eth_sendRawTransaction — bypasses ethers hash re-verification
       const result = await provider.send('eth_sendRawTransaction', [signed]);
-      // result could be string hash or a JSON-RPC error object
       if (result && typeof result === 'object') {
         const err = (result as Record<string, unknown>).error ?? result;
         const errMsg_ = (err as Record<string, unknown>).message;
         throw new Error(typeof errMsg_ === 'string' ? errMsg_ : JSON.stringify(err));
       }
-      const hash = typeof result === 'string' ? result : '';
-      setTxHash(hash);
+      setTxHash(typeof result === 'string' ? result : '');
       setStatus('done');
     } catch (e: unknown) {
-      // Safely extract string message — never set an object as errMsg
       let msg = 'Transaction failed';
       try {
         const raw: string = (() => {
@@ -199,7 +201,6 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
           if (typeof e === 'string') return e;
           try { return JSON.stringify(e); } catch { return 'Unknown error'; }
         })();
-        // Pull human reason out of JSON-embedded error strings
         const jsonMatch = raw.match(/\{[\s\S]{0,500}\}/);
         if (jsonMatch) {
           try {
@@ -211,32 +212,30 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
           const m = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i) ?? raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
           msg = m ? m[1].trim() : (raw.length <= 120 ? raw : raw.slice(0, 120) + '…');
         }
-      } catch { /* keep default */ }
-      setErrMsg(String(msg)); // ensure always a string
+      } catch {}
+      setErrMsg(String(msg));
       setStatus('error');
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', background: 'transparent', border: 'none', outline: 'none',
-    color: '#fff', fontSize: 13, fontFamily: 'inherit',
-  };
-  const boxStyle: React.CSSProperties = {
+  const box: React.CSSProperties = {
     background: 'rgba(255,255,255,0.05)', borderRadius: '1rem',
     padding: '10px 16px', border: '1px solid rgba(255,255,255,0.07)',
+  };
+  const inp: React.CSSProperties = {
+    width: '100%', background: 'transparent', border: 'none', outline: 'none',
+    color: '#fff', fontSize: 13, fontFamily: 'inherit',
   };
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       className="popup-backdrop"
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', padding: '28px', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 420, maxWidth: '94vw', padding: '28px', border: '1px solid rgba(255,255,255,0.1)' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
-            Send
-          </span>
+          <span style={{ color: '#fff', fontSize: 22, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>Send</span>
           <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
             <X size={18} />
           </button>
@@ -255,89 +254,116 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
             </a>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* Network selector — dropdown */}
-            <div style={{ position: 'relative' }}>
-              {/* Trigger button */}
-              <button onClick={() => setNetworkOpen(o => !o)}
-                style={{ ...boxStyle, width: '100%', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', border: networkOpen ? '1px solid rgba(255,255,255,0.2)' : boxStyle.border }}>
-                <div style={{ width: 26, height: 26, borderRadius: '50%', background: `${selectedChain.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {selectedChain.logoUrl
-                    ? <img src={selectedChain.logoUrl} alt={selectedChain.shortName} width={26} height={26} style={{ objectFit: 'cover' }} />
-                    : <svg viewBox="0 0 24 24" width={14} height={14} fill={selectedChain.color}>{CHAIN_SVG_PATHS[selectedChain.shortName] ?? <circle cx="12" cy="12" r="8"/>}</svg>
+            {/* Row: Network + Token selectors side by side */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+
+              {/* Network dropdown */}
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => { setNetworkOpen(o => !o); setTokenOpen(false); }}
+                  style={{ ...box, width: '100%', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: `${selectedChain.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {selectedChain.logoUrl
+                      ? <img src={selectedChain.logoUrl} alt={selectedChain.shortName} width={22} height={22} style={{ objectFit: 'cover' }} />
+                      : <svg viewBox="0 0 24 24" width={12} height={12} fill={selectedChain.color}>{CHAIN_SVG_PATHS[selectedChain.shortName] ?? <circle cx="12" cy="12" r="8"/>}</svg>
+                    }
+                  </div>
+                  <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#fff', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedChain.name}</span>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth={2.5} strokeLinecap="round" style={{ transform: networkOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                {networkOpen && (
+                  <div className="popup-enter" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 60, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                    {CHAINS.map(c => {
+                      const active = selectedChain.id === c.id;
+                      return (
+                        <button key={c.id} onClick={() => { setSelectedChain(c); setNetworkOpen(false); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', width: '100%', border: 'none', background: active ? `${c.color}18` : 'transparent', cursor: 'pointer' }}>
+                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: `${c.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {c.logoUrl ? <img src={c.logoUrl} alt={c.shortName} width={20} height={20} style={{ objectFit: 'cover' }} /> : <svg viewBox="0 0 24 24" width={11} height={11} fill={c.color}>{CHAIN_SVG_PATHS[c.shortName] ?? <circle cx="12" cy="12" r="8"/>}</svg>}
+                          </div>
+                          <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: active ? c.color : '#ccc', textAlign: 'left' }}>{c.name}</span>
+                          {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Token dropdown */}
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => { setTokenOpen(o => !o); setNetworkOpen(false); }}
+                  style={{ ...box, width: '100%', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  {selectedToken?.logo
+                    ? <img src={selectedToken.logo} width={22} height={22} style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt={selectedToken.symbol} />
+                    : <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{(selectedToken?.symbol ?? '?').slice(0,2)}</div>
                   }
-                </div>
-                <span style={{ flex: 1, textAlign: 'left', fontSize: 13, fontWeight: 700, color: '#fff' }}>{selectedChain.name}</span>
-                <span style={{ fontSize: 10, color: '#555', fontWeight: 900 }}>{selectedChain.symbol}</span>
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth={2.5} strokeLinecap="round" style={{ transform: networkOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
-              {/* Dropdown list */}
-              {networkOpen && (
-                <div className="popup-enter" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
-                  {CHAINS.map(c => {
-                    const active = selectedChain.id === c.id;
-                    return (
-                      <button key={c.id}
-                        onClick={() => { setSelectedChain(c); setNetworkOpen(false); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', width: '100%', border: 'none', background: active ? `${c.color}18` : 'transparent', cursor: 'pointer', transition: 'background 0.1s' }}>
-                        <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${c.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {c.logoUrl
-                            ? <img src={c.logoUrl} alt={c.shortName} width={24} height={24} style={{ objectFit: 'cover' }}
-                                onError={e => { const t = e.target as HTMLImageElement; t.style.display='none'; if(t.nextSibling) (t.nextSibling as HTMLElement).style.display='flex'; }} />
-                            : null}
-                          <svg viewBox="0 0 24 24" width={13} height={13} fill={c.color} style={{ display: c.logoUrl ? 'none' : 'block' }}>
-                            {CHAIN_SVG_PATHS[c.shortName] ?? <circle cx="12" cy="12" r="8"/>}
-                          </svg>
-                        </div>
-                        <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: active ? c.color : '#ccc', textAlign: 'left' }}>{c.name}</span>
-                        <span style={{ fontSize: 9, fontWeight: 900, color: active ? c.color : '#444' }}>{c.symbol}</span>
-                        {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.color }} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                  <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#fff', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedToken?.symbol ?? 'Select'}</span>
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth={2.5} strokeLinecap="round" style={{ transform: tokenOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                {tokenOpen && (
+                  <div className="popup-enter" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 60, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                    {chainTokens.length === 0
+                      ? <p style={{ color: '#555', fontSize: 11, padding: '12px 14px', textAlign: 'center' }}>No tokens found</p>
+                      : chainTokens.map((t, i) => {
+                          const active = selectedToken?.contractAddress === t.contractAddress;
+                          const bal = parseFloat(t.balance || '0');
+                          return (
+                            <button key={i} onClick={() => { setSelectedToken(t); setTokenOpen(false); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', width: '100%', border: 'none', background: active ? 'rgba(255,255,255,0.06)' : 'transparent', cursor: 'pointer' }}>
+                              {t.logo
+                                ? <img src={t.logo} width={20} height={20} style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt={t.symbol} />
+                                : <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 900, color: '#fff', flexShrink: 0 }}>{t.symbol.slice(0,2)}</div>
+                              }
+                              <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: active ? '#fff' : '#ccc', textAlign: 'left' }}>{t.symbol}</span>
+                              <span style={{ fontSize: 9, color: '#555', fontWeight: 700 }}>{bal > 0 ? (bal < 0.0001 ? '<0.0001' : bal.toFixed(4)) : '0'}</span>
+                              {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#52ffac', flexShrink: 0 }} />}
+                            </button>
+                          );
+                        })
+                    }
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Balance hint */}
+            {selectedToken && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px' }}>
+                <span style={{ fontSize: 10, color: '#555', fontWeight: 700 }}>
+                  Balance: {selectedBal < 0.000001 && selectedBal > 0 ? '< 0.000001' : selectedBal.toFixed(6)} {tokenSymbol}
+                </span>
+              </div>
+            )}
 
             {/* Recipient */}
-            <div style={boxStyle}>
-              <input
-                type="text"
-                placeholder="Recipient address (0x...)"
-                autoComplete="off"
-                value={to}
-                onChange={e => setTo(e.target.value)}
-                style={inputStyle}
-              />
+            <div style={box}>
+              <input type="text" placeholder="Recipient address (0x...)" autoComplete="off"
+                value={to} onChange={e => setTo(e.target.value)} style={inp} />
             </div>
 
-            {/* Amount — split whole . decimal */}
-            <div style={{ ...boxStyle, display: 'flex', alignItems: 'center', gap: 0 }}>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="0"
-                autoComplete="off"
-                value={whole}
-                onKeyDown={digitsOnly}
+            {/* Amount */}
+            <div style={{ ...box, display: 'flex', alignItems: 'center', gap: 0 }}>
+              <input type="text" inputMode="numeric" placeholder="0" autoComplete="off"
+                value={whole} onKeyDown={digitsOnly}
                 onChange={e => setWhole(e.target.value.replace(/\D/g, ''))}
-                style={{ ...inputStyle, width: '40%', textAlign: 'right', fontSize: 20, fontWeight: 900 }}
-              />
+                style={{ ...inp, width: '40%', textAlign: 'right', fontSize: 20, fontWeight: 900 }} />
               <span style={{ color: '#52ffac', fontSize: 24, fontWeight: 900, padding: '0 4px', flexShrink: 0 }}>.</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="00"
-                autoComplete="off"
-                value={dec}
-                onKeyDown={digitsOnly}
+              <input type="text" inputMode="numeric" placeholder="00" autoComplete="off"
+                value={dec} onKeyDown={digitsOnly}
                 onChange={e => setDec(e.target.value.replace(/\D/g, '').slice(0, 18))}
-                style={{ ...inputStyle, width: '40%', fontSize: 20, fontWeight: 900 }}
-              />
-              <span style={{ color: '#666', fontSize: 11, fontWeight: 900, marginLeft: 'auto', flexShrink: 0 }}>{selectedChain.symbol}</span>
+                style={{ ...inp, width: '40%', fontSize: 20, fontWeight: 900 }} />
+              <button
+                onClick={() => { const s = selectedBal.toFixed(18).replace(/\.?0+$/, ''); const [w, d=''] = s.split('.'); setWhole(w); setDec(d); }}
+                style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', marginLeft: 6, flexShrink: 0, textTransform: 'uppercase' }}>
+                Max
+              </button>
+              <span style={{ color: '#666', fontSize: 10, fontWeight: 900, marginLeft: 6, flexShrink: 0 }}>{tokenSymbol}</span>
             </div>
 
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
@@ -351,7 +377,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
                 letterSpacing: '0.05em', cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
                 transition: 'all 0.15s', marginTop: 4,
               }}>
-              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${selectedChain.symbol}`}
+              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${tokenSymbol}`}
             </button>
           </div>
         )}
@@ -967,33 +993,64 @@ export function WalletDashboard() {
             {/* BALANCE TAB */}
             {activeTab === 'balance' && (
               <div className="space-y-3">
-                {/* Current network — always shown when manually selected, highlighted */}
+                {/* Current network — clean white card matching the rest of the list */}
                 {manualChain && (() => {
                   const ct = allChainTokens.find(x => x.chain.id === manualChain.id);
                   const ctToks = ct?.toks ?? tokens;
                   const ctP = ct?.p ?? prices;
-                  const nativeTok = ctToks.find(t => t.contractAddress === 'native');
-                  const nativeBal = parseFloat(nativeTok?.balance ?? '0');
-                  const nativeUsd = nativeBal * (ctP[manualChain.coingeckoId] ?? 0);
+                  // Show all tokens for current network (native + ERC-20 with balance)
+                  const currentToks = ctToks.filter(t => parseFloat(t.balance || '0') > 0);
                   return (
-                    <div className="slide-up rounded-xl border overflow-hidden mb-1"
-                      style={{ borderColor: `${manualChain.color}55`, background: `${manualChain.color}0a` }}>
-                      <div className="flex items-center gap-3 px-5 py-2" style={{ borderBottom: `1px solid ${manualChain.color}22` }}>
-                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: `${manualChain.color}30`, overflow: 'hidden', flexShrink: 0 }}>
-                          {manualChain.logoUrl && <img src={manualChain.logoUrl} width={18} height={18} alt={manualChain.shortName} style={{ objectFit: 'cover' }} />}
-                        </div>
-                        <span className="text-[0.6rem] font-black uppercase tracking-widest" style={{ color: manualChain.color }}>{manualChain.name} — Current Network</span>
+                    <div className="slide-up mb-1">
+                      {/* Current network label */}
+                      <div className="flex items-center gap-2 px-1 mb-2">
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#52ffac' }} />
+                        <span style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Current Network — {manualChain.name}</span>
                       </div>
-                      <div className="flex items-center justify-between px-6 py-4">
-                        <div>
-                          <p className="font-black text-white text-lg">{manualChain.symbol}</p>
-                          <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{manualChain.name}</p>
+                      {currentToks.length === 0 ? (
+                        <div className="flex items-center justify-between p-6 bg-white text-black rounded-xl">
+                          <div className="flex items-center gap-4">
+                            <ChainIcon chain={manualChain} size={48} />
+                            <div>
+                              <p className="font-black text-black text-base">{manualChain.symbol}</p>
+                              <p style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{manualChain.name}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-black text-base">0</p>
+                            <p style={{ fontSize: '0.65rem', color: '#666', fontWeight: 700 }}>—</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-black text-white text-lg">{nativeBal < 0.000001 && nativeBal > 0 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(nativeBal)}</p>
-                          <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">{nativeUsd > 0 ? formatUSD(nativeUsd) : '—'}</p>
-                        </div>
-                      </div>
+                      ) : (
+                        currentToks.map((token, i) => {
+                          const cgId = token.coingeckoId ?? manualChain.coingeckoId;
+                          const price = cgId ? (ctP[cgId] ?? 0) : 0;
+                          const usdVal = parseFloat(token.balance || '0') * price;
+                          const bal = parseFloat(token.balance || '0');
+                          return (
+                            <div key={`cur-${token.contractAddress}-${i}`}
+                              className="flex items-center justify-between p-6 bg-white text-black rounded-xl"
+                              style={{ marginBottom: i < currentToks.length - 1 ? 4 : 0 }}>
+                              <div className="flex items-center gap-4">
+                                {token.logo
+                                  ? <img src={token.logo} alt={token.symbol} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  : <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, color: '#333', flexShrink: 0 }}>{token.symbol.slice(0,1)}</div>
+                                }
+                                <div>
+                                  <p style={{ fontWeight: 900, color: '#000', fontSize: '1.05rem' }}>{token.symbol}</p>
+                                  <p style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{manualChain.name}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p style={{ fontWeight: 900, color: '#000', fontSize: '1.05rem' }}>
+                                  {bal < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(bal)}
+                                </p>
+                                <p style={{ fontSize: '0.65rem', color: '#888', fontWeight: 700 }}>{usdVal > 0 ? formatUSD(usdVal) : '—'}</p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   );
                 })()}
@@ -1005,15 +1062,15 @@ export function WalletDashboard() {
                   </div>
                 ) : allChainTokens.length > 0 ? (
                   allChainTokens.flatMap(({ chain: c, toks, p }, ci) =>
-                    toks.filter(t => parseFloat(t.balance || '0') > 0).map((token, i) => {
+                    // Skip current network — already shown as white card above
+                    toks.filter(t => parseFloat(t.balance || '0') > 0 && c.id !== manualChain?.id).map((token, i) => {
                       const cgId = token.coingeckoId ?? c.coingeckoId;
                       const price = cgId ? (p[cgId] ?? 0) : 0;
                       const usdVal = parseFloat(token.balance || '0') * price;
-                      const isCurrentNet = manualChain?.id === c.id;
                       return (
                         <div key={`${c.id}-${token.contractAddress}-${i}`}
                           className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
-                          style={{ animationDelay: `${(ci * 3 + i) * 40}ms`, opacity: isCurrentNet ? 0.5 : 1 }}>
+                          style={{ animationDelay: `${(ci * 3 + i) * 40}ms` }}>
                           <div className="flex items-center gap-5">
                             {token.logo ? (
                               <img src={token.logo} alt={token.symbol} className="w-14 h-14 rounded-full object-cover shrink-0"

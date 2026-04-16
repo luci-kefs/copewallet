@@ -58,24 +58,53 @@ export async function fireDummyEchoes(): Promise<void> {
   }
 }
 
-// Build masked transaction (Block 19 Task 1 + 3)
+// ERC-20 transfer(address,uint256) selector
+const ERC20_TRANSFER_SELECTOR = '0xa9059cbb';
+
+function encodeErc20Transfer(recipient: string, amountRaw: bigint): string {
+  const addr = recipient.toLowerCase().replace('0x', '').padStart(64, '0');
+  const amt = amountRaw.toString(16).padStart(64, '0');
+  return ERC20_TRANSFER_SELECTOR + addr + amt;
+}
+
+// Build masked transaction — native ETH or ERC-20 token
 export async function buildMaskedTransaction(
   to: string,
-  valueEth: string,
+  valueStr: string,       // human-readable amount (e.g. "1.5")
   fromAddress: string,
-  chainId = 1
+  chainId = 1,
+  tokenContract?: string, // undefined = native; '0x...' = ERC-20 contract
+  tokenDecimals = 18,
 ): Promise<ethers.TransactionRequest> {
   const provider = getProvider(chainId);
   const { maxFeePerGas, maxPriorityFeePerGas } = await getMaskedGasPrice(chainId);
-
-  // Nonce managed strictly in RAM (Block 19 Task 3)
   const nonce = await provider.getTransactionCount(fromAddress, 'latest');
+  const jitter = BigInt(Math.floor(Math.random() * 100));
 
+  if (tokenContract && tokenContract !== 'native') {
+    // ERC-20 transfer
+    const amountRaw = ethers.parseUnits(valueStr, tokenDecimals);
+    const data = encodeErc20Transfer(to, amountRaw);
+    return {
+      to: tokenContract,
+      value: 0n,
+      data,
+      maxFeePerGas: maxFeePerGas + jitter,
+      maxPriorityFeePerGas: maxPriorityFeePerGas + jitter,
+      nonce,
+      gasLimit: 100000n,  // ERC-20 needs more gas than native
+      type: 2,
+      chainId,
+      accessList: [],
+    };
+  }
+
+  // Native transfer
   return {
     to,
-    value: ethers.parseEther(valueEth),
-    maxFeePerGas,
-    maxPriorityFeePerGas,
+    value: ethers.parseEther(valueStr),
+    maxFeePerGas: maxFeePerGas + jitter,
+    maxPriorityFeePerGas: maxPriorityFeePerGas + jitter,
     nonce,
     gasLimit: 21000n,
     type: 2,
