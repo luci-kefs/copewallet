@@ -1,7 +1,7 @@
 // Ephemeral Signer — Block 28
 import { ethers } from 'ethers';
 import { zeroFill } from './crypto';
-import { ScatteredStore, getReassembledData, wipeScatteredStore } from './memory-vault';
+import { ScatteredStore, getReassembledData } from './memory-vault';
 
 export async function ephemeralSign(
   store: ScatteredStore,
@@ -17,32 +17,22 @@ export async function ephemeralSign(
     // Keep a wipe-able byte copy for zero-fill in finally
     keyBytes = new Uint8Array(Buffer.from(hexKey.slice(2), 'hex'));
 
-    // Build a concrete ethers.Transaction (avoids any populateTransaction path)
-    const tx = ethers.Transaction.from({
-      to:                   transaction.to as string,
-      value:                transaction.value ?? 0n,
-      nonce:                transaction.nonce as number,
-      gasLimit:             transaction.gasLimit ?? 21000n,
-      maxFeePerGas:         transaction.maxFeePerGas as bigint,
-      maxPriorityFeePerGas: transaction.maxPriorityFeePerGas as bigint,
-      chainId:              transaction.chainId as bigint | number,
-      type:                 2,
-      accessList:           [],
-      data:                 transaction.data ?? '0x',
+    // Strip 'from' — ethers v6 calls populateTransaction if 'from' is present
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { from: _from, ...cleanTx } = transaction as ethers.TransactionRequest & { from?: string };
+
+    // Use Wallet without provider — signTransaction works offline for type-2 tx
+    const wallet = new ethers.Wallet(hexKey);
+    return await wallet.signTransaction({
+      ...cleanTx,
+      type: 2,
+      accessList: cleanTx.accessList ?? [],
     });
-
-    // Sign the serialized unsigned tx directly — zero provider interaction
-    const signingKey = new ethers.SigningKey(hexKey);
-    const digest = ethers.keccak256(tx.unsignedSerialized);
-    const sig = signingKey.sign(digest);
-    tx.signature = sig;
-
-    return tx.serialized;
   } finally {
-    // Zero-fill the key bytes — but keep the store intact for reuse
     if (keyBytes) {
       zeroFill(keyBytes);
       keyBytes = null;
     }
+    // Do NOT wipe the store — it must remain valid for subsequent sends
   }
 }

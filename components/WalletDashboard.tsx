@@ -222,21 +222,33 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
             {/* Network selector */}
-            <div style={boxStyle}>
-              <p style={{ color: '#666', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 6 }}>Network</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {CHAINS.filter(c => !c.isTestnet).map(c => (
-                  <button key={c.id} onClick={() => setSelectedChain(c)}
-                    style={{
-                      padding: '4px 10px', borderRadius: '2rem', fontSize: 10, fontWeight: 900,
-                      border: selectedChain.id === c.id ? `1.5px solid ${c.color}` : '1px solid rgba(255,255,255,0.1)',
-                      background: selectedChain.id === c.id ? `${c.color}18` : 'transparent',
-                      color: selectedChain.id === c.id ? c.color : '#888',
-                      cursor: 'pointer', transition: 'all 0.1s',
-                    }}>
-                    {c.shortName}
-                  </button>
-                ))}
+            <div style={{ ...boxStyle, padding: '12px 14px' }}>
+              <p style={{ color: '#555', fontSize: 9, fontWeight: 900, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>Network</p>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                {CHAINS.filter(c => !c.isTestnet).map(c => {
+                  const active = selectedChain.id === c.id;
+                  return (
+                    <button key={c.id} onClick={() => setSelectedChain(c)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                        flexShrink: 0, width: 56, padding: '8px 4px', borderRadius: '0.85rem',
+                        border: active ? `1.5px solid ${c.color}` : '1.5px solid rgba(255,255,255,0.06)',
+                        background: active ? `${c.color}15` : 'rgba(255,255,255,0.03)',
+                        cursor: 'pointer', transition: 'all 0.12s',
+                      }}>
+                      {c.logoUrl ? (
+                        <img src={c.logoUrl} alt={c.shortName} width={22} height={22} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', background: `${c.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg viewBox="0 0 24 24" width={14} height={14} style={{ color: c.color }} fill="currentColor">
+                            {CHAIN_SVG_PATHS[c.shortName] ?? <circle cx="12" cy="12" r="8"/>}
+                          </svg>
+                        </div>
+                      )}
+                      <span style={{ fontSize: 9, fontWeight: 900, color: active ? c.color : '#666', letterSpacing: '0.04em', lineHeight: 1 }}>{c.shortName}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -569,6 +581,7 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionToggling, setSessionToggling] = useState(false);
+  const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
   // Track whether wallet was ever unlocked — if yes, never show skeleton again
   const [everUnlocked, setEverUnlocked] = useState(false);
   useEffect(() => { if (wallet.isUnlocked) setEverUnlocked(true); }, [wallet.isUnlocked]);
@@ -638,9 +651,10 @@ export function WalletDashboard() {
         } catch { return { chain: c, usd: 0, toks: [], p: {} }; }
       })
     ).then(results => {
+      const total = results.reduce((s, r) => s + r.usd, 0);
+      setAllChainsTotal(total);
       const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
       if (best && best.usd > 0) {
-        // Set chain, tokens and prices all at once to avoid 0-flash
         setSelectedChain(best.chain);
         setTokens(best.toks);
         setPrices(best.p);
@@ -663,12 +677,14 @@ export function WalletDashboard() {
     setIsRefreshing(false);
   };
 
-  const totalUSD = tokens.reduce((sum, t) => {
+  const chainTotalUSD = tokens.reduce((sum, t) => {
     const price = prices[t.coingeckoId ?? ''] ?? prices[selectedChain.coingeckoId] ?? 0;
     return sum + parseFloat(t.balance || '0') * price;
   }, 0);
+  // Use all-chains total when available, otherwise fall back to current chain
+  const displayTotal = allChainsTotal ?? chainTotalUSD;
 
-  // Track previous totalUSD for CountUp from-value
+  // Track previous for CountUp from-value
   const prevTotalUSDRef = useRef(0);
   const [countFrom, setCountFrom] = useState(0);
   const [countTo, setCountTo] = useState(0);
@@ -677,10 +693,10 @@ export function WalletDashboard() {
   useEffect(() => {
     if (isLoadingTokens) return;
     setCountFrom(prevTotalUSDRef.current);
-    setCountTo(totalUSD);
+    setCountTo(displayTotal);
     setCountKey(k => k + 1);
-    prevTotalUSDRef.current = totalUSD;
-  }, [totalUSD, isLoadingTokens]);
+    prevTotalUSDRef.current = displayTotal;
+  }, [displayTotal, isLoadingTokens]);
 
   // ── Loading ──
   if (!wallet.isUnlocked && !everUnlocked) {
@@ -881,12 +897,12 @@ export function WalletDashboard() {
                   <div className="flex justify-center py-12">
                     <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
                   </div>
-                ) : tokens.length === 0 ? (
+                ) : tokens.filter(t => parseFloat(t.balance || '0') > 0).length === 0 ? (
                   <div className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5">
                     <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">No assets on {selectedChain.name}</p>
                   </div>
                 ) : (
-                  tokens.map((token, i) => {
+                  tokens.filter(t => parseFloat(t.balance || '0') > 0).map((token, i) => {
                     const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
                     const price = cgId ? (prices[cgId] ?? 0) : 0;
                     const usdVal = parseFloat(token.balance || '0') * price;
