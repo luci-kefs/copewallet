@@ -162,9 +162,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Build hybrid entropy (Block 11) — used as additional XOR layer on the key
       await buildSuperEntropySeed();
 
-      // ethers v6: createRandom() uses crypto.getRandomValues internally
+      // ethers v6: createRandom() returns HDNodeWallet with mnemonic
       const wallet = ethers.Wallet.createRandom();
       const mnemonic = wallet.mnemonic?.phrase ?? '';
+      if (!mnemonic || mnemonic.trim().split(/\s+/).length < 12) {
+        throw new Error('Failed to generate mnemonic');
+      }
       const privateKey = wallet.privateKey;
       const address = wallet.address;
 
@@ -288,11 +291,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Secure mnemonic export — reads from in-memory ref; falls back to decrypt if ref was lost
   const getMnemonicForExport = useCallback(async (): Promise<string | null> => {
-    if (mnemonicRef.current) return mnemonicRef.current;
-    // Fallback: re-derive from encrypted state using current vault key
+    if (mnemonicRef.current && mnemonicRef.current.trim().split(/\s+/).length >= 12) {
+      return mnemonicRef.current;
+    }
+    // Fallback: try multiple possible keys (ref, module-level, current key + hwId)
     const enc = state._v_enc;
-    const key = vaultKeyRef.current;
-    if (enc && key) {
+    if (!enc) return null;
+    const candidates: string[] = [];
+    if (vaultKeyRef.current) candidates.push(vaultKeyRef.current);
+    if (_vaultCombinedKey && _vaultCombinedKey !== vaultKeyRef.current) candidates.push(_vaultCombinedKey);
+    try {
+      const hwId = await getHardwareUUID();
+      candidates.push(getCurrentKey() + hwId);
+    } catch {}
+    for (const key of candidates) {
       try {
         const decoded = decryptData(enc, key);
         if (decoded && decoded.trim().split(/\s+/).length >= 12) {
