@@ -286,17 +286,32 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state._v_enc]);
 
-  // Secure mnemonic export — reads from in-memory ref, no decrypt needed
+  // Secure mnemonic export — reads from in-memory ref; falls back to decrypt if ref was lost
   const getMnemonicForExport = useCallback(async (): Promise<string | null> => {
-    return mnemonicRef.current ?? null;
-  }, []);
+    if (mnemonicRef.current) return mnemonicRef.current;
+    // Fallback: re-derive from encrypted state using current vault key
+    const enc = state._v_enc;
+    const key = vaultKeyRef.current;
+    if (enc && key) {
+      try {
+        const decoded = decryptData(enc, key);
+        if (decoded && decoded.trim().split(/\s+/).length >= 12) {
+          mnemonicRef.current = decoded; // restore ref
+          return decoded;
+        }
+      } catch {}
+    }
+    return null;
+  }, [state._v_enc]);
 
   // Persistent mode — Block 18 Task 2 (explicit user consent)
   // mnemonic is passed in directly (already decrypted by caller) to avoid double-decrypt
   const enablePersistentMode = useCallback(async (passphrase: string, mnemonic: string) => {
-    if (!mnemonic) throw new Error('Vault empty');
+    // Fallback to in-memory ref if caller passed empty string
+    const resolvedMnemonic = mnemonic || mnemonicRef.current || '';
+    if (!resolvedMnemonic) throw new Error('Vault empty');
     const hwId = await getHardwareUUID();
-    await persistVault(mnemonic, passphrase, hwId);
+    await persistVault(resolvedMnemonic, passphrase, hwId);
     setState((p) => ({ ...p, mode: 'PERSISTENT' }));
   }, []);
 
