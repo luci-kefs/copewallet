@@ -58,6 +58,15 @@ export async function fireDummyEchoes(): Promise<void> {
   }
 }
 
+// Estimate network fee in ETH (maxFeePerGas × gasLimit)
+export async function estimateFee(chainId = 1, isErc20 = false): Promise<{ eth: string; wei: bigint }> {
+  const { maxFeePerGas } = await getMaskedGasPrice(chainId);
+  const gasLimit = isErc20 ? 100000n : 21000n;
+  const wei = maxFeePerGas * gasLimit;
+  const eth = ethers.formatEther(wei);
+  return { eth, wei };
+}
+
 // ERC-20 transfer(address,uint256) selector
 const ERC20_TRANSFER_SELECTOR = '0xa9059cbb';
 

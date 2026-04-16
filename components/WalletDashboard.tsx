@@ -11,7 +11,7 @@ import { useWallet } from '@/context/WalletContext';
 import { CHAINS, Chain } from '@/lib/chains';
 import { fetchTokenBalances, fetchTxHistory, TokenBalance, TxRecord } from '@/lib/tokens';
 import { getPrices, formatUSD } from '@/lib/prices';
-import { buildMaskedTransaction, stealthDelay, fireDummyEchoes } from '@/lib/transaction';
+import { buildMaskedTransaction, stealthDelay, fireDummyEchoes, estimateFee } from '@/lib/transaction';
 import { ephemeralSign } from '@/lib/signer';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
@@ -143,6 +143,8 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
+  const [feeEth, setFeeEth] = useState<string | null>(null);
+  const [feeUsd, setFeeUsd] = useState<number | null>(null);
 
   // Re-fetch tokens whenever selected chain changes
   useEffect(() => {
@@ -156,6 +158,20 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
       })
       .catch(() => { setChainTokens([]); setSelectedToken(null); });
   }, [selectedChain.id, wallet.activeAddress]);
+
+  // Estimate fee when chain or token type changes
+  useEffect(() => {
+    setFeeEth(null); setFeeUsd(null);
+    const isErc20 = !!(selectedToken && selectedToken.contractAddress !== 'native');
+    estimateFee(selectedChain.id, isErc20).then(({ eth }) => {
+      setFeeEth(parseFloat(eth).toFixed(8).replace(/\.?0+$/, '') || '0');
+      // Fee is always paid in native token (ETH, MATIC, etc.)
+      getPrices([selectedChain.coingeckoId]).then(p => {
+        const nativePrice = p[selectedChain.coingeckoId] ?? 0;
+        setFeeUsd(parseFloat(eth) * nativePrice);
+      }).catch(() => {});
+    }).catch(() => {});
+  }, [selectedChain.id, selectedToken?.contractAddress]);
 
   const isNative = !selectedToken || selectedToken.contractAddress === 'native';
   const amountStr = `${whole || '0'}.${dec || '0'}`;
@@ -364,6 +380,21 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
                 Max
               </button>
               <span style={{ color: '#666', fontSize: 10, fontWeight: 900, marginLeft: 6, flexShrink: 0 }}>{tokenSymbol}</span>
+            </div>
+
+            {/* Network fee estimate */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 4px' }}>
+              <span style={{ fontSize: 10, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Network Fee</span>
+              {feeEth === null ? (
+                <span style={{ fontSize: 10, color: '#444', fontWeight: 700 }}>Estimating...</span>
+              ) : (
+                <span style={{ fontSize: 10, fontWeight: 900, color: '#888' }}>
+                  ~{feeEth} {selectedChain.symbol}
+                  {feeUsd !== null && feeUsd > 0 && (
+                    <span style={{ color: '#555', marginLeft: 5 }}>({formatUSD(feeUsd)})</span>
+                  )}
+                </span>
+              )}
             </div>
 
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
