@@ -163,33 +163,40 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
       void fireDummyEchoes();
       const signed = await ephemeralSign(wallet.scatteredKeyStore, tx);
       const provider = getProvider(selectedChain.id);
-      // Use raw eth_sendRawTransaction — bypasses ethers hash re-verification (@TODO hash mismatch)
-      const txHash_ = await provider.send('eth_sendRawTransaction', [signed]) as string;
-      setTxHash(txHash_);
+      // Use raw eth_sendRawTransaction — bypasses ethers hash re-verification
+      const result = await provider.send('eth_sendRawTransaction', [signed]);
+      // result could be string hash or a JSON-RPC error object
+      if (result && typeof result === 'object') {
+        const err = (result as Record<string, unknown>).error ?? result;
+        const errMsg_ = (err as Record<string, unknown>).message;
+        throw new Error(typeof errMsg_ === 'string' ? errMsg_ : JSON.stringify(err));
+      }
+      const hash = typeof result === 'string' ? result : '';
+      setTxHash(hash);
       setStatus('done');
     } catch (e: unknown) {
+      // Safely extract string message — never set an object as errMsg
       let msg = 'Transaction failed';
       try {
-        // e.message may be an object (ethers ServerError) — always stringify safely
-        const raw = e instanceof Error ? e.message : String(e);
-        // Try to extract human reason from JSON embedded in error string
-        const jsonMatch = raw.match(/\{[\s\S]*\}/);
+        const raw: string = (() => {
+          if (e instanceof Error) return e.message;
+          if (typeof e === 'string') return e;
+          try { return JSON.stringify(e); } catch { return 'Unknown error'; }
+        })();
+        // Pull human reason out of JSON-embedded error strings
+        const jsonMatch = raw.match(/\{[\s\S]{0,500}\}/);
         if (jsonMatch) {
           try {
-            const parsed = JSON.parse(jsonMatch[0]);
-            const inner = parsed?.error?.message ?? parsed?.message ?? parsed?.reason;
-            if (typeof inner === 'string' && inner.length < 200) { msg = inner; }
-            else msg = 'Transaction rejected by network';
+            const p = JSON.parse(jsonMatch[0]);
+            const inner = p?.error?.message ?? p?.message ?? p?.reason;
+            msg = typeof inner === 'string' ? inner.slice(0, 140) : 'Transaction rejected by network';
           } catch { msg = raw.slice(0, 120) + (raw.length > 120 ? '…' : ''); }
         } else {
-          const reasonMatch = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i)
-            ?? raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
-          if (reasonMatch) msg = reasonMatch[1].trim();
-          else if (raw.length <= 120) msg = raw;
-          else msg = raw.slice(0, 120) + '…';
+          const m = raw.match(/reason["\s:]+([^"}{,\n]{3,80})/i) ?? raw.match(/message["\s:]+([^"}{,\n]{3,80})/i);
+          msg = m ? m[1].trim() : (raw.length <= 120 ? raw : raw.slice(0, 120) + '…');
         }
-      } catch { /* keep default msg */ }
-      setErrMsg(msg);
+      } catch { /* keep default */ }
+      setErrMsg(String(msg)); // ensure always a string
       setStatus('error');
     }
   };
@@ -254,7 +261,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
               {/* Dropdown list */}
               {networkOpen && (
                 <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
-                  {CHAINS.filter(c => !c.isTestnet).map(c => {
+                  {CHAINS.map(c => {
                     const active = selectedChain.id === c.id;
                     return (
                       <button key={c.id}
@@ -658,14 +665,14 @@ export function WalletDashboard() {
     loadTokens();
   }, [wallet.isUnlocked, address, selectedChain.id]);
 
-  // Auto-select network with highest USD balance on first unlock + compute all-chains total
+  // Compute all-chains total + auto-select highest-balance chain on first unlock
   const autoSelectedRef = useRef(false);
   useEffect(() => {
     if (!wallet.isUnlocked || !address) return;
-    // Always recompute total; only auto-select chain once
-    const alreadySelected = autoSelectedRef.current;
+    const doAutoSelect = !autoSelectedRef.current;
     autoSelectedRef.current = true;
-    const alchemyChains = CHAINS.filter(c => c.isAlchemy && !c.isTestnet);
+    // Fetch ALL Alchemy chains (including testnets — user may hold testnet ETH)
+    const alchemyChains = CHAINS.filter(c => c.isAlchemy);
     Promise.all(
       alchemyChains.map(async c => {
         try {
@@ -682,7 +689,7 @@ export function WalletDashboard() {
     ).then(results => {
       const total = results.reduce((s, r) => s + r.usd, 0);
       setAllChainsTotal(total);
-      if (!alreadySelected) {
+      if (doAutoSelect) {
         const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
         if (best && best.usd > 0) {
           setSelectedChain(best.chain);
@@ -690,7 +697,7 @@ export function WalletDashboard() {
           setPrices(best.p);
         }
       }
-    }).catch(() => {});
+    }).catch(() => { setAllChainsTotal(0); });
   }, [wallet.isUnlocked, address]);
 
   useEffect(() => {
