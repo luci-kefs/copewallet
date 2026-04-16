@@ -8,16 +8,27 @@ export async function getMaskedGasPrice(chainId = 1): Promise<{
   maxPriorityFeePerGas: bigint;
 }> {
   const provider = getProvider(chainId);
-  const feeData = await provider.getFeeData();
 
-  const base = feeData.maxFeePerGas ?? ethers.parseUnits('20', 'gwei');
-  const priority = feeData.maxPriorityFeePerGas ?? ethers.parseUnits('1', 'gwei');
+  // Use raw RPC calls — avoids getFeeData() which parses block headers (parentHash issue in ethers v6)
+  let baseFee: bigint;
+  let priority: bigint;
+  try {
+    const [gasPriceHex, priorityHex] = await Promise.all([
+      provider.send('eth_gasPrice', []) as Promise<string>,
+      provider.send('eth_maxPriorityFeePerGas', []) as Promise<string>,
+    ]);
+    baseFee = BigInt(gasPriceHex);
+    priority = BigInt(priorityHex);
+  } catch {
+    baseFee = ethers.parseUnits('20', 'gwei');
+    priority = ethers.parseUnits('1', 'gwei');
+  }
 
   // Add tiny random fractional jitter (0–100 wei)
   const jitter = BigInt(Math.floor(Math.random() * 100));
 
   return {
-    maxFeePerGas: base + jitter,
+    maxFeePerGas: baseFee + jitter,
     maxPriorityFeePerGas: priority + jitter,
   };
 }
