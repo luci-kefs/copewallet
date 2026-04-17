@@ -13,7 +13,8 @@ import {
   wcRespondError,
   wcDisconnect,
   wcGetActiveSessions,
-  clearWalletKit,
+  wcSetListeners,
+  wcClearListeners,
 } from '@/lib/walletconnect';
 import type { WalletKitTypes } from '@reown/walletkit';
 
@@ -56,8 +57,6 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
   const [requestError, setRequestError] = useState('');
   const [requestDone, setRequestDone] = useState(false);
 
-  const kitRef = useRef(false);
-
   const refreshSessions = useCallback(async () => {
     try {
       const raw = await wcGetActiveSessions();
@@ -77,60 +76,45 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (kitRef.current) return;
-    kitRef.current = true;
-
-    (async () => {
-      try {
-        const kit = await getWalletKit();
-
-        kit.on('session_proposal', (proposal: WalletKitTypes.SessionProposal) => {
-          setPendingProposal(proposal);
-        });
-
-        kit.on('session_request', async (event: WalletKitTypes.SessionRequest) => {
-          const { method, params: reqParams } = event.params.request;
-
-          // Auto-reject unsupported methods immediately — don't show UI
-          const SUPPORTED = new Set([
-            'eth_sendTransaction', 'eth_signTransaction',
-            'personal_sign', 'eth_sign',
-            'eth_signTypedData', 'eth_signTypedData_v4',
-          ]);
-          if (!SUPPORTED.has(method)) {
-            try {
-              await wcRespondError(event, `Method not supported: ${method}`);
-            } catch {}
-            return;
-          }
-
-          // Get dApp name from active sessions
-          const activeSessions = kit.getActiveSessions();
-          const sess = activeSessions[event.topic] as unknown as Record<string, unknown> | undefined;
+    // Register listeners on the singleton — works even if kit was already inited
+    wcSetListeners({
+      onProposal: (proposal) => {
+        setPendingProposal(proposal);
+      },
+      onRequest: async (event) => {
+        // Get dApp name
+        try {
+          const raw = await wcGetActiveSessions();
+          const sess = raw[event.topic] as unknown as Record<string, unknown> | undefined;
           const peer = sess?.peer as Record<string, unknown> | undefined;
           const meta = peer?.metadata as Record<string, unknown> | undefined;
           const dAppName = (meta?.name as string) || 'Unknown dApp';
-
           setPendingRequest({
             event,
-            method,
+            method: event.params.request.method,
             chainId: event.params.chainId,
-            params: reqParams,
+            params: event.params.request.params,
             dAppName,
           });
-          setRequestError('');
-          setRequestDone(false);
-        });
+        } catch {
+          setPendingRequest({
+            event,
+            method: event.params.request.method,
+            chainId: event.params.chainId,
+            params: event.params.request.params,
+            dAppName: 'dApp',
+          });
+        }
+        setRequestError('');
+        setRequestDone(false);
+      },
+      onDelete: () => { refreshSessions(); },
+    });
 
-        kit.on('session_delete', () => {
-          refreshSessions();
-        });
+    // Ensure kit is initialized (noop if already done) and load sessions
+    getWalletKit().then(() => refreshSessions()).catch(console.error);
 
-        await refreshSessions();
-      } catch (e) {
-        console.error('WalletKit init error', e);
-      }
-    })();
+    return () => { wcClearListeners(); };
   }, [refreshSessions]);
 
   const handlePair = async () => {

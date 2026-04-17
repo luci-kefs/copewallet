@@ -18,26 +18,102 @@ const METADATA = {
   icons: ['https://copewallet.com/favicon.ico'],
 };
 
+// ── Singleton — one Core + one WalletKit, ever ────────────────────────────────
+let _core: InstanceType<typeof Core> | null = null;
 let _kit: InstanceType<typeof WalletKit> | null = null;
+let _initPromise: Promise<InstanceType<typeof WalletKit>> | null = null;
+
+// Global event callbacks — registered by the modal, fired regardless of mount order
+type ProposalCb = (p: WalletKitTypes.SessionProposal) => void;
+type RequestCb  = (e: WalletKitTypes.SessionRequest)  => void;
+type DeleteCb   = () => void;
+
+let _onProposal: ProposalCb | null = null;
+let _onRequest:  RequestCb  | null = null;
+let _onDelete:   DeleteCb   | null = null;
+
+// Queued events that arrived before listeners registered
+let _queuedProposal: WalletKitTypes.SessionProposal | null = null;
+let _queuedRequest:  WalletKitTypes.SessionRequest  | null = null;
+
+export function wcSetListeners(opts: {
+  onProposal: ProposalCb;
+  onRequest:  RequestCb;
+  onDelete:   DeleteCb;
+}): void {
+  _onProposal = opts.onProposal;
+  _onRequest  = opts.onRequest;
+  _onDelete   = opts.onDelete;
+
+  // Flush queued events immediately
+  if (_queuedProposal) { opts.onProposal(_queuedProposal); _queuedProposal = null; }
+  if (_queuedRequest)  { opts.onRequest(_queuedRequest);   _queuedRequest  = null; }
+}
+
+export function wcClearListeners(): void {
+  _onProposal = null;
+  _onRequest  = null;
+  _onDelete   = null;
+}
 
 export async function getWalletKit(): Promise<InstanceType<typeof WalletKit>> {
   if (_kit) return _kit;
-  const core = new Core({ projectId: PROJECT_ID });
-  _kit = await WalletKit.init({ core, metadata: METADATA });
-  return _kit;
+  if (_initPromise) return _initPromise;
+
+  _initPromise = (async () => {
+    if (!_core) {
+      _core = new Core({ projectId: PROJECT_ID });
+    }
+    _kit = await WalletKit.init({ core: _core, metadata: METADATA });
+
+    // Wire events ONCE on the singleton
+    _kit.on('session_proposal', (proposal: WalletKitTypes.SessionProposal) => {
+      if (_onProposal) _onProposal(proposal);
+      else _queuedProposal = proposal; // modal not mounted yet — queue it
+    });
+
+    _kit.on('session_request', async (event: WalletKitTypes.SessionRequest) => {
+      const { method } = event.params.request;
+      const SUPPORTED = new Set([
+        'eth_sendTransaction', 'eth_signTransaction',
+        'personal_sign', 'eth_sign',
+        'eth_signTypedData', 'eth_signTypedData_v4',
+      ]);
+      // Auto-reject unsupported immediately, no UI
+      if (!SUPPORTED.has(method)) {
+        try { await wcRespondError(event, `Method not supported: ${method}`); } catch {}
+        return;
+      }
+      if (_onRequest) _onRequest(event);
+      else _queuedRequest = event;
+    });
+
+    _kit.on('session_delete', () => {
+      if (_onDelete) _onDelete();
+    });
+
+    return _kit;
+  })();
+
+  return _initPromise;
 }
 
 export function clearWalletKit(): void {
+  wcClearListeners();
+  _queuedProposal = null;
+  _queuedRequest  = null;
   _kit = null;
+  _core = null;
+  _initPromise = null;
 }
 
-// Pair with a wc: URI from a dApp
+// ── Pairing ───────────────────────────────────────────────────────────────────
 export async function wcPair(uri: string): Promise<void> {
   const kit = await getWalletKit();
   await kit.pair({ uri: uri.trim() });
 }
 
-// Approve a session proposal — only propose chains we know about
+// ── Session approval ──────────────────────────────────────────────────────────
 export async function wcApproveSession(
   proposal: WalletKitTypes.SessionProposal,
   address: string
@@ -47,7 +123,6 @@ export async function wcApproveSession(
   const requiredNs = params.requiredNamespaces ?? {};
   const optionalNs = params.optionalNamespaces ?? {};
 
-  // Build namespaces for eip155 only
   const namespaces: Record<string, { accounts: string[]; methods: string[]; events: string[] }> = {};
 
   for (const key of Object.keys({ ...requiredNs, ...optionalNs })) {
@@ -56,42 +131,27 @@ export async function wcApproveSession(
     const req = requiredNs[key] ?? {};
     const opt = optionalNs[key] ?? {};
 
-    // Collect all requested chain ids
-    const chainIds = [...new Set([
-      ...(req.chains ?? []),
-      ...(opt.chains ?? []),
-    ])];
+    const chainIds = [...new Set([...(req.chains ?? []), ...(opt.chains ?? [])])];
 
-    // Filter to chains we support
     const supportedIds = chainIds.filter(c => {
-      const id = parseInt(c.split(':')[1] ?? '0');
-      return CHAINS.some(ch => ch.id === id);
+      const cid = parseInt(c.split(':')[1] ?? '0');
+      return CHAINS.some(ch => ch.id === cid);
     });
-
-    // If no supported chains, use eth mainnet
     const finalIds = supportedIds.length > 0 ? supportedIds : ['eip155:1'];
-
     const accounts = finalIds.map(c => `${c}:${address}`);
 
-    const methods = [
-      ...new Set([
-        ...(req.methods ?? []),
-        ...(opt.methods ?? []),
-        // Always include core signing methods
-        'eth_sendTransaction',
-        'eth_signTransaction',
-        'personal_sign',
-        'eth_sign',
-        'eth_signTypedData',
-        'eth_signTypedData_v4',
-      ]),
-    ];
+    const methods = [...new Set([
+      ...(req.methods ?? []),
+      ...(opt.methods ?? []),
+      'eth_sendTransaction', 'eth_signTransaction',
+      'personal_sign', 'eth_sign',
+      'eth_signTypedData', 'eth_signTypedData_v4',
+    ])];
 
     const events = [...new Set([
       ...(req.events ?? []),
       ...(opt.events ?? []),
-      'chainChanged',
-      'accountsChanged',
+      'chainChanged', 'accountsChanged',
     ])];
 
     namespaces[key] = { accounts, methods, events };
@@ -102,14 +162,10 @@ export async function wcApproveSession(
 
 export async function wcRejectSession(proposal: WalletKitTypes.SessionProposal): Promise<void> {
   const kit = await getWalletKit();
-  await kit.rejectSession({
-    id: proposal.id,
-    reason: { code: 4001, message: 'User rejected' },
-  });
+  await kit.rejectSession({ id: proposal.id, reason: { code: 4001, message: 'User rejected' } });
 }
 
 // ── Request handling ──────────────────────────────────────────────────────────
-
 export type WcRequestResult = { success: true; result: unknown } | { success: false; error: string };
 
 export async function handleWcRequest(
@@ -127,44 +183,27 @@ export async function handleWcRequest(
     keyBytes = new Uint8Array(Buffer.from(hexKey.slice(2), 'hex'));
     const signer = new ethers.Wallet(hexKey);
 
-    // Auto-reject unsupported wallet_* methods immediately (no UI needed)
-    const SUPPORTED = new Set([
-      'eth_sendTransaction', 'eth_signTransaction',
-      'personal_sign', 'eth_sign',
-      'eth_signTypedData', 'eth_signTypedData_v4',
-    ]);
-    if (!SUPPORTED.has(method)) {
-      return { success: false, error: `Method not supported: ${method}` };
-    }
-
     switch (method) {
       case 'personal_sign': {
-        // params: [message, address] — message is hex or utf8
         const msgHex: string = params[0];
         const bytes = ethers.isHexString(msgHex) ? ethers.getBytes(msgHex) : ethers.toUtf8Bytes(msgHex);
-        const sig = await signer.signMessage(bytes);
-        return { success: true, result: sig };
+        return { success: true, result: await signer.signMessage(bytes) };
       }
 
       case 'eth_sign': {
-        // Legacy: params: [address, message]
         const msgHex: string = params[1];
         const bytes = ethers.isHexString(msgHex) ? ethers.getBytes(msgHex) : ethers.toUtf8Bytes(msgHex);
-        const sig = await signer.signMessage(bytes);
-        return { success: true, result: sig };
+        return { success: true, result: await signer.signMessage(bytes) };
       }
 
       case 'eth_signTypedData':
       case 'eth_signTypedData_v4': {
-        // params: [address, typedDataJson]
         const typedDataStr: string = params[1];
         const typedData = typeof typedDataStr === 'string' ? JSON.parse(typedDataStr) : typedDataStr;
         const { domain, types, message } = typedData;
-        // Remove EIP712Domain from types if present — ethers adds it automatically
         const filteredTypes = { ...types };
         delete filteredTypes['EIP712Domain'];
-        const sig = await signer.signTypedData(domain, filteredTypes, message);
-        return { success: true, result: sig };
+        return { success: true, result: await signer.signTypedData(domain, filteredTypes, message) };
       }
 
       case 'eth_signTransaction': {
@@ -175,8 +214,7 @@ export async function handleWcRequest(
           address,
           chainId
         );
-        const signed = await signer.signTransaction({ ...tx, type: 2 });
-        return { success: true, result: signed };
+        return { success: true, result: await signer.signTransaction({ ...tx, type: 2 }) };
       }
 
       case 'eth_sendTransaction': {
@@ -186,16 +224,12 @@ export async function handleWcRequest(
           txReq.to,
           txReq.value ? ethers.formatEther(BigInt(txReq.value)) : '0',
           address,
-          chainId,
-          txReq.data && txReq.data !== '0x' ? undefined : undefined
+          chainId
         );
-
-        // Use data from dApp if present
         const finalTx = {
           ...tx,
           ...(txReq.data && txReq.data !== '0x' ? { data: txReq.data, gasLimit: 200000n } : {}),
         };
-
         await stealthDelay();
         const signed = await signer.signTransaction({ ...finalTx, type: 2 });
         const hash = await provider.send('eth_sendRawTransaction', [signed]) as string;
@@ -214,21 +248,14 @@ export async function handleWcRequest(
 
 export async function wcRespondSuccess(event: WalletKitTypes.SessionRequest, result: unknown): Promise<void> {
   const kit = await getWalletKit();
-  await kit.respondSessionRequest({
-    topic: event.topic,
-    response: { id: event.id, jsonrpc: '2.0', result },
-  });
+  await kit.respondSessionRequest({ topic: event.topic, response: { id: event.id, jsonrpc: '2.0', result } });
 }
 
 export async function wcRespondError(event: WalletKitTypes.SessionRequest, message: string): Promise<void> {
   const kit = await getWalletKit();
   await kit.respondSessionRequest({
     topic: event.topic,
-    response: {
-      id: event.id,
-      jsonrpc: '2.0',
-      error: { code: 4001, message },
-    },
+    response: { id: event.id, jsonrpc: '2.0', error: { code: 4001, message } },
   });
 }
 
@@ -239,5 +266,5 @@ export async function wcDisconnect(topic: string): Promise<void> {
 
 export async function wcGetActiveSessions(): Promise<Record<string, unknown>> {
   const kit = await getWalletKit();
-  return kit.getActiveSessions();
+  return kit.getActiveSessions() as unknown as Record<string, unknown>;
 }
