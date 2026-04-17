@@ -263,22 +263,35 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (mnemonicRef.current && mnemonicRef.current.trim().split(/\s+/).length >= 12) {
       return mnemonicRef.current;
     }
-    // Fallback: try known keys
+    // Fallback: try known session keys
     const enc = state._v_enc;
-    if (!enc) return null;
-    const candidates: string[] = [];
-    if (vaultKeyRef.current) candidates.push(vaultKeyRef.current);
-    if (_vaultCombinedKey && _vaultCombinedKey !== vaultKeyRef.current) candidates.push(_vaultCombinedKey);
-    candidates.push(getCurrentKey());
-    for (const key of candidates) {
-      try {
-        const decoded = decryptData(enc, key);
+    if (enc) {
+      const candidates: string[] = [];
+      if (vaultKeyRef.current) candidates.push(vaultKeyRef.current);
+      if (_vaultCombinedKey && _vaultCombinedKey !== vaultKeyRef.current) candidates.push(_vaultCombinedKey);
+      candidates.push(getCurrentKey());
+      for (const key of candidates) {
+        try {
+          const decoded = decryptData(enc, key);
+          if (decoded && decoded.trim().split(/\s+/).length >= 12) {
+            mnemonicRef.current = decoded;
+            return decoded;
+          }
+        } catch {}
+      }
+    }
+    // Last resort: read directly from localStorage session
+    try {
+      const saved = loadSession();
+      if (saved) {
+        const tabKey = getTabKey();
+        const decoded = decryptData(saved, tabKey);
         if (decoded && decoded.trim().split(/\s+/).length >= 12) {
           mnemonicRef.current = decoded;
           return decoded;
         }
-      } catch {}
-    }
+      }
+    } catch {}
     return null;
   }, [state._v_enc]);
 

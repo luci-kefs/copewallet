@@ -889,7 +889,7 @@ export function WalletDashboard() {
   // ── Loading ──
   if (!wallet.isUnlocked && !everUnlocked) {
     return (
-      <section className="flex-1 pt-[72px] px-8 pb-8 md:p-16 bg-surface flex flex-col overflow-y-auto">
+      <section className="flex-1 pt-[64px] px-4 pb-6 md:p-16 bg-surface flex flex-col overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto w-full space-y-12 animate-pulse">
           {/* Header skeleton */}
           <div className="flex items-start justify-between gap-4">
@@ -935,14 +935,14 @@ export function WalletDashboard() {
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
       {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
 
-      <section className="flex-1 pt-[72px] px-8 pb-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
+      <section className="flex-1 pt-[64px] px-4 pb-6 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto w-full space-y-12">
 
           {/* ── Session Heading with Chain Selector ── */}
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 flex-1">
-                <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase text-white">
+                <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white">
                   {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
                 </h2>
                 <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
@@ -979,7 +979,7 @@ export function WalletDashboard() {
           <div className="space-y-6 fade-in">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
-              <h1 className="text-[6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
+              <h1 className="text-[3.5rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
                 {isLoadingTotal ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
                 ) : (
@@ -1022,41 +1022,41 @@ export function WalletDashboard() {
 
             {/* ── Address Card ── */}
             <div
-              className="bg-white text-black p-8 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
+              className="bg-white text-black p-5 md:p-8 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
               onClick={handleCopy}>
               <div className="flex flex-col">
-                <span className="text-[0.7rem] font-black uppercase tracking-widest opacity-60 mb-2">Active Monolith Address</span>
-                <span className="text-3xl font-black tracking-tighter font-mono">{shortAddr}</span>
+                <span className="text-[0.65rem] font-black uppercase tracking-widest opacity-60 mb-1">Active Monolith Address</span>
+                <span className="text-xl md:text-3xl font-black tracking-tighter font-mono">{shortAddr}</span>
               </div>
-              <span className="material-symbols-outlined text-4xl">{copied ? 'check' : 'content_copy'}</span>
+              <span className="material-symbols-outlined text-3xl md:text-4xl">{copied ? 'check' : 'content_copy'}</span>
             </div>
           </div>
 
           {/* ── Action Grid ── */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3 md:gap-4">
             <button
               onClick={() => setShowWC(true)}
-              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">power</span>
-              <span className="font-black uppercase tracking-widest text-[0.65rem]">Connect</span>
+              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">power</span>
+              <span className="font-black uppercase tracking-widest text-[0.6rem]">Connect</span>
             </button>
             <button
               onClick={() => setShowSend(true)}
-              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">north_east</span>
-              <span className="font-black uppercase tracking-widest text-[0.65rem]">Send</span>
+              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">north_east</span>
+              <span className="font-black uppercase tracking-widest text-[0.6rem]">Send</span>
             </button>
             <button
               onClick={() => setShowQR(true)}
-              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">qr_code_2</span>
-              <span className="font-black uppercase tracking-widest text-[0.65rem]">Qr / Receive</span>
+              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">qr_code_2</span>
+              <span className="font-black uppercase tracking-widest text-[0.6rem]">Qr / Receive</span>
             </button>
             <button
               onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
-              className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">add_card</span>
-              <span className="font-black uppercase tracking-widest text-[0.65rem]">Create New Wallet</span>
+              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
+              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">add_card</span>
+              <span className="font-black uppercase tracking-widest text-[0.6rem]">Create New Wallet</span>
             </button>
           </div>
 

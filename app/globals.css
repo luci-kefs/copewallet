@@ -21,11 +21,18 @@
 html,
 body {
   overflow: hidden;
+  overflow-x: hidden;
+  max-width: 100vw;
   background: #000000;
   color: #ffffff;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-user-select: none;
   user-select: none;
+}
+
+* {
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 /* OCR/screenshot discouragement */
