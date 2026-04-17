@@ -1,18 +1,24 @@
-// Session Lock — tab-scoped persistence (sessionStorage, not localStorage)
-// Uses a random per-tab key so data dies when the tab closes.
-// No hwId, no passphrase — this is pure convenience, not security storage.
+// Session Lock — tab-scoped persistence (sessionStorage)
+// Encrypts mnemonic with a random per-tab key stored alongside the payload.
+// Data dies automatically when the tab closes — no device binding, no passphrase.
 
 const _KEY = '__cwvs__';
 const _TAB_KEY = '__cwvs_tk__';
 
-function getTabKey(): string {
-  let k = sessionStorage.getItem(_TAB_KEY);
-  if (!k) {
-    k = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-      .map(b => b.toString(16).padStart(2, '0')).join('');
-    sessionStorage.setItem(_TAB_KEY, k);
-  }
-  return k;
+function getOrCreateTabKey(): string {
+  try {
+    let k = sessionStorage.getItem(_TAB_KEY);
+    if (!k) {
+      k = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      sessionStorage.setItem(_TAB_KEY, k);
+    }
+    return k;
+  } catch { return ''; }
+}
+
+export function getTabKey(): string {
+  return getOrCreateTabKey();
 }
 
 export function saveSession(encrypted: string): void {
@@ -24,7 +30,10 @@ export function loadSession(): string | null {
 }
 
 export function clearSession(): void {
-  try { sessionStorage.removeItem(_KEY); } catch {}
+  try {
+    sessionStorage.removeItem(_KEY);
+    sessionStorage.removeItem(_TAB_KEY);
+  } catch {}
 }
 
 export function hasSession(): boolean {
