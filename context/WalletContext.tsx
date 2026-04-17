@@ -33,6 +33,8 @@ import {
   hasPersistedVault,
   loadPersistedVault,
 } from '@/lib/persistent-vault';
+import { saveSession, loadSession, clearSession } from '@/lib/session-lock';
+import { encryptData as _enc, decryptData as _dec } from '@/lib/crypto';
 import { clearWalletKit } from '@/lib/walletconnect';
 
 export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
@@ -50,6 +52,7 @@ interface WalletState {
   devToolsDetected: number;
   isBreachLocked: boolean;
   hasPersisted: boolean;
+  isSessionLocked: boolean;
 }
 
 let _seedData = '';
@@ -75,6 +78,8 @@ interface WalletContextType extends WalletState {
   scatteredKeyStore: ScatteredStore | null;
   enablePersistentMode: (passphrase: string, mnemonic: string) => Promise<void>;
   unlockPersistentVault: (passphrase: string) => Promise<void>;
+  enableSessionLock: () => void;
+  disableSessionLock: () => void;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -92,6 +97,7 @@ const INITIAL_STATE: WalletState = {
   devToolsDetected: 0,
   isBreachLocked: false,
   hasPersisted: false,
+  isSessionLocked: false,
 };
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -117,6 +123,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     stopHeapNoise();
     stopIntegrityWatch();
     clearWalletKit();
+    clearSession();
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
     _updateDecoys();
@@ -281,6 +288,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setState(p => ({ ...p, mode: 'PERSISTENT' }));
   }, [importCopeWallet]);
 
+  const enableSessionLock = useCallback(() => {
+    const mnemonic = mnemonicRef.current;
+    if (!mnemonic) return;
+    // Generate ephemeral tab key, encrypt mnemonic, store in sessionStorage
+    const tabKey = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+    try {
+      const enc = _enc(mnemonic, tabKey);
+      saveSession(JSON.stringify({ k: tabKey, d: enc }));
+      setState(p => ({ ...p, isSessionLocked: true }));
+    } catch {}
+  }, []);
+
+  const disableSessionLock = useCallback(() => {
+    clearSession();
+    setState(p => ({ ...p, isSessionLocked: false }));
+  }, []);
+
   // Check for persisted vault on mount
   useEffect(() => {
     hasPersistedVault().then(has => { if (has) setState(p => ({ ...p, hasPersisted: true })); });
@@ -396,6 +421,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       scatteredKeyStore: scatteredKeyRef.current,
       enablePersistentMode,
       unlockPersistentVault,
+      enableSessionLock,
+      disableSessionLock,
     }}>
       {children}
     </WalletContext.Provider>

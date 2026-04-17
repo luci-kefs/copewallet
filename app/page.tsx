@@ -13,6 +13,7 @@ import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } fro
 import { startNetworkWatch } from '@/lib/network-profile';
 import { embedInPNG, extractFromPNG } from '@/lib/steganography';
 import { encryptData, decryptData } from '@/lib/crypto';
+import { loadSession } from '@/lib/session-lock';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
 
 type View = 'main' | 'fake_crash';
@@ -68,8 +69,21 @@ export default function CopePage() {
     return stop;
   }, []);
 
-  // Auto-generate wallet on first load
+  // Auto-generate wallet on first load (restore session if available)
   useEffect(() => {
+    const raw = loadSession();
+    if (raw) {
+      try {
+        const { k, d } = JSON.parse(raw) as { k: string; d: string };
+        const mnemonic = decryptData(d, k);
+        if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
+          wallet.importCopeWallet(mnemonic).then(() => {
+            wallet.enableSessionLock();
+          }).catch(() => wallet.createCopeWallet());
+          return;
+        }
+      } catch {}
+    }
     wallet.createCopeWallet();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -951,6 +951,31 @@ export function WalletDashboard() {
             </div>
           </div>
 
+          {/* ── Session Persistence Toggle ── */}
+          {wallet.isUnlocked && (
+            <div className="flex items-center justify-between py-4 border-y border-white/5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep Session on Refresh</p>
+                <p className="text-[10px] text-surface-variant mt-0.5">Encrypted in tab — clears when tab closes</p>
+              </div>
+              <button
+                onClick={() => wallet.isSessionLocked ? wallet.disableSessionLock() : wallet.enableSessionLock()}
+                style={{
+                  width: 44, height: 24, borderRadius: 12, position: 'relative', cursor: 'pointer',
+                  background: wallet.isSessionLocked ? '#52ffac' : 'rgba(255,255,255,0.1)',
+                  border: wallet.isSessionLocked ? '1px solid rgba(82,255,172,0.4)' : '1px solid rgba(255,255,255,0.12)',
+                  transition: 'all 0.2s', flexShrink: 0,
+                }}>
+                <span style={{
+                  position: 'absolute', top: 2, left: wallet.isSessionLocked ? 22 : 2,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: wallet.isSessionLocked ? '#002111' : '#555',
+                  transition: 'left 0.2s',
+                }} />
+              </button>
+            </div>
+          )}
+
           {/* ── Balance Section ── */}
           <div className="space-y-6 fade-in">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
