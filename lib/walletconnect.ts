@@ -9,7 +9,7 @@ import { getProvider } from './provider';
 import { CHAINS } from './chains';
 import type { ScatteredStore } from './memory-vault';
 
-const PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID!;
+const PROJECT_ID = (process.env.NEXT_PUBLIC_WC_PROJECT_ID ?? process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID)!;
 
 const METADATA = {
   name: 'Cope Wallet',
