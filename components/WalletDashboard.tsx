@@ -847,9 +847,9 @@ export function WalletDashboard() {
     setIsRefreshing(false);
   };
 
-  const handleSessionToggle = async () => {
+  const handleSessionToggle = () => {
     if (wallet.isSessionLocked) wallet.disableSessionLock();
-    else await wallet.enableSessionLock();
+    else wallet.enableSessionLock();
   };
 
   const chainTotalUSD = tokens.reduce((sum, t) => {
@@ -934,11 +934,11 @@ export function WalletDashboard() {
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
       {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
 
-      <section className="flex-1 pt-[64px] px-4 pb-6 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
+      <section className="flex-1 pt-[64px] px-4 pb-24 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto w-full space-y-6 md:space-y-12">
 
-          {/* ── Session Heading with Chain Selector ── */}
-          <div className="space-y-4">
+          {/* ── Session Heading with Chain Selector + Toggle ── */}
+          <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 flex-1">
                 <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white">
@@ -958,28 +958,27 @@ export function WalletDashboard() {
                 <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
               </button>
             </div>
-          </div>
-
-          {/* ── Session Persistence Toggle ── */}
-          <div className="flex items-center justify-between py-4 border-y border-white/5">
-            <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
-            <div
-              onClick={handleSessionToggle}
-              style={{
-                width: 48, height: 26, borderRadius: 13, flexShrink: 0,
-                background: wallet.isSessionLocked ? '#52ffac' : 'rgba(255,255,255,0.12)',
-                border: `1px solid ${wallet.isSessionLocked ? 'rgba(82,255,172,0.5)' : 'rgba(255,255,255,0.15)'}`,
-                position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-            >
-              <div style={{
-                position: 'absolute', top: 3,
-                left: wallet.isSessionLocked ? 24 : 3,
-                width: 18, height: 18, borderRadius: '50%',
-                background: wallet.isSessionLocked ? '#002111' : '#888',
-                transition: 'left 0.2s',
-              }} />
+            {/* Keep session toggle — right below network button */}
+            <div className="flex items-center justify-between py-3 border-y border-white/5">
+              <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
+              <button
+                type="button"
+                onClick={handleSessionToggle}
+                style={{
+                  width: 48, height: 26, borderRadius: 13, flexShrink: 0, border: 'none', padding: 0,
+                  background: wallet.isSessionLocked ? '#52ffac' : 'rgba(255,255,255,0.12)',
+                  outline: 'none', position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+                  WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 4,
+                  left: wallet.isSessionLocked ? 26 : 4,
+                  width: 18, height: 18, borderRadius: '50%',
+                  background: wallet.isSessionLocked ? '#002111' : '#888',
+                  transition: 'left 0.2s', display: 'block',
+                }} />
+              </button>
             </div>
           </div>
 
