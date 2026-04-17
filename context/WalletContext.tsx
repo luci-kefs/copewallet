@@ -68,7 +68,7 @@ let _vaultCombinedKey: string | null = null;
 interface WalletContextType extends WalletState {
   createCopeWallet: () => Promise<void>;
   importCopeWallet: (mnemonic: string) => Promise<void>;
-  wipeCopeWallet: () => void;
+  wipeCopeWallet: (opts?: { keepSession?: boolean }) => void;
   triggerPanic: () => void;
   rotateVaultKeys: () => void;
   getMnemonic: () => string | null;
@@ -109,7 +109,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const mnemonicRef = useRef<string | null>(null);
   const vaultKeyRef = useRef<string | null>(null);
 
-  const wipeCopeWallet = useCallback(() => {
+  const wipeCopeWallet = useCallback((opts?: { keepSession?: boolean }) => {
     if (scatteredKeyRef.current) {
       wipeScatteredStore(scatteredKeyRef.current);
       scatteredKeyRef.current = null;
@@ -123,7 +123,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     stopHeapNoise();
     stopIntegrityWatch();
     clearWalletKit();
-    clearSession();
+    if (!opts?.keepSession) clearSession();
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
     _updateDecoys();
@@ -326,9 +326,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     startHistoryScrubber();
   }, []);
 
-  // Wipe on unload
+  // Wipe on unload — keep session so refresh can restore
   useEffect(() => {
-    const handler = () => wipeCopeWallet();
+    const handler = () => wipeCopeWallet({ keepSession: true });
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [wipeCopeWallet]);
