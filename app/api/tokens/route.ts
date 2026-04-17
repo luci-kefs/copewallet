@@ -12,6 +12,89 @@ function isAlchemyUrl(url: string): boolean {
   return url.includes('alchemy.com');
 }
 
+// Server-side CoinGecko ID cache: symbol → coingeckoId
+const CG_ID_CACHE = new Map<string, { id: string; ts: number }>();
+const CG_TTL = 24 * 60 * 60 * 1000; // 24h — coin IDs rarely change
+
+// Well-known symbols → CoinGecko IDs to avoid API calls
+const KNOWN_IDS: Record<string, string> = {
+  ETH: 'ethereum', WETH: 'weth', BTC: 'bitcoin', WBTC: 'wrapped-bitcoin',
+  USDT: 'tether', USDC: 'usd-coin', DAI: 'dai', BUSD: 'binance-usd',
+  BNB: 'binancecoin', MATIC: 'matic-network', POL: 'matic-network',
+  AVAX: 'avalanche-2', SOL: 'solana', DOT: 'polkadot', LINK: 'chainlink',
+  UNI: 'uniswap', AAVE: 'aave', CRV: 'curve-dao-token', MKR: 'maker',
+  SNX: 'havven', COMP: 'compound-governance-token', YFI: 'yearn-finance',
+  SUSHI: 'sushi', '1INCH': '1inch', BAL: 'balancer', REN: 'republic-protocol',
+  LRC: 'loopring', ZRX: '0x', ENJ: 'enjincoin', MANA: 'decentraland',
+  SAND: 'the-sandbox', AXS: 'axie-infinity', SHIB: 'shiba-inu',
+  PEPE: 'pepe', FLOKI: 'floki', DOGE: 'dogecoin', ARB: 'arbitrum',
+  OP: 'optimism', APT: 'aptos', SUI: 'sui', INJ: 'injective-protocol',
+  BLUR: 'blur', LDO: 'lido-dao', RPL: 'rocket-pool', FRAX: 'frax',
+  FXS: 'frax-share', CVX: 'convex-finance', FTM: 'fantom', GNO: 'gnosis',
+  CELO: 'celo', CRO: 'crypto-com-chain', GLMR: 'moonbeam', METIS: 'metis-token',
+  MNT: 'mantle', KAVA: 'kava', KLAY: 'klay-token', FUSE: 'fuse-network-token',
+  EVMOS: 'evmos', STG: 'stargate-finance', GMX: 'gmx', RDNT: 'radiant-capital',
+  WLD: 'worldcoin-wld', PYTH: 'pyth-network', JTO: 'jito-governance-token',
+  EIGEN: 'eigenlayer', PENDLE: 'pendle', ENA: 'ethena', ETHFI: 'ether-fi',
+  REZ: 'renzo-restaked-eth', OMNI: 'omni-network',
+};
+
+async function resolveCoingeckoId(symbol: string, contractAddress: string, chainId: number): Promise<string | undefined> {
+  const upper = symbol.toUpperCase();
+
+  // 1. Known map
+  if (KNOWN_IDS[upper]) return KNOWN_IDS[upper];
+
+  // 2. Cache
+  const cached = CG_ID_CACHE.get(upper);
+  if (cached && Date.now() - cached.ts < CG_TTL) return cached.id;
+
+  // 3. CoinGecko contract lookup — most accurate for unknown ERC-20s
+  const PLATFORM: Record<number, string> = {
+    1: 'ethereum', 8453: 'base', 42161: 'arbitrum-one',
+    10: 'optimistic-ethereum', 137: 'polygon-pos', 56: 'binance-smart-chain',
+    43114: 'avalanche', 250: 'fantom',
+  };
+  const platform = PLATFORM[chainId];
+  if (platform && contractAddress && contractAddress !== 'native') {
+    try {
+      const res = await fetch(
+        `https://api.coingecko.com/api/v3/coins/${platform}/contract/${contractAddress.toLowerCase()}`,
+        { headers: { Accept: 'application/json' }, next: { revalidate: 3600 } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.id) {
+          CG_ID_CACHE.set(upper, { id: data.id, ts: Date.now() });
+          return data.id;
+        }
+      }
+    } catch {}
+  }
+
+  // 4. CoinGecko search by symbol
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(symbol)}`,
+      { headers: { Accept: 'application/json' }, next: { revalidate: 3600 } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const coins: Array<{ id: string; symbol: string; market_cap_rank?: number }> = data?.coins ?? [];
+      // Pick the one whose symbol exactly matches with highest market cap rank
+      const match = coins
+        .filter(c => c.symbol.toUpperCase() === upper)
+        .sort((a, b) => (a.market_cap_rank ?? 9999) - (b.market_cap_rank ?? 9999))[0];
+      if (match) {
+        CG_ID_CACHE.set(upper, { id: match.id, ts: Date.now() });
+        return match.id;
+      }
+    }
+  } catch {}
+
+  return undefined;
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const { address, chainId } = await req.json();
   if (!address || !chainId) return NextResponse.json([]);
@@ -55,10 +138,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
       const tokenData = await tokenRes.json();
       const nonZero = (tokenData.result?.tokenBalances ?? [])
-        .filter((t: { tokenBalance: string }) => t.tokenBalance !== '0x0000000000000000000000000000000000000000000000000000000000000000')
+        .filter((t: { tokenBalance: string }) =>
+          t.tokenBalance !== '0x0000000000000000000000000000000000000000000000000000000000000000')
         .slice(0, 20);
 
-      for (const token of nonZero) {
+      // Resolve metadata + coingeckoId in parallel
+      await Promise.all(nonZero.map(async (token: { contractAddress: string; tokenBalance: string }) => {
         try {
           const metaRes = await fetch(rpcUrl, {
             method: 'POST',
@@ -72,20 +157,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           const meta = await metaRes.json();
           const decimals = meta.result?.decimals ?? 18;
           const raw = BigInt(token.tokenBalance);
-          const formatted = (Number(raw) / Math.pow(10, decimals)).toFixed(4);
+          const formatted = (Number(raw) / Math.pow(10, decimals)).toFixed(6);
           if (parseFloat(formatted) > 0) {
+            const symbol: string = meta.result?.symbol ?? '???';
+            // Resolve real CoinGecko ID for accurate USD pricing
+            const coingeckoId = await resolveCoingeckoId(symbol, token.contractAddress, chainId);
             results.push({
-              symbol: meta.result?.symbol ?? '???',
+              symbol,
               name: meta.result?.name ?? 'Unknown Token',
               decimals,
               balance: formatted,
               balanceRaw: token.tokenBalance,
               contractAddress: token.contractAddress,
-              logo: meta.result?.logo,
+              logo: meta.result?.logo ?? null,
+              coingeckoId: coingeckoId ?? null,
             });
           }
         } catch {}
-      }
+      }));
     } catch {}
   }
 
