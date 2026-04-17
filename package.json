@@ -18,6 +18,7 @@
     "ethers": "^6.16.0",
     "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.8.0",
     "next": "14.2.35",
     "qrcode.react": "^4.2.0",

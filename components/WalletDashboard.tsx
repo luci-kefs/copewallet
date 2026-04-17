@@ -150,6 +150,39 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [feeLoading, setFeeLoading] = useState(false);
   const feeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nativePriceRef = useRef<number>(0);
+  const qrInputRef = useRef<HTMLInputElement>(null);
+
+  const handleQRScan = async (file: File) => {
+    try {
+      const bitmap = await createImageBitmap(file);
+      // @ts-expect-error BarcodeDetector not in all TS libs yet
+      if (typeof BarcodeDetector !== 'undefined') {
+        // @ts-expect-error BarcodeDetector
+        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+        const codes = await detector.detect(bitmap);
+        if (codes.length > 0) {
+          let raw: string = codes[0].rawValue;
+          // Handle ethereum: URI scheme
+          if (raw.startsWith('ethereum:')) raw = raw.replace(/^ethereum:/i, '').split('?')[0].split('@')[0];
+          if (ethers.isAddress(raw)) { setTo(raw); return; }
+        }
+      }
+      // Fallback: draw to canvas + jsQR
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width; canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(bitmap, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const { default: jsQR } = await import('jsqr');
+      const code = jsQR(imgData.data, imgData.width, imgData.height);
+      if (code) {
+        let raw = code.data;
+        if (raw.startsWith('ethereum:')) raw = raw.replace(/^ethereum:/i, '').split('?')[0].split('@')[0];
+        if (ethers.isAddress(raw)) setTo(raw);
+      }
+    } catch {}
+  };
 
   // Re-fetch tokens whenever selected chain changes
   useEffect(() => {
@@ -412,9 +445,27 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
             )}
 
             {/* Recipient */}
-            <div style={box}>
+            <div style={{ ...box, display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="text" placeholder="Recipient address (0x...)" autoComplete="off"
-                value={to} onChange={e => setTo(e.target.value)} style={inp} />
+                value={to} onChange={e => setTo(e.target.value)} style={{ ...inp, flex: 1 }} />
+              <button
+                type="button"
+                onClick={() => qrInputRef.current?.click()}
+                title="Scan QR code"
+                style={{ flexShrink: 0, background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 8, padding: '5px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#52ffac" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                  <line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="21" y2="14"/><line x1="14" y1="17" x2="14" y2="21"/><line x1="21" y1="17" x2="17" y2="21"/>
+                </svg>
+              </button>
+              <input
+                ref={qrInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleQRScan(f); e.target.value = ''; }}
+              />
             </div>
 
             {/* Amount */}
