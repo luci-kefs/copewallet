@@ -745,7 +745,6 @@ export function WalletDashboard() {
   const [showNetworks, setShowNetworks] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showWC, setShowWC] = useState(false);
-  const [sessionToggling, setSessionToggling] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
   // All chains token data for balance tab display
@@ -849,12 +848,8 @@ export function WalletDashboard() {
   };
 
   const handleSessionToggle = async () => {
-    if (sessionToggling) return;
-    setSessionToggling(true);
-    try {
-      if (wallet.isSessionLocked) wallet.disableSessionLock();
-      else await wallet.enableSessionLock();
-    } finally { setSessionToggling(false); }
+    if (wallet.isSessionLocked) wallet.disableSessionLock();
+    else await wallet.enableSessionLock();
   };
 
   const chainTotalUSD = tokens.reduce((sum, t) => {
