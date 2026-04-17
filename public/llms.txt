@@ -1,0 +1,47 @@
+# Cope Wallet
+
+> Cope Wallet is a free, anonymous, temporary crypto wallet (temp wallet) for all EVM-compatible blockchains. No signup, no KYC, no tracking. Your private keys never leave your browser.
+
+## What is Cope Wallet?
+
+Cope Wallet is a browser-based ephemeral crypto wallet — also called a temp wallet, burner wallet, or disposable wallet. It generates an Ethereum-compatible wallet address instantly with no account creation or personal data required. It is 100% anonymous and open to use as a secure web wallet for sending and receiving crypto.
+
+## Key Features
+
+- **Temp Wallet / Temporary Crypto Wallet**: Generates a fresh wallet instantly. Session-based with optional persistence via passphrase.
+- **Anonymous Crypto Wallet**: Zero personal data, no email, no KYC, no tracking, no server-side key storage.
+- **Secure Web Wallet**: AES-256 encryption, ephemeral key rotation every 60 seconds, memory vault with scattered shards.
+- **EVM Compatible**: Works on Ethereum, BNB Chain (BSC), Polygon (MATIC), Arbitrum, Optimism, Base, Avalanche (AVAX), Fantom, and all EVM chains.
+- **WalletConnect v2**: Connect to any dApp that supports WalletConnect — Uniswap, OpenSea, Aave, etc.
+- **Persistent Vault**: Optionally encrypt and persist your wallet with a passphrase + PNG key file.
+- **Free**: Completely free to use. No fees, no ads.
+
+## Use Cases
+
+- Burner wallet for one-time transactions
+- Anonymous DeFi interactions
+- Testing smart contracts or dApps
+- Receiving crypto without revealing identity
+- Temporary wallet while setting up a hardware wallet
+- Privacy-preserving airdrops and token claims
+
+## Supported Chains
+
+Ethereum (ETH), BNB Smart Chain (BNB), Polygon (MATIC), Arbitrum (ARB), Optimism (OP), Base (BASE), Avalanche (AVAX), Fantom (FTM), and more EVM-compatible networks.
+
+## Privacy & Security
+
+- Keys generated entirely in-browser using ethers.js
+- Private keys are never transmitted to any server
+- All encryption happens locally (AES-256 via CryptoJS)
+- Automatic key rotation every 60 seconds
+- Wipes all data on tab close (unless persistence enabled)
+- No analytics, no cookies, no fingerprinting
+
+## Target Keywords / Topics
+
+temp wallet, temporary crypto wallet, anonymous crypto wallet, burner wallet crypto, disposable ethereum wallet, secure web wallet, no kyc crypto wallet, free crypto wallet, ephemeral wallet, browser crypto wallet, EVM wallet, WalletConnect wallet, instant crypto wallet, no signup wallet, privacy wallet ethereum
+
+## URL
+
+https://copewallet.com

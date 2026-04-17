@@ -520,18 +520,6 @@ export default function CopePage() {
 
   return (
     <main className="flex flex-col md:flex-row h-screen w-full bg-background text-on-background">
-      {/* SEO content — visible to crawlers, hidden from UI */}
-      <div style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap' }} aria-hidden="true">
-        <h1>Cope Wallet — Free Temp Wallet &amp; Anonymous Crypto Wallet</h1>
-        <h2>Instant Temporary Crypto Wallet — No Signup, No KYC</h2>
-        <p>Cope Wallet is a free temporary crypto wallet for EVM-compatible blockchains. Generate an anonymous wallet instantly — no email, no account, no personal information required. Your private keys never leave your browser.</p>
-        <h2>Secure Web Wallet for Ethereum &amp; All EVM Chains</h2>
-        <p>Use Cope Wallet as a secure web wallet on Ethereum, BNB Chain, Polygon, Arbitrum, Optimism, Base, Avalanche, and more. Send tokens, connect to dApps via WalletConnect, and stay completely anonymous.</p>
-        <h2>How to Use a Temp Wallet</h2>
-        <p>Open Cope Wallet, get an instant disposable Ethereum address, use it for transactions or dApp connections, then optionally persist it with a passphrase for later access. No registration needed.</p>
-        <h2>Anonymous Crypto Wallet — 100% Private</h2>
-        <p>Unlike centralized wallets, Cope Wallet requires zero personal data. There is no server storing your keys. All encryption happens locally in your browser using ephemeral keys with automatic rotation.</p>
-      </div>
       <DevToolsGuard
         onLevel1={() => setSendDisabled(true)}
         onLevel2={() => setInfiniteLoading(true)}
