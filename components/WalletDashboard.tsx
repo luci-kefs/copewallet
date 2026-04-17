@@ -757,15 +757,19 @@ export function WalletDashboard() {
   const [everUnlocked, setEverUnlocked] = useState(false);
   useEffect(() => { if (wallet.isUnlocked) setEverUnlocked(true); }, [wallet.isUnlocked]);
 
-  // Freeze last known address/mode so UI doesn't blank during transient wipe
+  // Freeze last known address so UI doesn't blank during transient wipe
   const [frozenAddress, setFrozenAddress] = useState<string | null>(null);
   const [frozenMode, setFrozenMode] = useState(wallet.mode);
   useEffect(() => {
     if (wallet.isUnlocked && wallet.activeAddress) {
       setFrozenAddress(wallet.activeAddress);
-      setFrozenMode(wallet.mode);
     }
-  }, [wallet.isUnlocked, wallet.activeAddress, wallet.mode]);
+  }, [wallet.isUnlocked, wallet.activeAddress]);
+  // Always track mode changes immediately
+  useEffect(() => {
+    if (wallet.mode === 'PERSISTENT') setFrozenMode('PERSISTENT');
+    else if (wallet.isUnlocked) setFrozenMode('EPHEMERAL');
+  }, [wallet.mode, wallet.isUnlocked]);
 
   const address = wallet.activeAddress ?? frozenAddress;
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
@@ -969,7 +973,6 @@ export function WalletDashboard() {
                 type="checkbox"
                 checked={wallet.isSessionLocked}
                 onChange={handleSessionToggle}
-                disabled={sessionToggling}
               />
               <span className="slider"></span>
             </label>

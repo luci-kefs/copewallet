@@ -17,7 +17,7 @@ import { loadSession, getTabKey } from '@/lib/session-lock';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
 
 type View = 'main' | 'fake_crash';
-type RightPanel = 'idle' | 'persist_confirm' | 'new_vault' | 'access_vault' | 'success';
+type RightPanel = 'idle' | 'persist_confirm' | 'new_vault' | 'access_vault' | 'success' | 'success_access';
 
 export default function CopePage() {
   const wallet = useWallet();
@@ -168,7 +168,8 @@ export default function CopePage() {
       const mnemonic = decryptData(encPayload, passphrase);
       if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
         await wallet.importCopeWallet(mnemonic);
-        setRightPanel('success');
+        await wallet.enablePersistentMode(passphrase, mnemonic);
+        setRightPanel('success_access');
         return;
       }
       setAccessError('Wrong passphrase or invalid Key PNG');
@@ -458,7 +459,7 @@ export default function CopePage() {
           </motion.div>
         )}
 
-        {/* ── SUCCESS ── */}
+        {/* ── SUCCESS (persist) ── */}
         {rightPanel === 'success' && (
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }}
             className="flex flex-col items-center justify-center h-full gap-10">
@@ -469,6 +470,26 @@ export default function CopePage() {
               <p className="text-4xl font-black tracking-tighter uppercase text-white">Vault Secured</p>
               <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs mx-auto">
                 Favicon Key PNG downloaded. Store it safely — it is your only key.
+              </p>
+            </div>
+            <button onClick={() => setRightPanel('idle')}
+              className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-xl active:scale-[0.98] transition-transform">
+              ← Return
+            </button>
+          </motion.div>
+        )}
+
+        {/* ── SUCCESS (access) ── */}
+        {rightPanel === 'success_access' && (
+          <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.25 }}
+            className="flex flex-col items-center justify-center h-full gap-10">
+            <div className="w-24 h-24 rounded-full bg-tertiary/10 border-2 border-tertiary/40 flex items-center justify-center">
+              <span className="material-symbols-outlined text-5xl text-tertiary">lock_open</span>
+            </div>
+            <div className="text-center space-y-3">
+              <p className="text-4xl font-black tracking-tighter uppercase text-white">Wallet Unlocked</p>
+              <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs mx-auto">
+                Your persistent wallet is now active.
               </p>
             </div>
             <button onClick={() => setRightPanel('idle')}
