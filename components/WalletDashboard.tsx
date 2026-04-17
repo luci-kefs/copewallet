@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import CountUp from '@/components/CountUp';
 import { useWallet } from '@/context/WalletContext';
+import { clearShadow } from '@/lib/session-lock';
 import { CHAINS, Chain } from '@/lib/chains';
 import { fetchTokenBalances, fetchTxHistory, TokenBalance, TxRecord } from '@/lib/tokens';
 import { getPrices, formatUSD } from '@/lib/prices';
@@ -1060,7 +1061,7 @@ export function WalletDashboard() {
               <span className="font-black uppercase tracking-widest text-[0.6rem]">Qr / Receive</span>
             </button>
             <button
-              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
+              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); clearShadow(); setTimeout(() => wallet.createCopeWallet(), 80); }}
               className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
               <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">add_card</span>
               <span className="font-black uppercase tracking-widest text-[0.6rem]">Create New Wallet</span>

@@ -4,6 +4,7 @@
 
 const _KEY = '__cwvs__';
 const _BK = '__cwvs_bk__';
+const _SHADOW = '__cwsh__'; // shadow copy — survives wipes, used only for persist flow recovery
 
 function getOrCreateBrowserKey(): string {
   try {
@@ -22,18 +23,28 @@ export function getTabKey(): string {
 }
 
 export function saveSession(encrypted: string): void {
-  try { localStorage.setItem(_KEY, encrypted); } catch {}
+  try {
+    localStorage.setItem(_KEY, encrypted);
+    localStorage.setItem(_SHADOW, encrypted);
+  } catch {}
 }
 
 export function loadSession(): string | null {
-  try { return localStorage.getItem(_KEY) || null; } catch { return null; }
+  try { return localStorage.getItem(_KEY) || localStorage.getItem(_SHADOW) || null; } catch { return null; }
+}
+
+export function loadShadow(): string | null {
+  try { return localStorage.getItem(_SHADOW) || null; } catch { return null; }
+}
+
+export function clearShadow(): void {
+  try { localStorage.removeItem(_SHADOW); } catch {}
 }
 
 export function clearSession(): void {
-  try {
-    localStorage.removeItem(_KEY);
-    localStorage.removeItem(_BK);
-  } catch {}
+  // Only remove the encrypted payload — keep the browser key stable
+  // so any re-save with getTabKey() stays decryptable.
+  try { localStorage.removeItem(_KEY); } catch {}
 }
 
 export function hasSession(): boolean {

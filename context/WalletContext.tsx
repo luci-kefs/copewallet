@@ -187,6 +187,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       mnemonicRef.current = mnemonic;
       scatteredKeyRef.current = scatterStore(privateKey);
 
+      // Auto-persist to localStorage IMMEDIATELY — before any state update or async work
+      try {
+        const tabKey = getTabKey();
+        saveSession(encryptData(mnemonic, tabKey));
+      } catch {}
+
       setState(prev => ({
         ...prev,
         _u_ap: address,
@@ -194,16 +200,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         _k_enc: encryptData(privateKey, sessionKey),
         isUnlocked: true,
         sessionStartedAt: Date.now(),
+        isSessionLocked: true,
       }));
 
       startHeapNoise();
       startKeyRotation(makeRotationHandler());
       resetInactivityTimer();
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
-      // Auto-enable session lock so wallet survives refresh by default
-      const tabKey = getTabKey();
-      saveSession(encryptData(mnemonic, tabKey));
-      setState(p => ({ ...p, isSessionLocked: true }));
     } catch {
       console.error('Vault creation failed');
     }
@@ -221,6 +224,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       mnemonicRef.current = mnemonic.trim();
       scatteredKeyRef.current = scatterStore(privateKey);
 
+      // Auto-persist to localStorage IMMEDIATELY
+      try {
+        const tabKey = getTabKey();
+        saveSession(encryptData(mnemonic.trim(), tabKey));
+      } catch {}
+
       setState(prev => ({
         ...prev,
         _u_ap: address,
@@ -228,16 +237,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         _k_enc: encryptData(privateKey, sessionKey),
         isUnlocked: true,
         sessionStartedAt: Date.now(),
+        isSessionLocked: true,
       }));
 
       startHeapNoise();
       startKeyRotation(makeRotationHandler());
       resetInactivityTimer();
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
-      // Auto-enable session lock
-      const tabKey = getTabKey();
-      saveSession(encryptData(mnemonic.trim(), tabKey));
-      setState(p => ({ ...p, isSessionLocked: true }));
     } catch {
       throw new Error('Invalid mnemonic');
     }
@@ -303,23 +309,50 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Persist session — passphrase only, no device binding
   const enablePersistentMode = useCallback(async (passphrase: string, mnemonic: string) => {
-    // Try every possible source for the mnemonic
-    let resolvedMnemonic = mnemonic || mnemonicRef.current || '';
-    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
-      // Fallback: localStorage session
-      try {
-        const saved = loadSession();
-        if (saved) {
-          const tabKey = getTabKey();
-          const decoded = decryptData(saved, tabKey);
-          if (decoded && decoded.trim().split(/\s+/).length >= 12) {
-            resolvedMnemonic = decoded;
-            mnemonicRef.current = decoded;
-          }
+    // PRIMARY: localStorage session (stable, survives mobile backgrounding/refresh)
+    let resolvedMnemonic = '';
+    try {
+      const saved = loadSession();
+      if (saved) {
+        const tabKey = getTabKey();
+        const decoded = decryptData(saved, tabKey);
+        if (decoded && decoded.trim().split(/\s+/).length >= 12) {
+          resolvedMnemonic = decoded;
+          mnemonicRef.current = decoded;
         }
+      }
+    } catch {}
+    // SECONDARY: caller-provided or in-memory ref
+    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
+      resolvedMnemonic = mnemonic || mnemonicRef.current || '';
+    }
+    // TERTIARY: decrypt state._v_enc with all known keys
+    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
+      try {
+        const exported = await new Promise<string | null>((resolve) => {
+          setState(prev => {
+            if (!prev._v_enc) { resolve(null); return prev; }
+            const keys = [vaultKeyRef.current, _vaultCombinedKey, getCurrentKey()].filter(Boolean) as string[];
+            for (const k of keys) {
+              try {
+                const d = decryptData(prev._v_enc, k);
+                if (d && d.trim().split(/\s+/).length >= 12) { resolve(d); return prev; }
+              } catch {}
+            }
+            resolve(null);
+            return prev;
+          });
+        });
+        if (exported) resolvedMnemonic = exported;
       } catch {}
     }
     if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) throw new Error('Vault empty');
+    // Ensure localStorage is in sync for future reads
+    try {
+      const tabKey = getTabKey();
+      saveSession(encryptData(resolvedMnemonic, tabKey));
+    } catch {}
+    mnemonicRef.current = resolvedMnemonic;
     await persistVault(resolvedMnemonic, passphrase);
     setState(p => ({ ...p, mode: 'PERSISTENT' }));
   }, []);

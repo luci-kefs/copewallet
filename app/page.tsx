@@ -13,7 +13,7 @@ import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } fro
 import { startNetworkWatch } from '@/lib/network-profile';
 import { embedInPNG, extractFromPNG } from '@/lib/steganography';
 import { encryptData, decryptData } from '@/lib/crypto';
-import { loadSession, getTabKey } from '@/lib/session-lock';
+import { loadSession, getTabKey, clearShadow } from '@/lib/session-lock';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
 
 type View = 'main' | 'fake_crash';
@@ -142,11 +142,23 @@ export default function CopePage() {
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
-      // enablePersistentMode resolves mnemonic from all sources internally
-      await wallet.enablePersistentMode(passphrase, '');
-      // Get mnemonic for PNG — at this point mnemonicRef is guaranteed populated
-      const mnemonic = await wallet.getMnemonicForExport();
+      // Read mnemonic directly from localStorage FIRST — most reliable on mobile
+      let mnemonic = '';
+      const saved = loadSession();
+      if (saved) {
+        try {
+          const tabKey = getTabKey();
+          const decoded = decryptData(saved, tabKey);
+          if (decoded && decoded.trim().split(/\s+/).length >= 12) mnemonic = decoded;
+        } catch {}
+      }
+      // Fallback to context export
+      if (!mnemonic) {
+        const exported = await wallet.getMnemonicForExport();
+        if (exported) mnemonic = exported;
+      }
       if (!mnemonic) throw new Error('Vault empty');
+      await wallet.enablePersistentMode(passphrase, mnemonic);
       const encPayload = encryptData(mnemonic, passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
@@ -156,6 +168,7 @@ export default function CopePage() {
 
   const handleInitNewVault = () => {
     wallet.wipeCopeWallet();
+    clearShadow(); // clear shadow backup — user is explicitly creating a new wallet
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
     setTimeout(() => wallet.createCopeWallet(), 100);
