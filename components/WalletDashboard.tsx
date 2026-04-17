@@ -889,7 +889,7 @@ export function WalletDashboard() {
   if (!wallet.isUnlocked && !everUnlocked) {
     return (
       <section className="flex-1 pt-[64px] px-4 pb-6 md:p-16 bg-surface flex flex-col overflow-y-auto overflow-x-hidden">
-        <div className="max-w-3xl mx-auto w-full space-y-12 animate-pulse">
+        <div className="max-w-3xl mx-auto w-full space-y-6 md:space-y-12 animate-pulse">
           {/* Header skeleton */}
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-3 flex-1">
@@ -935,7 +935,7 @@ export function WalletDashboard() {
       {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
 
       <section className="flex-1 pt-[64px] px-4 pb-6 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
-        <div className="max-w-3xl mx-auto w-full space-y-12">
+        <div className="max-w-3xl mx-auto w-full space-y-6 md:space-y-12">
 
           {/* ── Session Heading with Chain Selector ── */}
           <div className="space-y-4">
@@ -963,18 +963,28 @@ export function WalletDashboard() {
           {/* ── Session Persistence Toggle ── */}
           <div className="flex items-center justify-between py-4 border-y border-white/5">
             <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
-            <label className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={wallet.isSessionLocked}
-                onChange={handleSessionToggle}
-              />
-              <span className="slider"></span>
-            </label>
+            <div
+              onClick={handleSessionToggle}
+              style={{
+                width: 48, height: 26, borderRadius: 13, flexShrink: 0,
+                background: wallet.isSessionLocked ? '#52ffac' : 'rgba(255,255,255,0.12)',
+                border: `1px solid ${wallet.isSessionLocked ? 'rgba(82,255,172,0.5)' : 'rgba(255,255,255,0.15)'}`,
+                position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3,
+                left: wallet.isSessionLocked ? 24 : 3,
+                width: 18, height: 18, borderRadius: '50%',
+                background: wallet.isSessionLocked ? '#002111' : '#888',
+                transition: 'left 0.2s',
+              }} />
+            </div>
           </div>
 
           {/* ── Balance Section ── */}
-          <div className="space-y-6 fade-in">
+          <div className="space-y-3 md:space-y-6 fade-in">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
               <h1 className="text-[3.5rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
@@ -1059,8 +1069,8 @@ export function WalletDashboard() {
           </div>
 
           {/* ── Tabs & List ── */}
-          <div className="pt-8">
-            <div className="flex gap-12 mb-8 border-b border-white/5">
+          <div className="pt-2 md:pt-8">
+            <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5">
               <button
                 onClick={() => setActiveTab('balance')}
                 className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'balance' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>

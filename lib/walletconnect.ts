@@ -98,7 +98,17 @@ export async function getWalletKit(): Promise<InstanceType<typeof WalletKit>> {
   return _initPromise;
 }
 
-export function clearWalletKit(): void {
+export async function clearWalletKit(): Promise<void> {
+  if (_kit) {
+    try {
+      const sessions = _kit.getActiveSessions();
+      await Promise.allSettled(
+        Object.keys(sessions).map(topic =>
+          _kit!.disconnectSession({ topic, reason: { code: 6000, message: 'Wallet cleared' } })
+        )
+      );
+    } catch {}
+  }
   wcClearListeners();
   _queuedProposal = null;
   _queuedRequest  = null;

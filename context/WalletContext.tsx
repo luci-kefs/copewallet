@@ -122,7 +122,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     stopKeyRotation();
     stopHeapNoise();
     stopIntegrityWatch();
-    clearWalletKit();
+    void clearWalletKit();
     if (!opts?.keepSession) clearSession();
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
