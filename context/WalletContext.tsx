@@ -19,13 +19,11 @@ import {
 } from '@/lib/crypto';
 import { buildSuperEntropySeed } from '@/lib/entropy';
 import { scatterStore, ScatteredStore, wipeScatteredStore, startHeapNoise, stopHeapNoise } from '@/lib/memory-vault';
-import { getHardwareUUID, startEnvironmentWatch } from '@/lib/fingerprint';
 import {
   registerBreachWipe,
   startIntegrityWatch,
   stopIntegrityWatch,
   activateSilentLockout,
-  isBreachLockedOut,
   poisonVault,
   isUnauthorizedEnvironment,
 } from '@/lib/breach';
@@ -34,32 +32,26 @@ import {
   persistVault,
   hasPersistedVault,
   loadPersistedVault,
-  nukePersistedVault,
 } from '@/lib/persistent-vault';
-import { saveSession, clearSession } from '@/lib/session-lock';
 import { clearWalletKit } from '@/lib/walletconnect';
 
-// Block 35: Two explicit operating modes
 export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
 
 interface WalletState {
-  // Obfuscated real state (Block 5)
-  _u_ap: string | null;          // activeAddress
-  _v_enc: string | null;         // encryptedVault (mnemonic)
-  _k_enc: string | null;         // encryptedVault (private key)
+  _u_ap: string | null;
+  _v_enc: string | null;
+  _k_enc: string | null;
   isUnlocked: boolean;
   mode: WalletMode;
-  isPulseActive: boolean;        // key rotation pulse (Block 9)
-  isBlurred: boolean;            // anti-prying blur (Block 4)
-  isGhostLocked: boolean;        // anomaly detection lock (Block 8)
+  isPulseActive: boolean;
+  isBlurred: boolean;
+  isGhostLocked: boolean;
   sessionStartedAt: number | null;
-  devToolsDetected: number;      // graduated counter (Block 34)
-  isBreachLocked: boolean;       // logic bomb lockout (Block 10)
-  hasPersisted: boolean;         // persistent vault exists (Block 18)
-  isSessionLocked: boolean;      // localStorage session persistence (Block 36)
+  devToolsDetected: number;
+  isBreachLocked: boolean;
+  hasPersisted: boolean;
 }
 
-// Decoy honeypot variables (Block 5 Task 1)
 let _seedData = '';
 let _pvt_key_vault = '';
 let _wallet_backup = '';
@@ -69,8 +61,6 @@ const _updateDecoys = () => {
   _wallet_backup = Math.random().toString(36).repeat(4);
 };
 
-// Module-level vault key tracker — updated on every createCopeWallet / importCopeWallet
-// and re-updated on every key rotation, so getMnemonicForExport always has the right key
 let _vaultCombinedKey: string | null = null;
 
 interface WalletContextType extends WalletState {
@@ -85,9 +75,6 @@ interface WalletContextType extends WalletState {
   scatteredKeyStore: ScatteredStore | null;
   enablePersistentMode: (passphrase: string, mnemonic: string) => Promise<void>;
   unlockPersistentVault: (passphrase: string) => Promise<void>;
-  enableSessionLock: () => Promise<void>;
-  disableSessionLock: () => void;
-  markSessionRestored: () => void;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -105,7 +92,6 @@ const INITIAL_STATE: WalletState = {
   devToolsDetected: 0,
   isBreachLocked: false,
   hasPersisted: false,
-  isSessionLocked: false,
 };
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -114,15 +100,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const mnemonicShownRef = useRef(false);
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Plain-text mnemonic ref — set on create/import, wiped on wipe. Avoids all decrypt issues.
   const mnemonicRef = useRef<string | null>(null);
-  // Ref backup for vault combined key
   const vaultKeyRef = useRef<string | null>(null);
 
-  // GHOST: no storage ops permitted below this line (EPHEMERAL mode boundary)
-
   const wipeCopeWallet = useCallback(() => {
-    // Wipe scattered key store
     if (scatteredKeyRef.current) {
       wipeScatteredStore(scatteredKeyRef.current);
       scatteredKeyRef.current = null;
@@ -143,92 +124,70 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const triggerPanic = useCallback(() => {
     wipeCopeWallet();
-    // Clear all caches
     if ('caches' in window) {
-      caches.keys().then((names) => names.forEach((name) => caches.delete(name)));
+      caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
-    // Redirect to external link
-    const ext = process.env.NEXT_PUBLIC_EXTERNAL_LINK || 'https://www.google.com';
-    window.location.replace(ext);
+    window.location.replace(process.env.NEXT_PUBLIC_EXTERNAL_LINK || 'https://www.google.com');
   }, [wipeCopeWallet]);
 
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
-    inactivityTimer.current = setTimeout(() => {
-      wipeCopeWallet();
-    }, 5 * 60 * 1000); // 5 minutes
+    inactivityTimer.current = setTimeout(() => wipeCopeWallet(), 5 * 60 * 1000);
   }, [wipeCopeWallet]);
 
+  // Key rotation handler — re-encrypts vault with new session key (no hwId)
   const makeRotationHandler = useCallback(
-    (hwId: string) => (oldKey: string, newKey: string) => {
+    () => (oldKey: string, newKey: string) => {
       setState((prev) => {
         if (!prev._v_enc || !prev._k_enc) return prev;
-        const oldCombined = oldKey + hwId;
-        const newCombined = newKey + hwId;
         try {
-          const rawMnemonic = decryptData(prev._v_enc, oldCombined);
-          const rawPrivKey  = decryptData(prev._k_enc, oldCombined);
-          _vaultCombinedKey    = newCombined;
-          vaultKeyRef.current  = newCombined;
-          mnemonicRef.current  = rawMnemonic;
+          const rawMnemonic = decryptData(prev._v_enc, oldKey);
+          const rawPrivKey  = decryptData(prev._k_enc, oldKey);
+          _vaultCombinedKey   = newKey;
+          vaultKeyRef.current = newKey;
+          mnemonicRef.current = rawMnemonic;
           return {
             ...prev,
-            _v_enc: encryptData(rawMnemonic, newCombined),
-            _k_enc: encryptData(rawPrivKey,  newCombined),
+            _v_enc: encryptData(rawMnemonic, newKey),
+            _k_enc: encryptData(rawPrivKey,  newKey),
             isPulseActive: true,
           };
-        } catch {
-          return prev;
-        }
+        } catch { return prev; }
       });
-      setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 500);
+      setTimeout(() => setState(p => ({ ...p, isPulseActive: false })), 500);
     },
     []
   );
 
   const createCopeWallet = useCallback(async () => {
     try {
-      // Build hybrid entropy (Block 11) — used as additional XOR layer on the key
       await buildSuperEntropySeed();
-
-      // ethers v6: createRandom() returns HDNodeWallet with mnemonic
       const wallet = ethers.Wallet.createRandom();
       const mnemonic = wallet.mnemonic?.phrase ?? '';
-      if (!mnemonic || mnemonic.trim().split(/\s+/).length < 12) {
-        throw new Error('Failed to generate mnemonic');
-      }
+      if (!mnemonic || mnemonic.trim().split(/\s+/).length < 12) throw new Error('Failed to generate mnemonic');
       const privateKey = wallet.privateKey;
       const address = wallet.address;
+      const sessionKey = getCurrentKey();
 
-      const hwId = await getHardwareUUID();
-      const combinedKey = getCurrentKey() + hwId;
-
-      const encMnemonic = encryptData(mnemonic, combinedKey);
-      const encPrivKey = encryptData(privateKey, combinedKey);
-
-      // Track the combined key and plain mnemonic for reliable export
-      _vaultCombinedKey = combinedKey;
-      vaultKeyRef.current = combinedKey;
+      _vaultCombinedKey = sessionKey;
+      vaultKeyRef.current = sessionKey;
       mnemonicRef.current = mnemonic;
-
-      // Scatter private key in memory
       scatteredKeyRef.current = scatterStore(privateKey);
 
-      setState((prev) => ({
+      setState(prev => ({
         ...prev,
         _u_ap: address,
-        _v_enc: encMnemonic,
-        _k_enc: encPrivKey,
+        _v_enc: encryptData(mnemonic, sessionKey),
+        _k_enc: encryptData(privateKey, sessionKey),
         isUnlocked: true,
         sessionStartedAt: Date.now(),
       }));
 
       startHeapNoise();
-      startKeyRotation(makeRotationHandler(hwId));
+      startKeyRotation(makeRotationHandler());
       resetInactivityTimer();
-      // 30-minute hard session limit (Block 6)
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
-    } catch (err) {
+    } catch {
       console.error('Vault creation failed');
     }
   }, [resetInactivityTimer, wipeCopeWallet, makeRotationHandler]);
@@ -238,28 +197,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const wallet = ethers.Wallet.fromPhrase(mnemonic.trim());
       const privateKey = wallet.privateKey;
       const address = wallet.address;
+      const sessionKey = getCurrentKey();
 
-      const hwId = await getHardwareUUID();
-      const combinedKey = getCurrentKey() + hwId;
-
-      // Track the combined key and plain mnemonic
-      _vaultCombinedKey = combinedKey;
-      vaultKeyRef.current = combinedKey;
+      _vaultCombinedKey = sessionKey;
+      vaultKeyRef.current = sessionKey;
       mnemonicRef.current = mnemonic.trim();
-
       scatteredKeyRef.current = scatterStore(privateKey);
 
-      setState((prev) => ({
+      setState(prev => ({
         ...prev,
         _u_ap: address,
-        _v_enc: encryptData(mnemonic, combinedKey),
-        _k_enc: encryptData(privateKey, combinedKey),
+        _v_enc: encryptData(mnemonic, sessionKey),
+        _k_enc: encryptData(privateKey, sessionKey),
         isUnlocked: true,
         sessionStartedAt: Date.now(),
       }));
 
       startHeapNoise();
-      startKeyRotation(makeRotationHandler(hwId));
+      startKeyRotation(makeRotationHandler());
       resetInactivityTimer();
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
     } catch {
@@ -269,51 +224,42 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const rotateVaultKeys = useCallback(() => {
     rotateKeys((oldKey, newKey) => {
-      setState((prev) => {
+      setState(prev => {
         if (!prev._v_enc || !prev._k_enc) return prev;
-        const raw1 = decryptData(prev._v_enc, oldKey);
-        const raw2 = decryptData(prev._k_enc, oldKey);
         return {
           ...prev,
-          _v_enc: encryptData(raw1, newKey),
-          _k_enc: encryptData(raw2, newKey),
+          _v_enc: encryptData(decryptData(prev._v_enc, oldKey), newKey),
+          _k_enc: encryptData(decryptData(prev._k_enc, oldKey), newKey),
           isPulseActive: true,
         };
       });
-      setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 300);
+      setTimeout(() => setState(p => ({ ...p, isPulseActive: false })), 300);
     });
   }, []);
 
   const getMnemonic = useCallback((): string | null => {
     if (!state._v_enc || mnemonicShownRef.current) return null;
-    mnemonicShownRef.current = true; // burn after reading (Block 6)
-    try {
-      return decryptData(state._v_enc);
-    } catch {
-      return null;
-    }
+    mnemonicShownRef.current = true;
+    try { return decryptData(state._v_enc); } catch { return null; }
   }, [state._v_enc]);
 
-  // Secure mnemonic export — reads from in-memory ref; falls back to decrypt if ref was lost
   const getMnemonicForExport = useCallback(async (): Promise<string | null> => {
+    // Primary: in-memory ref (always up-to-date)
     if (mnemonicRef.current && mnemonicRef.current.trim().split(/\s+/).length >= 12) {
       return mnemonicRef.current;
     }
-    // Fallback: try multiple possible keys (ref, module-level, current key + hwId)
+    // Fallback: try known keys
     const enc = state._v_enc;
     if (!enc) return null;
     const candidates: string[] = [];
     if (vaultKeyRef.current) candidates.push(vaultKeyRef.current);
     if (_vaultCombinedKey && _vaultCombinedKey !== vaultKeyRef.current) candidates.push(_vaultCombinedKey);
-    try {
-      const hwId = await getHardwareUUID();
-      candidates.push(getCurrentKey() + hwId);
-    } catch {}
+    candidates.push(getCurrentKey());
     for (const key of candidates) {
       try {
         const decoded = decryptData(enc, key);
         if (decoded && decoded.trim().split(/\s+/).length >= 12) {
-          mnemonicRef.current = decoded; // restore ref
+          mnemonicRef.current = decoded;
           return decoded;
         }
       } catch {}
@@ -321,140 +267,83 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [state._v_enc]);
 
-  // Persistent mode — Block 18 Task 2 (explicit user consent)
-  // mnemonic is passed in directly (already decrypted by caller) to avoid double-decrypt
+  // Persist session — passphrase only, no device binding
   const enablePersistentMode = useCallback(async (passphrase: string, mnemonic: string) => {
-    // Fallback to in-memory ref if caller passed empty string
     const resolvedMnemonic = mnemonic || mnemonicRef.current || '';
     if (!resolvedMnemonic) throw new Error('Vault empty');
-    const hwId = await getHardwareUUID();
-    await persistVault(resolvedMnemonic, passphrase, hwId);
-    setState((p) => ({ ...p, mode: 'PERSISTENT' }));
+    await persistVault(resolvedMnemonic, passphrase);
+    setState(p => ({ ...p, mode: 'PERSISTENT' }));
   }, []);
 
   const unlockPersistentVault = useCallback(async (passphrase: string) => {
-    const hwId = await getHardwareUUID();
-    const mnemonic = await loadPersistedVault(passphrase, hwId);
+    const mnemonic = await loadPersistedVault(passphrase);
     await importCopeWallet(mnemonic);
+    setState(p => ({ ...p, mode: 'PERSISTENT' }));
   }, [importCopeWallet]);
 
-  // Block 36: localStorage session lock (device-bound, no passphrase)
-  const enableSessionLock = useCallback(async () => {
-    const mnemonic = mnemonicRef.current;
-    if (!mnemonic) return;
-    const hwId = await getHardwareUUID();
-    const payload = encryptData(mnemonic, hwId);
-    saveSession(payload);
-    setState((p) => ({ ...p, isSessionLocked: true }));
-  }, []);
-
-  const disableSessionLock = useCallback(() => {
-    clearSession();
-    setState((p) => ({ ...p, isSessionLocked: false }));
-  }, []);
-
-  const markSessionRestored = useCallback(() => {
-    setState((p) => ({ ...p, isSessionLocked: true }));
-  }, []);
-
-  // Check for persisted vault on mount (Block 18 Task 3)
+  // Check for persisted vault on mount
   useEffect(() => {
-    hasPersistedVault().then((has) => {
-      if (has) setState((p) => ({ ...p, hasPersisted: true }));
-    });
+    hasPersistedVault().then(has => { if (has) setState(p => ({ ...p, hasPersisted: true })); });
   }, []);
 
-  // Breach registration (Block 10)
+  // Breach registration
   useEffect(() => {
     registerBreachWipe(() => {
-      // Poison vault before wipe
-      setState((p) => ({
-        ...p,
-        _v_enc: poisonVault(),
-        _k_enc: poisonVault(),
-        isBreachLocked: true,
-      }));
+      setState(p => ({ ...p, _v_enc: poisonVault(), _k_enc: poisonVault(), isBreachLocked: true }));
       setTimeout(() => wipeCopeWallet(), 100);
     });
-
-    // Unauthorized environment check
-    if (isUnauthorizedEnvironment()) {
-      activateSilentLockout();
-    }
+    if (isUnauthorizedEnvironment()) activateSilentLockout();
   }, [wipeCopeWallet]);
 
-  // History scrubber + singleton tab (Block 14)
+  // History scrubber + singleton tab
   useEffect(() => {
     checkSingletonTab();
     startHistoryScrubber();
   }, []);
 
-  // Anti-Persistence: wipe on unload (Block 2)
+  // Wipe on unload
   useEffect(() => {
     const handler = () => wipeCopeWallet();
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [wipeCopeWallet]);
 
-  // Anti-Prying: blur on tab switch (Block 4)
+  // Blur on tab switch
   useEffect(() => {
     const handler = () => {
-      if (document.hidden) {
-        setState((p) => ({ ...p, isBlurred: true }));
-        document.title = 'By Aethilm';
-      } else {
-        setState((p) => ({ ...p, isBlurred: false }));
-        document.title = 'Cope Wallet';
-      }
+      if (document.hidden) { setState(p => ({ ...p, isBlurred: true })); document.title = 'By Aethilm'; }
+      else { setState(p => ({ ...p, isBlurred: false })); document.title = 'Cope Wallet'; }
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
   }, []);
 
-  // Activity listeners for inactivity timer (Block 4 + 6)
+  // Activity listeners for inactivity timer
   useEffect(() => {
     if (!state.isUnlocked) return;
     const events = ['mousemove', 'keydown', 'click', 'touchstart'];
     const handler = () => resetInactivityTimer();
-    events.forEach((e) => window.addEventListener(e, handler));
-    return () => events.forEach((e) => window.removeEventListener(e, handler));
+    events.forEach(e => window.addEventListener(e, handler));
+    return () => events.forEach(e => window.removeEventListener(e, handler));
   }, [state.isUnlocked, resetInactivityTimer]);
 
-  // Decoy updater (Block 5)
+  // Decoy updater
   useEffect(() => {
     const id = setInterval(_updateDecoys, 5000);
     return () => clearInterval(id);
   }, []);
 
-  // Environment watch (Block 16)
-  useEffect(() => {
-    const stop = startEnvironmentWatch(() => {
-      setState((p) => ({ ...p, isGhostLocked: true }));
-    });
-    return stop;
-  }, []);
-
-  // Canary trap — window._aethilm_canary (Block 20)
+  // Canary trap
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    let _canary = 'aethilm_sovereign';
-    const canaryProxy = new Proxy(
-      { value: _canary },
-      {
-        set: () => {
-          wipeCopeWallet();
-          return false;
-        },
-        deleteProperty: () => {
-          wipeCopeWallet();
-          return false;
-        },
-      }
-    );
+    const canaryProxy = new Proxy({ value: 'aethilm_sovereign' }, {
+      set: () => { wipeCopeWallet(); return false; },
+      deleteProperty: () => { wipeCopeWallet(); return false; },
+    });
     (window as unknown as Record<string, unknown>)['_aethilm_canary'] = canaryProxy;
   }, [wipeCopeWallet]);
 
-  // Honey input trap (Block 20)
+  // Honey input trap
   useEffect(() => {
     const trap = document.createElement('input');
     trap.setAttribute('name', 'wallet_seed_backup');
@@ -467,12 +356,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => { try { document.body.removeChild(trap); } catch {} };
   }, [wipeCopeWallet]);
 
-  // Branding self-heal via periodic DOM check (Block 7 Task 4)
-  // Polls every 3s — if a brand element existed before but is now gone AND
-  // React hasn't re-added it within the same tick, it was externally removed.
+  // Branding self-heal
   useEffect(() => {
     let knownCount = 0;
-    let graceTicks = 0; // allow 1 tick for React to re-add after state change
+    let graceTicks = 0;
     const id = setInterval(() => {
       const current = document.querySelectorAll('[data-aethilm="brand"]').length;
       if (knownCount > 0 && current === 0) {
@@ -486,38 +373,30 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [wipeCopeWallet]);
 
-  // Console honey-trap (Block 12 Task 4)
+  // Console honey-trap
   useEffect(() => {
     if (typeof window === 'undefined') return;
     Object.defineProperty(window, 'wallet', {
-      get: () => {
-        triggerPanic();
-        return { error: 'Build Integrity Failure: 0xAE7H1LM' };
-      },
+      get: () => { triggerPanic(); return { error: 'Build Integrity Failure: 0xAE7H1LM' }; },
       configurable: false,
     });
   }, [triggerPanic]);
 
   return (
-    <WalletContext.Provider
-      value={{
-        ...state,
-        activeAddress: state._u_ap,
-        createCopeWallet,
-        importCopeWallet,
-        wipeCopeWallet,
-        triggerPanic,
-        rotateVaultKeys,
-        getMnemonic,
-        getMnemonicForExport,
-        scatteredKeyStore: scatteredKeyRef.current,
-        enablePersistentMode,
-        unlockPersistentVault,
-        enableSessionLock,
-        disableSessionLock,
-        markSessionRestored,
-      }}
-    >
+    <WalletContext.Provider value={{
+      ...state,
+      activeAddress: state._u_ap,
+      createCopeWallet,
+      importCopeWallet,
+      wipeCopeWallet,
+      triggerPanic,
+      rotateVaultKeys,
+      getMnemonic,
+      getMnemonicForExport,
+      scatteredKeyStore: scatteredKeyRef.current,
+      enablePersistentMode,
+      unlockPersistentVault,
+    }}>
       {children}
     </WalletContext.Provider>
   );

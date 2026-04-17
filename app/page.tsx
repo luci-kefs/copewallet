@@ -12,9 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { generateVisualTheme, injectThemeVariables, startCSSIntegrityWatch } from '@/lib/visual-entropy';
 import { startNetworkWatch } from '@/lib/network-profile';
 import { embedInPNG, extractFromPNG } from '@/lib/steganography';
-import { encryptData, decryptData, getCurrentKey } from '@/lib/crypto';
-import { getHardwareUUID } from '@/lib/fingerprint';
-import { loadSession } from '@/lib/session-lock';
+import { encryptData, decryptData } from '@/lib/crypto';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
 
 type View = 'main' | 'fake_crash';
@@ -70,23 +68,9 @@ export default function CopePage() {
     return stop;
   }, []);
 
-  // Auto-generate wallet on first load — or restore from session lock
+  // Auto-generate wallet on first load
   useEffect(() => {
-    (async () => {
-      const saved = loadSession();
-      if (saved) {
-        try {
-          const hwId = await getHardwareUUID();
-          const mnemonic = decryptData(saved, hwId);
-          if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
-            await wallet.importCopeWallet(mnemonic);
-            wallet.markSessionRestored();
-            return;
-          }
-        } catch {}
-      }
-      wallet.createCopeWallet();
-    })();
+    wallet.createCopeWallet();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -146,8 +130,7 @@ export default function CopePage() {
       const mnemonic = await wallet.getMnemonicForExport();
       if (!mnemonic) throw new Error('Vault empty');
       await wallet.enablePersistentMode(passphrase, mnemonic);
-      const hwId = await getHardwareUUID();
-      const encPayload = encryptData(mnemonic, hwId + passphrase);
+      const encPayload = encryptData(mnemonic, passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
     } catch (e) { setPersistError(e instanceof Error ? e.message : 'Operation failed. Try again.'); }
@@ -155,7 +138,6 @@ export default function CopePage() {
   };
 
   const handleInitNewVault = () => {
-    wallet.disableSessionLock();
     wallet.wipeCopeWallet();
     setPassphrase(''); setPassphraseConfirm(''); setPersistError('');
     setRightPanel('new_vault');
@@ -167,9 +149,8 @@ export default function CopePage() {
     if (!passphrase) { setAccessError('Enter your vault passphrase first'); return; }
     setIsProcessing(true); setAccessError('');
     try {
-      const hwId = await getHardwareUUID();
       const encPayload = await extractFromPNG(file);
-      const mnemonic = decryptData(encPayload, hwId + passphrase);
+      const mnemonic = decryptData(encPayload, passphrase);
       if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
         await wallet.importCopeWallet(mnemonic);
         setRightPanel('success');

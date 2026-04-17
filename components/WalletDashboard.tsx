@@ -746,7 +746,6 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [showWC, setShowWC] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [sessionToggling, setSessionToggling] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
   // All chains token data for balance tab display
   type ChainTokens = { chain: Chain; toks: TokenBalance[]; p: Record<string,number> };
@@ -769,15 +768,6 @@ export function WalletDashboard() {
 
   const address = wallet.activeAddress ?? frozenAddress;
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
-
-  const handleSessionToggle = async () => {
-    if (sessionToggling) return;
-    setSessionToggling(true);
-    try {
-      if (wallet.isSessionLocked) wallet.disableSessionLock();
-      else await wallet.enableSessionLock();
-    } finally { setSessionToggling(false); }
-  };
 
   const loadTokens = useCallback(async () => {
     if (!address) return;
@@ -959,18 +949,6 @@ export function WalletDashboard() {
                 <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
               </button>
             </div>
-            <div className="flex items-center justify-between py-4 border-y border-white/5">
-              <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={wallet.isSessionLocked}
-                  onChange={handleSessionToggle}
-                  disabled={sessionToggling}
-                />
-                <span className="slider"></span>
-              </label>
-            </div>
           </div>
 
           {/* ── Balance Section ── */}
@@ -1051,7 +1029,7 @@ export function WalletDashboard() {
               <span className="font-black uppercase tracking-widest text-[0.65rem]">Qr / Receive</span>
             </button>
             <button
-              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
+              onClick={() => { wallet.wipeCopeWallet(); setTimeout(() => wallet.createCopeWallet(), 80); }}
               className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
               <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">add_card</span>
               <span className="font-black uppercase tracking-widest text-[0.65rem]">Create New Wallet</span>
