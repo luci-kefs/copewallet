@@ -194,6 +194,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       startKeyRotation(makeRotationHandler());
       resetInactivityTimer();
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
+      // Auto-enable session lock so wallet survives refresh by default
+      const tabKey = getTabKey();
+      saveSession(encryptData(mnemonic, tabKey));
+      setState(p => ({ ...p, isSessionLocked: true }));
     } catch {
       console.error('Vault creation failed');
     }
@@ -224,6 +228,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       startKeyRotation(makeRotationHandler());
       resetInactivityTimer();
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
+      // Auto-enable session lock
+      const tabKey = getTabKey();
+      saveSession(encryptData(mnemonic.trim(), tabKey));
+      setState(p => ({ ...p, isSessionLocked: true }));
     } catch {
       throw new Error('Invalid mnemonic');
     }
