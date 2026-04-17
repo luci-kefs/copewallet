@@ -1,41 +1,41 @@
-// Session Lock — tab-scoped persistence (sessionStorage)
-// Encrypts mnemonic with a random per-tab key stored alongside the payload.
-// Data dies automatically when the tab closes — no device binding, no passphrase.
+// Session Lock — explicit user opt-in to localStorage persistence.
+// Encrypted with a stable per-browser key stored in localStorage alongside the payload.
+// Survives page refresh; cleared only when user disables the toggle or wipes the wallet.
 
 const _KEY = '__cwvs__';
-const _TAB_KEY = '__cwvs_tk__';
+const _BK = '__cwvs_bk__';
 
-function getOrCreateTabKey(): string {
+function getOrCreateBrowserKey(): string {
   try {
-    let k = sessionStorage.getItem(_TAB_KEY);
+    let k = localStorage.getItem(_BK);
     if (!k) {
-      k = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      k = Array.from(crypto.getRandomValues(new Uint8Array(32)))
         .map(b => b.toString(16).padStart(2, '0')).join('');
-      sessionStorage.setItem(_TAB_KEY, k);
+      localStorage.setItem(_BK, k);
     }
     return k;
-  } catch { return ''; }
+  } catch { return 'fallback-key'; }
 }
 
 export function getTabKey(): string {
-  return getOrCreateTabKey();
+  return getOrCreateBrowserKey();
 }
 
 export function saveSession(encrypted: string): void {
-  try { sessionStorage.setItem(_KEY, encrypted); } catch {}
+  try { localStorage.setItem(_KEY, encrypted); } catch {}
 }
 
 export function loadSession(): string | null {
-  try { return sessionStorage.getItem(_KEY) || null; } catch { return null; }
+  try { return localStorage.getItem(_KEY) || null; } catch { return null; }
 }
 
 export function clearSession(): void {
   try {
-    sessionStorage.removeItem(_KEY);
-    sessionStorage.removeItem(_TAB_KEY);
+    localStorage.removeItem(_KEY);
+    localStorage.removeItem(_BK);
   } catch {}
 }
 
 export function hasSession(): boolean {
-  try { return !!sessionStorage.getItem(_KEY); } catch { return false; }
+  try { return !!localStorage.getItem(_KEY); } catch { return false; }
 }
