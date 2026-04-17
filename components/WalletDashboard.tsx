@@ -16,6 +16,7 @@ import { ephemeralSign } from '@/lib/signer';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
+import { WalletConnectModal } from '@/components/WalletConnectModal';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
@@ -743,6 +744,7 @@ export function WalletDashboard() {
   const [showSend, setShowSend] = useState(false);
   const [showNetworks, setShowNetworks] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [showWC, setShowWC] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sessionToggling, setSessionToggling] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
@@ -931,6 +933,7 @@ export function WalletDashboard() {
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); }} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
+      {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
 
       <section className="flex-1 pt-[72px] px-8 pb-8 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto">
         <div className="max-w-3xl mx-auto w-full space-y-12">
@@ -1030,7 +1033,7 @@ export function WalletDashboard() {
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-4">
             <button
-              onClick={() => setShowNetworks(true)}
+              onClick={() => setShowWC(true)}
               className="bg-surface-container-highest p-10 rounded-xl flex flex-col items-center gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
               <span className="material-symbols-outlined text-5xl group-hover:scale-110 transition-transform">power</span>
               <span className="font-black uppercase tracking-widest text-[0.65rem]">Connect</span>

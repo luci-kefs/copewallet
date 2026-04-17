@@ -37,6 +37,7 @@ import {
   nukePersistedVault,
 } from '@/lib/persistent-vault';
 import { saveSession, clearSession } from '@/lib/session-lock';
+import { clearWalletKit } from '@/lib/walletconnect';
 
 // Block 35: Two explicit operating modes
 export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
@@ -134,6 +135,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     stopKeyRotation();
     stopHeapNoise();
     stopIntegrityWatch();
+    clearWalletKit();
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
     _updateDecoys();
