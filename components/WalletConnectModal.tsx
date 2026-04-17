@@ -89,14 +89,27 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
         });
 
         kit.on('session_request', async (event: WalletKitTypes.SessionRequest) => {
+          const { method, params: reqParams } = event.params.request;
+
+          // Auto-reject unsupported methods immediately — don't show UI
+          const SUPPORTED = new Set([
+            'eth_sendTransaction', 'eth_signTransaction',
+            'personal_sign', 'eth_sign',
+            'eth_signTypedData', 'eth_signTypedData_v4',
+          ]);
+          if (!SUPPORTED.has(method)) {
+            try {
+              await wcRespondError(event, `Method not supported: ${method}`);
+            } catch {}
+            return;
+          }
+
           // Get dApp name from active sessions
           const activeSessions = kit.getActiveSessions();
           const sess = activeSessions[event.topic] as unknown as Record<string, unknown> | undefined;
           const peer = sess?.peer as Record<string, unknown> | undefined;
           const meta = peer?.metadata as Record<string, unknown> | undefined;
           const dAppName = (meta?.name as string) || 'Unknown dApp';
-
-          const { method, params: reqParams } = event.params.request;
 
           setPendingRequest({
             event,
@@ -166,6 +179,11 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Request failed';
+      // "Record was recently deleted" = relay expired the request — dismiss silently
+      if (msg.toLowerCase().includes('recently deleted') || msg.toLowerCase().includes('expired')) {
+        setPendingRequest(null);
+        return;
+      }
       setRequestError(msg);
       try { await wcRespondError(pendingRequest.event, msg); } catch {}
     } finally {

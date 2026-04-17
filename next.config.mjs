@@ -28,7 +28,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com wss://relay.walletconnect.org wss://relay.walletconnect.com https://relay.walletconnect.org https://relay.walletconnect.com https://pulse.walletconnect.org https://pulse.walletconnect.com https://rpc.walletconnect.org https://rpc.walletconnect.com https://keys.walletconnect.org https://verify.walletconnect.org",
-              "img-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://assets.coingecko.com https://coin-images.coingecko.com https://lh3.googleusercontent.com data: blob:",
+              "img-src 'self' https: data: blob:",
               "font-src 'self' https://fonts.gstatic.com",
               "frame-ancestors 'none'",
             ].join('; '),

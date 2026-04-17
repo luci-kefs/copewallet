@@ -127,6 +127,16 @@ export async function handleWcRequest(
     keyBytes = new Uint8Array(Buffer.from(hexKey.slice(2), 'hex'));
     const signer = new ethers.Wallet(hexKey);
 
+    // Auto-reject unsupported wallet_* methods immediately (no UI needed)
+    const SUPPORTED = new Set([
+      'eth_sendTransaction', 'eth_signTransaction',
+      'personal_sign', 'eth_sign',
+      'eth_signTypedData', 'eth_signTypedData_v4',
+    ]);
+    if (!SUPPORTED.has(method)) {
+      return { success: false, error: `Method not supported: ${method}` };
+    }
+
     switch (method) {
       case 'personal_sign': {
         // params: [message, address] — message is hex or utf8
