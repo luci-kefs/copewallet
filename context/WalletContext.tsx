@@ -157,6 +157,33 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }, 5 * 60 * 1000); // 5 minutes
   }, [wipeCopeWallet]);
 
+  const makeRotationHandler = useCallback(
+    (hwId: string) => (oldKey: string, newKey: string) => {
+      setState((prev) => {
+        if (!prev._v_enc || !prev._k_enc) return prev;
+        const oldCombined = oldKey + hwId;
+        const newCombined = newKey + hwId;
+        try {
+          const rawMnemonic = decryptData(prev._v_enc, oldCombined);
+          const rawPrivKey  = decryptData(prev._k_enc, oldCombined);
+          _vaultCombinedKey    = newCombined;
+          vaultKeyRef.current  = newCombined;
+          mnemonicRef.current  = rawMnemonic;
+          return {
+            ...prev,
+            _v_enc: encryptData(rawMnemonic, newCombined),
+            _k_enc: encryptData(rawPrivKey,  newCombined),
+            isPulseActive: true,
+          };
+        } catch {
+          return prev;
+        }
+      });
+      setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 500);
+    },
+    []
+  );
+
   const createCopeWallet = useCallback(async () => {
     try {
       // Build hybrid entropy (Block 11) — used as additional XOR layer on the key
@@ -195,39 +222,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }));
 
       startHeapNoise();
-      startKeyRotation((oldKey, newKey) => {
-        setState((prev) => {
-          if (!prev._v_enc || !prev._k_enc) return prev;
-          const hwUUID = hwId;
-          const oldCombined = oldKey + hwUUID;
-          const newCombined = newKey + hwUUID;
-          try {
-            const rawMnemonic = decryptData(prev._v_enc, oldCombined);
-            const rawPrivKey = decryptData(prev._k_enc, oldCombined);
-            // Update the tracked combined key to the new one
-            _vaultCombinedKey = newCombined;
-            vaultKeyRef.current = newCombined;
-            return {
-              ...prev,
-              _v_enc: encryptData(rawMnemonic, newCombined),
-              _k_enc: encryptData(rawPrivKey, newCombined),
-              isPulseActive: true,
-            };
-          } catch {
-            // Rotation failed — keep existing encryption, don't corrupt vault
-            return prev;
-          }
-        });
-        setTimeout(() => setState((p) => ({ ...p, isPulseActive: false })), 500);
-      });
-
+      startKeyRotation(makeRotationHandler(hwId));
       resetInactivityTimer();
       // 30-minute hard session limit (Block 6)
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
     } catch (err) {
       console.error('Vault creation failed');
     }
-  }, [resetInactivityTimer, wipeCopeWallet]);
+  }, [resetInactivityTimer, wipeCopeWallet, makeRotationHandler]);
 
   const importCopeWallet = useCallback(async (mnemonic: string) => {
     try {
@@ -255,12 +257,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }));
 
       startHeapNoise();
+      startKeyRotation(makeRotationHandler(hwId));
       resetInactivityTimer();
       sessionTimer.current = setTimeout(() => wipeCopeWallet(), 30 * 60 * 1000);
     } catch {
       throw new Error('Invalid mnemonic');
     }
-  }, [resetInactivityTimer, wipeCopeWallet]);
+  }, [resetInactivityTimer, wipeCopeWallet, makeRotationHandler]);
 
   const rotateVaultKeys = useCallback(() => {
     rotateKeys((oldKey, newKey) => {
