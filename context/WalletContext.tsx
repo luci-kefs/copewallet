@@ -150,9 +150,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         try {
           const rawMnemonic = decryptData(prev._v_enc, oldKey);
           const rawPrivKey  = decryptData(prev._k_enc, oldKey);
+          if (!rawMnemonic || rawMnemonic.trim().split(/\s+/).length < 12) return prev;
           _vaultCombinedKey   = newKey;
           vaultKeyRef.current = newKey;
           mnemonicRef.current = rawMnemonic;
+          // Keep localStorage session in sync after rotation
+          try {
+            const tabKey = getTabKey();
+            saveSession(encryptData(rawMnemonic, tabKey));
+          } catch {}
           return {
             ...prev,
             _v_enc: encryptData(rawMnemonic, newKey),
