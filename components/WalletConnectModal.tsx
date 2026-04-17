@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Link, Wifi, WifiOff, Check, AlertTriangle, Zap } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
+import { CHAINS } from '@/lib/chains';
 import {
   getWalletKit,
   wcPair,
@@ -223,18 +224,38 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Requested chains */}
-          {uniqueChains.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ color: '#555', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 8 }}>Requested Chains</p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {uniqueChains.map(c => (
-                  <span key={c} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#ccc', fontWeight: 700 }}>
-                    {c}
-                  </span>
-                ))}
+          {uniqueChains.length > 0 && (() => {
+            const chainNameMap: Record<number, string> = Object.fromEntries(
+              CHAINS.map(c => [c.id, c.name])
+            );
+            const resolve = (raw: string) => {
+              const num = parseInt(raw.replace('eip155:', ''), 10);
+              return chainNameMap[num] ?? null;
+            };
+            const known = uniqueChains.map(c => resolve(c)).filter(Boolean) as string[];
+            const unknownCount = uniqueChains.length - known.length;
+            const display = [...new Set(known)];
+            return (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ color: '#555', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 8 }}>Requested Chains</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {display.map(name => (
+                    <span key={name} style={{ background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#52ffac', fontWeight: 700 }}>
+                      {name}
+                    </span>
+                  ))}
+                  {unknownCount > 0 && (
+                    <span style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#555', fontWeight: 700 }}>
+                      +{unknownCount} more
+                    </span>
+                  )}
+                  {display.length === 0 && (
+                    <span style={{ fontSize: 10, color: '#555', fontWeight: 700 }}>Any EVM chain</span>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Your address */}
           <div style={{ padding: '10px 14px', background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: '0.75rem', marginBottom: 20 }}>
