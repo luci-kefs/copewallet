@@ -142,9 +142,11 @@ export default function CopePage() {
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
+      // enablePersistentMode resolves mnemonic from all sources internally
+      await wallet.enablePersistentMode(passphrase, '');
+      // Get mnemonic for PNG — at this point mnemonicRef is guaranteed populated
       const mnemonic = await wallet.getMnemonicForExport();
       if (!mnemonic) throw new Error('Vault empty');
-      await wallet.enablePersistentMode(passphrase, mnemonic);
       const encPayload = encryptData(mnemonic, passphrase);
       await embedInPNG(encPayload, 'copewallet');
       setRightPanel('success');
@@ -233,7 +235,7 @@ export default function CopePage() {
 
   // Vault panel content — shared between desktop sidebar and mobile drawer
   const VaultContent = (
-    <section className="flex-1 bg-surface-container-lowest p-8 md:p-16 flex flex-col relative overflow-hidden border-t md:border-t-0 md:border-l border-white/10 overflow-y-auto">
+    <section className="flex-1 bg-surface-container-lowest p-8 pb-24 md:p-16 flex flex-col relative overflow-hidden border-t md:border-t-0 md:border-l border-white/10 overflow-y-auto">
       {/* Background Decorative Texture */}
       <div className="absolute inset-0 monolith-gradient pointer-events-none" />
 
@@ -556,7 +558,7 @@ export default function CopePage() {
           />
           <div
             className={drawerClosing ? 'drawer-exit' : 'drawer-enter'}
-            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, overflowY: 'auto', background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: 0, overflowY: 'auto', paddingBottom: 80, background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
             {VaultContent}
           </div>
         </div>

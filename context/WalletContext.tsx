@@ -297,8 +297,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Persist session — passphrase only, no device binding
   const enablePersistentMode = useCallback(async (passphrase: string, mnemonic: string) => {
-    const resolvedMnemonic = mnemonic || mnemonicRef.current || '';
-    if (!resolvedMnemonic) throw new Error('Vault empty');
+    // Try every possible source for the mnemonic
+    let resolvedMnemonic = mnemonic || mnemonicRef.current || '';
+    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
+      // Fallback: localStorage session
+      try {
+        const saved = loadSession();
+        if (saved) {
+          const tabKey = getTabKey();
+          const decoded = decryptData(saved, tabKey);
+          if (decoded && decoded.trim().split(/\s+/).length >= 12) {
+            resolvedMnemonic = decoded;
+            mnemonicRef.current = decoded;
+          }
+        }
+      } catch {}
+    }
+    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) throw new Error('Vault empty');
     await persistVault(resolvedMnemonic, passphrase);
     setState(p => ({ ...p, mode: 'PERSISTENT' }));
   }, []);
