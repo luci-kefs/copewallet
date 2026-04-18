@@ -154,11 +154,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           _vaultCombinedKey   = newKey;
           vaultKeyRef.current = newKey;
           mnemonicRef.current = rawMnemonic;
-          // Keep localStorage session in sync after rotation
-          try {
-            const tabKey = getTabKey();
-            saveSession(encryptData(rawMnemonic, tabKey));
-          } catch {}
+          try { saveSession(encryptData(rawMnemonic, getTabKey())); } catch {}
           return {
             ...prev,
             _v_enc: encryptData(rawMnemonic, newKey),
@@ -187,11 +183,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       mnemonicRef.current = mnemonic;
       scatteredKeyRef.current = scatterStore(privateKey);
 
-      // Auto-persist to localStorage IMMEDIATELY — before any state update or async work
-      try {
-        const tabKey = getTabKey();
-        saveSession(encryptData(mnemonic, tabKey));
-      } catch {}
+      try { saveSession(encryptData(mnemonic, getTabKey())); } catch {}
 
       setState(prev => ({
         ...prev,
@@ -224,11 +216,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       mnemonicRef.current = mnemonic.trim();
       scatteredKeyRef.current = scatterStore(privateKey);
 
-      // Auto-persist to localStorage IMMEDIATELY
-      try {
-        const tabKey = getTabKey();
-        saveSession(encryptData(mnemonic.trim(), tabKey));
-      } catch {}
+      try { saveSession(encryptData(mnemonic.trim(), getTabKey())); } catch {}
 
       setState(prev => ({
         ...prev,
@@ -307,55 +295,40 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, [state._v_enc]);
 
-  // Persist session — passphrase only, no device binding
   const enablePersistentMode = useCallback(async (passphrase: string, mnemonic: string) => {
-    // PRIMARY: localStorage session (stable, survives mobile backgrounding/refresh)
-    let resolvedMnemonic = '';
-    try {
-      const saved = loadSession();
-      if (saved) {
-        const tabKey = getTabKey();
-        const decoded = decryptData(saved, tabKey);
-        if (decoded && decoded.trim().split(/\s+/).length >= 12) {
-          resolvedMnemonic = decoded;
-          mnemonicRef.current = decoded;
-        }
-      }
-    } catch {}
-    // SECONDARY: caller-provided or in-memory ref
-    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
-      resolvedMnemonic = mnemonic || mnemonicRef.current || '';
-    }
-    // TERTIARY: decrypt state._v_enc with all known keys
+    // localStorage first — survives mobile backgrounding/security trap wipes
+    let resolvedMnemonic = mnemonic || '';
     if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
       try {
-        const exported = await new Promise<string | null>((resolve) => {
-          setState(prev => {
-            if (!prev._v_enc) { resolve(null); return prev; }
-            const keys = [vaultKeyRef.current, _vaultCombinedKey, getCurrentKey()].filter(Boolean) as string[];
-            for (const k of keys) {
-              try {
-                const d = decryptData(prev._v_enc, k);
-                if (d && d.trim().split(/\s+/).length >= 12) { resolve(d); return prev; }
-              } catch {}
-            }
-            resolve(null);
-            return prev;
-          });
-        });
-        if (exported) resolvedMnemonic = exported;
+        const saved = loadSession();
+        if (saved) {
+          const decoded = decryptData(saved, getTabKey());
+          if (decoded && decoded.trim().split(/\s+/).length >= 12) resolvedMnemonic = decoded;
+        }
       } catch {}
     }
+    // in-memory ref fallback
+    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
+      resolvedMnemonic = mnemonicRef.current || '';
+    }
+    // last resort: try known vault keys against encrypted state snapshot
+    if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) {
+      const encSnap = state._v_enc;
+      if (encSnap) {
+        for (const k of [vaultKeyRef.current, _vaultCombinedKey, getCurrentKey()].filter(Boolean) as string[]) {
+          try {
+            const d = decryptData(encSnap, k);
+            if (d && d.trim().split(/\s+/).length >= 12) { resolvedMnemonic = d; break; }
+          } catch {}
+        }
+      }
+    }
     if (!resolvedMnemonic || resolvedMnemonic.trim().split(/\s+/).length < 12) throw new Error('Vault empty');
-    // Ensure localStorage is in sync for future reads
-    try {
-      const tabKey = getTabKey();
-      saveSession(encryptData(resolvedMnemonic, tabKey));
-    } catch {}
     mnemonicRef.current = resolvedMnemonic;
+    try { saveSession(encryptData(resolvedMnemonic, getTabKey())); } catch {}
     await persistVault(resolvedMnemonic, passphrase);
     setState(p => ({ ...p, mode: 'PERSISTENT' }));
-  }, []);
+  }, [state._v_enc]);
 
   const unlockPersistentVault = useCallback(async (passphrase: string) => {
     const mnemonic = await loadPersistedVault(passphrase);

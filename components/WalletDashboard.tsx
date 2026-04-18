@@ -153,21 +153,20 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const qrInputRef = useRef<HTMLInputElement>(null);
 
   const handleQRScan = async (file: File) => {
+    const parseQRAddress = (raw: string): string =>
+      raw.startsWith('ethereum:') ? raw.replace(/^ethereum:/i, '').split('?')[0].split('@')[0] : raw;
+
     try {
       const bitmap = await createImageBitmap(file);
       // @ts-expect-error BarcodeDetector not in all TS libs yet
       if (typeof BarcodeDetector !== 'undefined') {
         // @ts-expect-error BarcodeDetector
-        const detector = new BarcodeDetector({ formats: ['qr_code'] });
-        const codes = await detector.detect(bitmap);
+        const codes = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bitmap);
         if (codes.length > 0) {
-          let raw: string = codes[0].rawValue;
-          // Handle ethereum: URI scheme
-          if (raw.startsWith('ethereum:')) raw = raw.replace(/^ethereum:/i, '').split('?')[0].split('@')[0];
-          if (ethers.isAddress(raw)) { setTo(raw); return; }
+          const addr = parseQRAddress(codes[0].rawValue);
+          if (ethers.isAddress(addr)) { setTo(addr); return; }
         }
       }
-      // Fallback: draw to canvas + jsQR
       const canvas = document.createElement('canvas');
       canvas.width = bitmap.width; canvas.height = bitmap.height;
       const ctx = canvas.getContext('2d');
@@ -177,9 +176,8 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
       const { default: jsQR } = await import('jsqr');
       const code = jsQR(imgData.data, imgData.width, imgData.height);
       if (code) {
-        let raw = code.data;
-        if (raw.startsWith('ethereum:')) raw = raw.replace(/^ethereum:/i, '').split('?')[0].split('@')[0];
-        if (ethers.isAddress(raw)) setTo(raw);
+        const addr = parseQRAddress(code.data);
+        if (ethers.isAddress(addr)) setTo(addr);
       }
     } catch {}
   };

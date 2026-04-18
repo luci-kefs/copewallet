@@ -136,31 +136,23 @@ export default function CopePage() {
     setTimeout(() => setPanicClickCount(0), 1000);
   };
 
-  // ── PERSIST SESSION ────────────────────────────────────────────
   const handlePersistSession = async () => {
     if (passphrase.length < 8) { setPersistError('Minimum 8 characters required'); return; }
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
-      // Read mnemonic directly from localStorage FIRST — most reliable on mobile
       let mnemonic = '';
-      const saved = loadSession();
-      if (saved) {
-        try {
-          const tabKey = getTabKey();
-          const decoded = decryptData(saved, tabKey);
+      try {
+        const saved = loadSession();
+        if (saved) {
+          const decoded = decryptData(saved, getTabKey());
           if (decoded && decoded.trim().split(/\s+/).length >= 12) mnemonic = decoded;
-        } catch {}
-      }
-      // Fallback to context export
-      if (!mnemonic) {
-        const exported = await wallet.getMnemonicForExport();
-        if (exported) mnemonic = exported;
-      }
-      if (!mnemonic) throw new Error('Vault empty');
+        }
+      } catch {}
       await wallet.enablePersistentMode(passphrase, mnemonic);
-      const encPayload = encryptData(mnemonic, passphrase);
-      await embedInPNG(encPayload, 'copewallet');
+      const finalMnemonic = await wallet.getMnemonicForExport();
+      if (!finalMnemonic) throw new Error('Vault empty');
+      await embedInPNG(encryptData(finalMnemonic, passphrase), 'copewallet');
       setRightPanel('success');
     } catch (e) { setPersistError(e instanceof Error ? e.message : 'Operation failed. Try again.'); }
     finally { setIsProcessing(false); }

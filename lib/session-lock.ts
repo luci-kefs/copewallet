@@ -33,10 +33,6 @@ export function loadSession(): string | null {
   try { return localStorage.getItem(_KEY) || localStorage.getItem(_SHADOW) || null; } catch { return null; }
 }
 
-export function loadShadow(): string | null {
-  try { return localStorage.getItem(_SHADOW) || null; } catch { return null; }
-}
-
 export function clearShadow(): void {
   try { localStorage.removeItem(_SHADOW); } catch {}
 }
