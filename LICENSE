@@ -177,3 +177,38 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
    implied. See the License for the specific language governing
    permissions and limitations under the License.
+
+---
+
+   ADDITIONAL TERMS (pursuant to Apache License 2.0, Section 7)
+
+   1. ATTRIBUTION REQUIREMENT
+
+      Any use, distribution, deployment, or derivative work of this
+      software — whether as a web service, desktop application, mobile
+      application, CLI tool, library, or any other form — MUST display
+      the following attribution in a visible location accessible to end
+      users (e.g. UI, about screen, footer, splash screen, or
+      documentation):
+
+          "Powered by Cope Wallet (https://copewallet.com)"
+
+      This attribution must remain intact, unobscured, and legible.
+      Removing, hiding, or misrepresenting this attribution constitutes
+      a violation of this license.
+
+   2. COMMONS CLAUSE (Non-Commercial Restriction)
+
+      The Software is provided under the Apache License 2.0 with the
+      following additional restriction:
+
+      Without a separate commercial license granted in writing by the
+      copyright holder, you may NOT sell, resell, sublicense, or offer
+      the Software or any Derivative Works as a commercial product or
+      paid service where the primary value derived by the purchaser or
+      user is the Software itself or its functionality.
+
+      For commercial licensing inquiries, contact: copewallet.com
+
+      "Commons Clause" License Condition v1.0 — see
+      https://commonsclause.com for reference.
