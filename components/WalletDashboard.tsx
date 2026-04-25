@@ -18,6 +18,7 @@ import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { WalletConnectModal } from '@/components/WalletConnectModal';
+import { AdvancedDashboard } from '@/components/AdvancedDashboard';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
@@ -783,6 +784,7 @@ function LightningTab() {
 // ─── Main WalletDashboard ─────────────────────────────────────────────────────
 export function WalletDashboard() {
   const wallet = useWallet();
+  const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
   const [activeTab, setActiveTab] = useState<Tab>('balance');
   const [selectedChain, setSelectedChain] = useState<Chain>(CHAINS[0]);
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
@@ -977,6 +979,8 @@ export function WalletDashboard() {
     );
   }
 
+  if (mode === 'advanced') return <AdvancedDashboard onExit={() => setMode('simple')} />;
+
   return (
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
@@ -998,15 +1002,25 @@ export function WalletDashboard() {
                   {frozenMode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
                 </p>
               </div>
-              <button
-                onClick={() => setShowNetworks(true)}
-                className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
-                <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
-                <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">
-                  {manualChain ? manualChain.name : 'Network'}
-                </span>
-                <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <button
+                  onClick={() => setShowNetworks(true)}
+                  className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
+                  <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
+                  <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">
+                    {manualChain ? manualChain.name : 'Network'}
+                  </span>
+                  <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
+                </button>
+                <button
+                  onClick={() => setMode('advanced')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.07)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.2)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#52ffac' }}>settings</span>
+                  <span style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Advanced</span>
+                </button>
+              </div>
             </div>
             {/* Keep session toggle — right below network button */}
             <div className="flex items-center justify-between py-3 border-y border-white/5">
@@ -1333,6 +1347,18 @@ export function WalletDashboard() {
 
             {/* LIGHTNING TAB */}
             {activeTab === 'lightning' && <LightningTab />}
+
+            {/* Advanced Mode hint */}
+            {activeTab === 'balance' && (
+              <div style={{ paddingTop: 8, textAlign: 'center' }}>
+                <button onClick={() => setMode('advanced')}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', transition: 'color 0.2s' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#52ffac'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#555'; }}>
+                  Didn&apos;t find what you&apos;re looking for? Try Advanced Mode →
+                </button>
+              </div>
+            )}
           </div>
 
 

@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  webpack: (config) => {
+    config.experiments = { ...config.experiments, asyncWebAssembly: true };
+    return config;
+  },
   env: {
     NEXT_PUBLIC_EXTERNAL_LINK: process.env.NEXT_PUBLIC_EXTERNAL_LINK,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -27,7 +31,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com wss://relay.walletconnect.org wss://relay.walletconnect.com https://relay.walletconnect.org https://relay.walletconnect.com https://pulse.walletconnect.org https://pulse.walletconnect.com https://rpc.walletconnect.org https://rpc.walletconnect.com https://keys.walletconnect.org https://verify.walletconnect.org",
+              "connect-src 'self' https://fpghxkrpafipmdslrunr.supabase.co https://api.coingecko.com https://api.blockchair.com wss://relay.walletconnect.org wss://relay.walletconnect.com https://relay.walletconnect.org https://relay.walletconnect.com https://pulse.walletconnect.org https://pulse.walletconnect.com https://rpc.walletconnect.org https://rpc.walletconnect.com https://keys.walletconnect.org https://verify.walletconnect.org",
               "img-src 'self' https: data: blob:",
               "font-src 'self' https://fonts.gstatic.com",
               "frame-ancestors 'none'",

@@ -14,7 +14,11 @@
     "@simplewebauthn/browser": "^10.0.0",
     "@supabase/supabase-js": "^2.103.0",
     "@walletconnect/core": "^2.23.9",
+    "bip32": "^5.0.1",
+    "bip39": "^3.1.0",
+    "bitcoinjs-lib": "^7.0.1",
     "crypto-js": "^4.2.0",
+    "ecpair": "^3.0.1",
     "ethers": "^6.16.0",
     "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
@@ -23,7 +27,8 @@
     "next": "14.2.35",
     "qrcode.react": "^4.2.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "tiny-secp256k1": "^2.2.4"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
