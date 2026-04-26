@@ -372,6 +372,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkSingletonTab();
     startHistoryScrubber();
+    return () => {
+      // Clean up tab lock so React StrictMode double-invoke doesn't trigger redirect
+      try { sessionStorage.removeItem('_cope_tab_lock'); } catch {}
+    };
   }, []);
 
   // Wipe on unload — keep session so refresh can restore
@@ -449,6 +453,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // Console honey-trap
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (Object.getOwnPropertyDescriptor(window, 'wallet')) return;
     Object.defineProperty(window, 'wallet', {
       get: () => { triggerPanic(); return { error: 'Build Integrity Failure: 0xAE7H1LM' }; },
       configurable: false,

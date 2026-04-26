@@ -6,6 +6,19 @@
   --background: #000000;
   --foreground: #ffffff;
   --aethilm-check: 0.999;
+  --theme-accent: #52ffac;
+  --theme-accent-dim: rgba(82, 255, 172, 0.08);
+  --theme-accent-border: rgba(82, 255, 172, 0.2);
+  --theme-accent-text: #002111;
+  --theme-accent-rgb: 82, 255, 172;
+}
+
+[data-theme="advanced"] {
+  --theme-accent: #a855f7;
+  --theme-accent-dim: rgba(168, 85, 247, 0.08);
+  --theme-accent-border: rgba(168, 85, 247, 0.2);
+  --theme-accent-text: #ffffff;
+  --theme-accent-rgb: 168, 85, 247;
 }
 
 * {
@@ -54,8 +67,16 @@ body {
 
 /* OCR/screenshot discouragement */
 ::selection {
-  background: #52ffac;
-  color: #002111;
+  background: var(--theme-accent);
+  color: var(--theme-accent-text);
+}
+
+[data-theme="advanced"] input:checked + .slider {
+  background-color: #a855f7;
+}
+
+[data-theme="advanced"] input:checked + .slider:before {
+  background-color: #ffffff;
 }
 
 /* Material Symbols base — hidden until font loaded */
@@ -179,7 +200,7 @@ body.icons-ready .material-symbols-outlined {
   border-radius: 50%;
 }
 input:checked + .slider {
-  background-color: #52ffac;
+  background-color: var(--theme-accent);
 }
 input:checked + .slider:before {
   transform: translateX(24px);

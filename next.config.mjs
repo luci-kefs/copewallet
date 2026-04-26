@@ -1,7 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.experiments = { ...config.experiments, asyncWebAssembly: true };
+    if (!isServer) {
+      config.output = { ...config.output, webassemblyModuleFilename: 'static/wasm/[modulehash].wasm' };
+    }
     return config;
   },
   env: {

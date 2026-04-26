@@ -19,6 +19,11 @@ import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { WalletConnectModal } from '@/components/WalletConnectModal';
 import { AdvancedDashboard } from '@/components/AdvancedDashboard';
+import { motion, AnimatePresence } from 'framer-motion';
+import { springs, variants } from '@/lib/animations';
+import { getHistory, addToHistory, saveWallet, removeFromHistory, makeSnapshot, WalletSnapshot } from '@/lib/wallet-history';
+import { WarningBanner } from '@/components/WarningBanner';
+import { TransferModal } from '@/components/TransferModal';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
@@ -146,6 +151,11 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
   const [feeEth, setFeeEth] = useState<string | null>(null);
   const [feeUsd, setFeeUsd] = useState<number | null>(null);
   const [feeLoading, setFeeLoading] = useState(false);
@@ -529,6 +539,11 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
 // ─── QR Modal ─────────────────────────────────────────────────────────────────
 function QRModal({ address, onClose }: { address: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
   const copy = async () => {
     await navigator.clipboard.writeText(address).catch(() => {});
     setCopied(true);
@@ -808,6 +823,34 @@ export function WalletDashboard() {
   const [everUnlocked, setEverUnlocked] = useState(false);
   useEffect(() => { if (wallet.isUnlocked) setEverUnlocked(true); }, [wallet.isUnlocked]);
 
+  // Wallet history
+  const [walletHistory, setWalletHistory] = useState<WalletSnapshot[]>([]);
+  const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
+  const [showWipeWarning, setShowWipeWarning] = useState(false);
+  const [showNewWalletWarning, setShowNewWalletWarning] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
+
+  // Sync theme to document root
+  useEffect(() => {
+    document.documentElement.dataset.theme = mode === 'advanced' ? 'advanced' : '';
+  }, [mode]);
+
+  // Track wallet creation in history
+  useEffect(() => {
+    if (!wallet.isUnlocked || !wallet.activeAddress) return;
+    const history = getHistory();
+    const existing = history.find(s => s.address === wallet.activeAddress);
+    if (existing) {
+      setCurrentHistoryId(existing.id);
+      setWalletHistory(history);
+    } else {
+      const snap = makeSnapshot(wallet.activeAddress, wallet.mode as 'EPHEMERAL' | 'PERSISTENT');
+      addToHistory(snap);
+      setCurrentHistoryId(snap.id);
+      setWalletHistory(getHistory());
+    }
+  }, [wallet.isUnlocked, wallet.activeAddress]);
+
   // Freeze last known address so UI doesn't blank during transient wipe
   const [frozenAddress, setFrozenAddress] = useState<string | null>(null);
   const [frozenMode, setFrozenMode] = useState(wallet.mode);
@@ -979,7 +1022,19 @@ export function WalletDashboard() {
     );
   }
 
-  if (mode === 'advanced') return <AdvancedDashboard onExit={() => setMode('simple')} />;
+  if (mode === 'advanced') return (
+    <motion.div
+      key="advanced"
+      variants={variants.pageSwitch}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      transition={springs.cinematic}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+    >
+      <AdvancedDashboard onExit={() => setMode('simple')} />
+    </motion.div>
+  );
 
   return (
     <>
@@ -987,6 +1042,17 @@ export function WalletDashboard() {
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); }} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
       {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
+      {showTransfer && address && (
+        <TransferModal onClose={() => setShowTransfer(false)} currentAddress={address} currentHistoryId={currentHistoryId} />
+      )}
+      <AnimatePresence>
+        {showWipeWarning && (
+          <WarningBanner type="wipe" onConfirm={() => { setShowWipeWarning(false); wallet.disableSessionLock(); wallet.wipeCopeWallet(); clearShadow(); }} onCancel={() => setShowWipeWarning(false)} />
+        )}
+        {showNewWalletWarning && (
+          <WarningBanner type="new-wallet" onConfirm={() => { setShowNewWalletWarning(false); wallet.disableSessionLock(); wallet.wipeCopeWallet(); clearShadow(); setTimeout(() => wallet.createCopeWallet(), 80); }} onCancel={() => setShowNewWalletWarning(false)} />
+        )}
+      </AnimatePresence>
 
       <section className="flex-1 pt-[64px] px-4 pb-24 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto w-full space-y-6 md:space-y-12">
@@ -1105,30 +1171,35 @@ export function WalletDashboard() {
 
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">
-            <button
-              onClick={() => setShowWC(true)}
-              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">power</span>
-              <span className="font-black uppercase tracking-widest text-[0.6rem]">Connect</span>
-            </button>
-            <button
-              onClick={() => setShowSend(true)}
-              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">north_east</span>
-              <span className="font-black uppercase tracking-widest text-[0.6rem]">Send</span>
-            </button>
-            <button
-              onClick={() => setShowQR(true)}
-              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">qr_code_2</span>
-              <span className="font-black uppercase tracking-widest text-[0.6rem]">Qr / Receive</span>
-            </button>
-            <button
-              onClick={() => { wallet.disableSessionLock(); wallet.wipeCopeWallet(); clearShadow(); setTimeout(() => wallet.createCopeWallet(), 80); }}
-              className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-all group active:scale-95 border border-white/5">
-              <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">add_card</span>
-              <span className="font-black uppercase tracking-widest text-[0.6rem]">Create New Wallet</span>
-            </button>
+            {[
+              { icon: 'power',    label: 'Connect',           onClick: () => setShowWC(true) },
+              { icon: 'north_east', label: 'Send',            onClick: () => setShowSend(true) },
+              { icon: 'qr_code_2', label: 'QR / Receive',    onClick: () => setShowQR(true) },
+              { icon: 'add_card', label: 'Create New Wallet', onClick: () => setShowNewWalletWarning(true) },
+            ].map((item) => (
+              <motion.button
+                key={item.label}
+                onClick={item.onClick}
+                whileHover={{ scale: 1.03, rotateX: 3, rotateY: -3 }}
+                whileTap={{ scale: 0.96 }}
+                transition={springs.snappy}
+                style={{ transformStyle: 'preserve-3d', perspective: 800 }}
+                className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
+              </motion.button>
+            ))}
+            {walletHistory.filter(s => s.isSaved && s.id !== currentHistoryId).length >= 1 && (
+              <motion.button
+                onClick={() => setShowTransfer(true)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                transition={springs.snappy}
+                className="bg-surface-container-highest p-5 md:p-8 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
+                <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">swap_horiz</span>
+                <span className="font-black uppercase tracking-widest text-[0.6rem]">Transfer Between Wallets</span>
+              </motion.button>
+            )}
           </div>
 
           {/* ── Tabs & List ── */}
@@ -1225,42 +1296,50 @@ export function WalletDashboard() {
                     <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
                   </div>
                 ) : allChainTokens.length > 0 ? (
-                  allChainTokens.flatMap(({ chain: c, toks, p }, ci) =>
-                    // Skip current network — already shown as white card above
-                    toks.filter(t => parseFloat(t.balance || '0') > 0 && c.id !== manualChain?.id).map((token, i) => {
-                      const cgId = token.coingeckoId ?? c.coingeckoId;
-                      const price = cgId ? (p[cgId] ?? 0) : 0;
-                      const usdVal = parseFloat(token.balance || '0') * price;
-                      return (
-                        <div key={`${c.id}-${token.contractAddress}-${i}`}
-                          className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
-                          style={{ animationDelay: `${(ci * 3 + i) * 40}ms` }}>
-                          <div className="flex items-center gap-5">
-                            {token.logo ? (
-                              <img src={token.logo} alt={token.symbol} className="w-14 h-14 rounded-full object-cover shrink-0"
-                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            ) : (
-                              <div className="w-14 h-14 bg-surface-container-highest rounded-full flex items-center justify-center font-black text-xl shrink-0">
-                                {token.symbol.slice(0, 1)}
+                  (() => {
+                    const items = allChainTokens.flatMap(({ chain: c, toks, p }, ci) =>
+                      toks.filter(t => parseFloat(t.balance || '0') > 0 && c.id !== manualChain?.id).map((token, i) => ({ c, token, p, ci, i }))
+                    );
+                    return (
+                      <motion.div variants={variants.staggerContainer} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {items.map(({ c, token, p, ci, i }) => {
+                          const cgId = token.coingeckoId ?? c.coingeckoId;
+                          const price = cgId ? (p[cgId] ?? 0) : 0;
+                          const usdVal = parseFloat(token.balance || '0') * price;
+                          return (
+                            <motion.div key={`${c.id}-${token.contractAddress}-${i}`}
+                              variants={variants.staggerItem}
+                              transition={springs.smooth}
+                              whileHover={{ x: 4, transition: springs.snappy }}
+                              className="flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-colors cursor-pointer">
+                              <div className="flex items-center gap-5">
+                                {token.logo ? (
+                                  <img src={token.logo} alt={token.symbol} className="w-14 h-14 rounded-full object-cover shrink-0"
+                                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                ) : (
+                                  <div className="w-14 h-14 bg-surface-container-highest rounded-full flex items-center justify-center font-black text-xl shrink-0">
+                                    {token.symbol.slice(0, 1)}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-black text-white text-lg">{token.symbol}</p>
+                                  <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{c.name}</p>
+                                </div>
                               </div>
-                            )}
-                            <div>
-                              <p className="font-black text-white text-lg">{token.symbol}</p>
-                              <p className="text-[0.65rem] text-on-surface-variant uppercase tracking-widest font-bold">{c.name}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-black text-white text-lg">
-                              {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(parseFloat(token.balance))}
-                            </p>
-                            <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
-                              {price > 0 ? formatUSD(usdVal) : '—'}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )
+                              <div className="text-right">
+                                <p className="font-black text-white text-lg">
+                                  {parseFloat(token.balance) < 0.000001 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 }).format(parseFloat(token.balance))}
+                                </p>
+                                <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
+                                  {price > 0 ? formatUSD(usdVal) : '—'}
+                                </p>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    );
+                  })()
                 ) : tokens.filter(t => parseFloat(t.balance || '0') > 0).map((token, i) => {
                   const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
                   const price = cgId ? (prices[cgId] ?? 0) : 0;
@@ -1348,12 +1427,94 @@ export function WalletDashboard() {
             {/* LIGHTNING TAB */}
             {activeTab === 'lightning' && <LightningTab />}
 
+            {/* Wallet History */}
+            {activeTab === 'balance' && walletHistory.length > 0 && (
+              <div style={{ paddingTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Wallet History</span>
+                  <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <AnimatePresence>
+                    {walletHistory.map((snap, i) => {
+                      const isCurrent = snap.id === currentHistoryId;
+                      return (
+                        <motion.div
+                          key={snap.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ ...springs.smooth, delay: i * 0.04 }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '10px 14px',
+                            background: isCurrent ? 'rgba(var(--theme-accent-rgb, 82,255,172),0.06)' : 'rgba(255,255,255,0.03)',
+                            border: `1px solid ${isCurrent ? 'rgba(var(--theme-accent-rgb, 82,255,172),0.2)' : 'rgba(255,255,255,0.06)'}`,
+                            borderRadius: '0.75rem', cursor: isCurrent ? 'default' : 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                          onClick={() => {
+                            if (isCurrent) return;
+                            // Switch to this wallet — show warning if different address
+                            // For now navigate to advanced for non-current wallets;
+                            // actual session switch requires vault restore flow
+                          }}
+                        >
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? 'var(--theme-accent)' : 'rgba(255,255,255,0.4)' }}>account_balance_wallet</span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: isCurrent ? 'var(--theme-accent)' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {snap.shortAddress}
+                              </span>
+                              {isCurrent && (
+                                <span style={{ fontSize: 8, fontWeight: 900, color: 'var(--theme-accent)', background: 'rgba(var(--theme-accent-rgb, 82,255,172),0.12)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
+                                  Current
+                                </span>
+                              )}
+                              {snap.isSaved && !isCurrent && (
+                                <span style={{ fontSize: 8, fontWeight: 900, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
+                                  Saved
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+                              {snap.vaultMode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'} · {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          {!snap.isSaved ? (
+                            <button
+                              onClick={e => { e.stopPropagation(); saveWallet(snap.id); setWalletHistory(getHistory()); }}
+                              style={{ flexShrink: 0, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.4rem', padding: '3px 8px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.15s' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--theme-accent)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--theme-accent)'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.4)'; }}>
+                              Kaydet
+                            </button>
+                          ) : (
+                            <button
+                              onClick={e => { e.stopPropagation(); removeFromHistory(snap.id); setWalletHistory(getHistory()); }}
+                              style={{ flexShrink: 0, background: 'none', border: 'none', padding: '3px 6px', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', borderRadius: '0.4rem', transition: 'color 0.15s' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ff6b6b'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.2)'; }}
+                              title="Remove from history">
+                              <X size={12} />
+                            </button>
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+
             {/* Advanced Mode hint */}
             {activeTab === 'balance' && (
               <div style={{ paddingTop: 8, textAlign: 'center' }}>
                 <button onClick={() => setMode('advanced')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', transition: 'color 0.2s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#52ffac'; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--theme-accent)'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#555'; }}>
                   Didn&apos;t find what you&apos;re looking for? Try Advanced Mode →
                 </button>
