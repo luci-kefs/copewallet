@@ -108,7 +108,7 @@ export async function getLTCTransactions(
 
 export async function estimateLTCFee(): Promise<{ slow: number; medium: number; fast: number }> {
   try {
-    const res = await fetch('https://mempool.space/litecoin/api/v1/fees/recommended');
+    const res = await fetch('https://litecoinspace.org/api/v1/fees/recommended');
     if (!res.ok) throw new Error('fees error');
     const json = await res.json();
     return { slow: json.hourFee ?? 2, medium: json.halfHourFee ?? 10, fast: json.fastestFee ?? 25 };
@@ -174,7 +174,7 @@ export async function buildLTCTransaction(opts: {
 }
 
 export async function broadcastLTC(hex: string): Promise<string> {
-  const res = await fetch('https://mempool.space/litecoin/api/tx', {
+  const res = await fetch('https://litecoinspace.org/api/tx', {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: hex,
