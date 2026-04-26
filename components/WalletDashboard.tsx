@@ -19,8 +19,7 @@ import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { WalletConnectModal } from '@/components/WalletConnectModal';
 import { AdvancedDashboard } from '@/components/AdvancedDashboard';
-import { ChainPanel, ChainTx } from '@/components/ChainPanel';
-import { LitecoinPanel } from '@/components/LitecoinPanel';
+import type { ChainTx } from '@/components/ChainPanel';
 import { deriveBTCWallet, getBTCBalance, getBTCTransactions, estimateBTCFee, buildBTCTransaction, broadcastBTC } from '@/lib/btc';
 import { deriveDOGEWallet, getDOGEBalance, getDOGETransactions, estimateDOGEFee, buildDOGETransaction, broadcastDOGE } from '@/lib/doge';
 import { deriveBCHWallet, getBCHBalance, getBCHTransactions, estimateBCHFee, buildBCHTransaction, broadcastBCH } from '@/lib/bch';
@@ -39,77 +38,50 @@ import { TransferModal } from '@/components/TransferModal';
 
 type Tab = 'balance' | 'transactions' | 'lightning';
 
-// ─── Chain SVG Paths ─────────────────────────────────────────────────────────
-const CHAIN_SVG_PATHS: Record<string, React.ReactNode> = {
-  ETH:   <><polygon points="12,2 20,13 12,16 4,13" fill="currentColor" opacity="0.85"/><polygon points="12,16 20,13 12,22 4,13" fill="currentColor"/></>,
-  BASE:  <><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.15"/><path d="M12 6c-3.3 0-6 2.7-6 6s2.7 6 6 6c3 0 5.5-2.1 5.9-5h-5.9V11h8c.1.6.1 1 .1 1 0 4.4-3.6 8-8 8S4 16.4 4 12 7.6 4 12 4c2.1 0 4 .8 5.5 2.1l-2.1 2.1C14.4 7.3 13.3 6 12 6z" fill="currentColor"/></>,
-  ARB:   <><path d="M12 2 L22 18 L18 18 L14 10 L16 18 L12 18 L8 10 L10 18 L6 18 Z" fill="currentColor"/></>,
-  OP:    <><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2"/><circle cx="12" cy="12" r="5" fill="currentColor"/></>,
-  MATIC: <><path d="M12 2 L22 7 L22 17 L12 22 L2 17 L2 7 Z" fill="currentColor" opacity="0.2" stroke="currentColor" strokeWidth="1.5"/><text x="12" y="16" textAnchor="middle" fill="currentColor" fontSize="7" fontWeight="900">POL</text></>,
-  ZK:    <><path d="M4 7h12l-8 10h12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></>,
-  LINEA: <><line x1="4" y1="8" x2="20" y2="8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="4" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="4" y1="16" x2="12" y2="16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></>,
-  SCR:   <><path d="M17 4H9a5 5 0 0 0 0 10h6a3 3 0 0 1 0 6H7" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round"/></>,
-  BLAST: <><path d="M13 2 L6 13 L11 13 L9 22 L18 9 L13 9 Z" fill="currentColor"/></>,
-  BNB:   <><path d="M12 2 L14.5 4.5 L12 7 L9.5 4.5 Z M7 7 L9.5 9.5 L7 12 L4.5 9.5 Z M17 7 L19.5 9.5 L17 12 L14.5 9.5 Z M9.5 9.5 L12 12 L14.5 9.5 L12 7 Z M7 12 L9.5 14.5 L12 12 L9.5 9.5 Z M14.5 9.5 L17 12 L14.5 14.5 L12 12 Z M9.5 14.5 L12 17 L14.5 14.5 L12 12 Z M12 17 L14.5 19.5 L12 22 L9.5 19.5 Z" fill="currentColor"/></>,
-  AVAX:  <><path d="M9 18 L12 13 L15 18 Z" fill="currentColor"/><path d="M4 18 L10 7 L13 12 L8 18 Z" fill="currentColor" opacity="0.7"/><path d="M14 18 L16 14 L20 18 Z" fill="currentColor" opacity="0.5"/></>,
-  FTM:   <><path d="M12 2 L8 8 L12 11 L16 8 Z M8 8 L4 12 L8 16 L12 11 Z M16 8 L20 12 L16 16 L12 11 Z M8 16 L12 11 L16 16 L12 22 Z" fill="currentColor" opacity="0.9"/></>,
-  GNO:   <><circle cx="12" cy="12" r="9" fill="currentColor" opacity="0.15" stroke="currentColor" strokeWidth="1.5"/><path d="M9 9 L15 15 M15 9 L9 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></>,
+// ─── Non-EVM chain metadata ───────────────────────────────────────────────────
+interface NonEvmMeta {
+  coin: string; name: string; color: string;
+  explorerBase: string; symbol: string; coingeckoId: string; feeUnit?: string;
+  logoUrl?: string;
+}
+const CG_IMG = 'https://assets.coingecko.com/coins/images';
+const NON_EVM_META: Record<string, NonEvmMeta> = {
+  BTC:   { coin: 'BTC',   name: 'Bitcoin',      color: '#F7931A', explorerBase: 'https://blockchair.com/bitcoin/transaction',      symbol: 'BTC',   coingeckoId: 'bitcoin',          feeUnit: 'sat/vByte', logoUrl: `${CG_IMG}/1/small/bitcoin.png` },
+  DOGE:  { coin: 'DOGE',  name: 'Dogecoin',     color: '#C2A633', explorerBase: 'https://blockchair.com/dogecoin/transaction',     symbol: 'DOGE',  coingeckoId: 'dogecoin',         feeUnit: 'sat/vByte', logoUrl: `${CG_IMG}/5/small/dogecoin.png` },
+  BCH:   { coin: 'BCH',   name: 'Bitcoin Cash', color: '#8DC351', explorerBase: 'https://blockchair.com/bitcoin-cash/transaction', symbol: 'BCH',   coingeckoId: 'bitcoin-cash',     feeUnit: 'sat/vByte', logoUrl: `${CG_IMG}/780/small/bitcoin-cash-circle.png` },
+  SOL:   { coin: 'SOL',   name: 'Solana',       color: '#9945FF', explorerBase: 'https://solscan.io/tx',                          symbol: 'SOL',   coingeckoId: 'solana',           feeUnit: 'lamports',  logoUrl: `${CG_IMG}/4128/small/solana.png` },
+  XRP:   { coin: 'XRP',   name: 'XRP',          color: '#346AA9', explorerBase: 'https://xrpscan.com/tx',                        symbol: 'XRP',   coingeckoId: 'ripple',                                 logoUrl: `${CG_IMG}/44/small/xrp-symbol-white-128.png` },
+  XLM:   { coin: 'XLM',   name: 'Stellar',      color: '#7D00FF', explorerBase: 'https://stellarchain.io/transactions',          symbol: 'XLM',   coingeckoId: 'stellar',                                logoUrl: `${CG_IMG}/100/small/Stellar_symbol_black_RGB.png` },
+  NANO:  { coin: 'NANO',  name: 'Nano',         color: '#4A90D9', explorerBase: 'https://nanolooker.com/block',                  symbol: 'NANO',  coingeckoId: 'nano',                                   logoUrl: `${CG_IMG}/1177/small/nano.png` },
+  HBAR:  { coin: 'HBAR',  name: 'Hedera',       color: '#5d8fbc', explorerBase: 'https://hashscan.io/mainnet/transaction',       symbol: 'HBAR',  coingeckoId: 'hedera-hashgraph',                       logoUrl: `${CG_IMG}/3688/small/hbar.png` },
+  SUI:   { coin: 'SUI',   name: 'Sui',          color: '#6FBCF0', explorerBase: 'https://suiscan.xyz/mainnet/tx',                symbol: 'SUI',   coingeckoId: 'sui',                                    logoUrl: `${CG_IMG}/26375/small/sui_asset.jpeg` },
+  APTOS: { coin: 'APTOS', name: 'Aptos',        color: '#00BFAE', explorerBase: 'https://explorer.aptoslabs.com/txn',            symbol: 'APT',   coingeckoId: 'aptos',                                  logoUrl: `${CG_IMG}/26455/small/aptos_round.png` },
+  LTC:   { coin: 'LTC',   name: 'Litecoin',     color: '#A5A9B1', explorerBase: 'https://blockchair.com/litecoin/transaction',   symbol: 'LTC',   coingeckoId: 'litecoin',         feeUnit: 'sat/vByte', logoUrl: `${CG_IMG}/2/small/litecoin.png` },
 };
 
-function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
-  const [imgErr, setImgErr] = useState(false);
-  const svgPath = CHAIN_SVG_PATHS[chain.shortName];
+// ─── Unified coin icon — tries logoUrl first, then jsdelivr CDN, then letter ─
+function CoinIcon({ symbol, color, logoUrl, size = 34, label }: {
+  symbol: string; color: string; logoUrl?: string; size?: number; label?: string;
+}) {
+  const [err1, setErr1] = useState(false);
+  const [err2, setErr2] = useState(false);
+  const cdn = `https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/${symbol.toLowerCase()}.png`;
+  const src = (!err1 && logoUrl) ? logoUrl : (!err2 ? cdn : null);
   return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: `${chain.color}18`, border: `1.5px solid ${chain.color}44`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, overflow: 'hidden',
-    }}>
-      {chain.logoUrl && !imgErr ? (
-        <img src={chain.logoUrl} alt={chain.shortName} width={size * 0.7} height={size * 0.7}
-          style={{ borderRadius: '50%', objectFit: 'cover' }} onError={() => setImgErr(true)} />
-      ) : svgPath ? (
-        <svg viewBox="0 0 24 24" width={size * 0.56} height={size * 0.56} style={{ color: chain.color }}>
-          {svgPath}
-        </svg>
+    <div style={{ width: size, height: size, borderRadius: '50%', background: `${color}18`, border: `1.5px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+      {src ? (
+        <img src={src} alt={symbol} width={size * 0.72} height={size * 0.72}
+          style={{ borderRadius: '50%', objectFit: 'cover' }}
+          onError={() => { if (!err1 && logoUrl) { setErr1(true); } else { setErr2(true); } }} />
       ) : (
-        <span style={{ color: chain.color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1 }}>
-          {chain.shortName.slice(0, 3)}
-        </span>
+        <span style={{ color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1 }}>{(label ?? symbol).slice(0, 3)}</span>
       )}
     </div>
   );
 }
 
-// ─── Non-EVM chain metadata ───────────────────────────────────────────────────
-interface NonEvmMeta {
-  coin: string; name: string; color: string;
-  explorerBase: string; symbol: string; coingeckoId: string; feeUnit?: string;
-}
-const NON_EVM_META: Record<string, NonEvmMeta> = {
-  BTC:   { coin: 'BTC',   name: 'Bitcoin',      color: '#F7931A', explorerBase: 'https://blockchair.com/bitcoin/transaction',           symbol: 'BTC',   coingeckoId: 'bitcoin',          feeUnit: 'sat/vByte' },
-  DOGE:  { coin: 'DOGE',  name: 'Dogecoin',     color: '#C2A633', explorerBase: 'https://blockchair.com/dogecoin/transaction',          symbol: 'DOGE',  coingeckoId: 'dogecoin',         feeUnit: 'sat/vByte' },
-  BCH:   { coin: 'BCH',   name: 'Bitcoin Cash', color: '#8DC351', explorerBase: 'https://blockchair.com/bitcoin-cash/transaction',      symbol: 'BCH',   coingeckoId: 'bitcoin-cash',     feeUnit: 'sat/vByte' },
-  SOL:   { coin: 'SOL',   name: 'Solana',       color: '#9945FF', explorerBase: 'https://solscan.io/tx',                               symbol: 'SOL',   coingeckoId: 'solana',           feeUnit: 'lamports' },
-  XRP:   { coin: 'XRP',   name: 'XRP',          color: '#346AA9', explorerBase: 'https://xrpscan.com/tx',                             symbol: 'XRP',   coingeckoId: 'ripple' },
-  XLM:   { coin: 'XLM',   name: 'Stellar',      color: '#7D00FF', explorerBase: 'https://stellarchain.io/transactions',               symbol: 'XLM',   coingeckoId: 'stellar' },
-  NANO:  { coin: 'NANO',  name: 'Nano',         color: '#4A90D9', explorerBase: 'https://nanolooker.com/block',                       symbol: 'NANO',  coingeckoId: 'nano' },
-  HBAR:  { coin: 'HBAR',  name: 'Hedera',       color: '#5d8fbc', explorerBase: 'https://hashscan.io/mainnet/transaction',            symbol: 'HBAR',  coingeckoId: 'hedera-hashgraph' },
-  SUI:   { coin: 'SUI',   name: 'Sui',          color: '#6FBCF0', explorerBase: 'https://suiscan.xyz/mainnet/tx',                     symbol: 'SUI',   coingeckoId: 'sui' },
-  APTOS: { coin: 'APTOS', name: 'Aptos',        color: '#00BFAE', explorerBase: 'https://explorer.aptoslabs.com/txn',                 symbol: 'APT',   coingeckoId: 'aptos' },
-  LTC:   { coin: 'LTC',   name: 'Litecoin',     color: '#A5A9B1', explorerBase: 'https://blockchair.com/litecoin/transaction',        symbol: 'LTC',   coingeckoId: 'litecoin',         feeUnit: 'sat/vByte' },
-};
-
-function NonEvmIcon({ coin, size = 34 }: { coin: string; size?: number }) {
-  const meta = NON_EVM_META[coin];
-  const color = meta?.color ?? '#888';
-  const label = meta?.symbol?.slice(0, 3) ?? coin.slice(0, 3);
-  return (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: `${color}18`, border: `1.5px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <span style={{ color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1 }}>{label}</span>
-    </div>
-  );
+function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
+  return <CoinIcon symbol={chain.shortName} color={chain.color} logoUrl={chain.logoUrl} size={size} label={chain.shortName} />;
 }
 
 // ─── All Networks Modal ───────────────────────────────────────────────────────
@@ -182,7 +154,7 @@ function AllNetworksModal({ selected, onSelect, selectedNonEvm, onSelectNonEvm, 
                 {selectedNonEvm === m.coin && (
                   <div style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: '50%', background: m.color }} />
                 )}
-                <NonEvmIcon coin={m.coin} size={34} />
+                <CoinIcon symbol={m.symbol} color={m.color} logoUrl={m.logoUrl} size={34} />
                 <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 700 }}>{m.symbol}</span>
                 <span style={{ color: '#c6c6c6', fontSize: 9 }}>{m.name}</span>
                 <span style={{ background: 'rgba(255,255,255,0.06)', color: '#888', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>NON-EVM</span>
@@ -439,12 +411,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
               <div style={{ position: 'relative' }}>
                 <button onClick={() => { setNetworkOpen(o => !o); setTokenOpen(false); }}
                   style={{ ...box, width: '100%', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: `${selectedChain.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {selectedChain.logoUrl
-                      ? <img src={selectedChain.logoUrl} alt={selectedChain.shortName} width={22} height={22} style={{ objectFit: 'cover' }} />
-                      : <svg viewBox="0 0 24 24" width={12} height={12} fill={selectedChain.color}>{CHAIN_SVG_PATHS[selectedChain.shortName] ?? <circle cx="12" cy="12" r="8"/>}</svg>
-                    }
-                  </div>
+                  <CoinIcon symbol={selectedChain.shortName} color={selectedChain.color} logoUrl={selectedChain.logoUrl} size={22} />
                   <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: '#fff', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedChain.name}</span>
                   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth={2.5} strokeLinecap="round" style={{ transform: networkOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}>
                     <polyline points="6 9 12 15 18 9"/>
@@ -457,9 +424,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
                       return (
                         <button key={c.id} onClick={() => { setSelectedChain(c); setNetworkOpen(false); }}
                           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', width: '100%', border: 'none', background: active ? `${c.color}18` : 'transparent', cursor: 'pointer' }}>
-                          <div style={{ width: 20, height: 20, borderRadius: '50%', background: `${c.color}22`, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {c.logoUrl ? <img src={c.logoUrl} alt={c.shortName} width={20} height={20} style={{ objectFit: 'cover' }} /> : <svg viewBox="0 0 24 24" width={11} height={11} fill={c.color}>{CHAIN_SVG_PATHS[c.shortName] ?? <circle cx="12" cy="12" r="8"/>}</svg>}
-                          </div>
+                          <CoinIcon symbol={c.shortName} color={c.color} logoUrl={c.logoUrl} size={20} />
                           <span style={{ flex: 1, fontSize: 11, fontWeight: 700, color: active ? c.color : '#ccc', textAlign: 'left' }}>{c.name}</span>
                           {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: c.color, flexShrink: 0 }} />}
                         </button>
@@ -1288,9 +1253,10 @@ export function WalletDashboard() {
               className="bg-white text-black p-5 md:p-8 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
               onClick={handleCopy}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                {selectedNonEvm ? (
-                  <NonEvmIcon coin={selectedNonEvm} size={40} />
-                ) : (
+                {selectedNonEvm ? (() => {
+                  const m = NON_EVM_META[selectedNonEvm];
+                  return <CoinIcon symbol={m?.symbol ?? selectedNonEvm} color={m?.color ?? '#888'} logoUrl={m?.logoUrl} size={40} />;
+                })() : (
                   <ChainIcon chain={selectedChain} size={40} />
                 )}
                 <div className="flex flex-col min-w-0">
@@ -1324,52 +1290,30 @@ export function WalletDashboard() {
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
               </motion.button>
             ))}
-            {walletHistory.filter(s => s.isSaved && s.id !== currentHistoryId).length >= 1 && (
-              <motion.button
-                onClick={() => setShowTransfer(true)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                transition={springs.snappy}
-                className="bg-surface-container-highest p-5 md:p-8 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
-                <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">swap_horiz</span>
-                <span className="font-black uppercase tracking-widest text-[0.6rem]">Transfer Between Wallets</span>
-              </motion.button>
-            )}
+            {(() => {
+              // Show Transfer only when another saved wallet exists AND current wallet
+              // has a positive balance on the currently selected chain
+              const hasOtherSaved = walletHistory.filter(s => s.isSaved && s.id !== currentHistoryId).length >= 1;
+              const currentChainToks = allChainTokens.find(x => x.chain.id === selectedChain.id)?.toks ?? tokens;
+              const hasBalance = currentChainToks.some(t => parseFloat(t.balance || '0') > 0);
+              if (!hasOtherSaved || !hasBalance) return null;
+              return (
+                <motion.button
+                  onClick={() => setShowTransfer(true)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={springs.snappy}
+                  className="bg-surface-container-highest p-5 md:p-8 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
+                  <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">swap_horiz</span>
+                  <span className="font-black uppercase tracking-widest text-[0.6rem]">Transfer Between Wallets</span>
+                </motion.button>
+              );
+            })()}
           </div>
 
           {/* ── Tabs & List ── */}
           <div className="pt-2 md:pt-8">
-            {/* Non-EVM panel — replaces tabs when a non-EVM chain is active */}
-            {selectedNonEvm && (
-              <div>
-                {selectedNonEvm === 'LTC' ? (
-                  <LitecoinPanel />
-                ) : (() => {
-                  const meta = NON_EVM_META[selectedNonEvm];
-                  return meta ? (
-                    <ChainPanel
-                      key={selectedNonEvm}
-                      coin={meta.coin}
-                      name={meta.name}
-                      color={meta.color}
-                      explorerBase={meta.explorerBase}
-                      address={nonEvmAddr}
-                      balance={nonEvmBal}
-                      usdPrice={nonEvmUsdPrice}
-                      symbol={meta.symbol}
-                      onSend={handleNonEvmSend}
-                      onGetHistory={handleNonEvmGetHistory}
-                      onGetFees={['BTC','DOGE','BCH','SOL'].includes(selectedNonEvm) ? handleNonEvmGetFees : undefined}
-                      feeUnit={meta.feeUnit}
-                      isLoading={nonEvmLoading}
-                    />
-                  ) : null;
-                })()}
-              </div>
-            )}
-
-            {/* EVM tabs — only shown when no non-EVM chain selected */}
-            {!selectedNonEvm && <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5">
+            <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5">
               <button
                 onClick={() => setActiveTab('balance')}
                 className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'balance' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
@@ -1388,9 +1332,45 @@ export function WalletDashboard() {
               <button onClick={handleRefresh} className="ml-auto pb-4 text-on-surface-variant hover:text-white transition-colors">
                 <span className={`material-symbols-outlined text-base ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
               </button>
-            </div>}
+            </div>
 
-            {/* EVM tab content — hidden when non-EVM chain selected */}
+            {/* Non-EVM balance card — shown when non-EVM chain selected */}
+            {selectedNonEvm && activeTab === 'balance' && (() => {
+              const meta = NON_EVM_META[selectedNonEvm];
+              const bal = nonEvmBal;
+              const usdVal = bal !== null ? bal * nonEvmUsdPrice : null;
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-1 mb-2">
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: meta?.color ?? '#888' }} />
+                    <span style={{ fontSize: 9, fontWeight: 900, color: meta?.color ?? '#888', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Current Network — {meta?.name ?? selectedNonEvm}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-6 bg-white text-black rounded-xl">
+                    <div className="flex items-center gap-4">
+                      {meta && <CoinIcon symbol={meta.symbol} color={meta.color} logoUrl={meta.logoUrl} size={48} />}
+                      <div>
+                        <p className="font-black text-black text-base">{meta?.symbol ?? selectedNonEvm}</p>
+                        <p style={{ fontSize: '0.65rem', color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>{meta?.name ?? selectedNonEvm}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {nonEvmLoading ? (
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #ddd', borderTopColor: '#333', animation: 'spin 1s linear infinite' }} />
+                      ) : (
+                        <>
+                          <p className="font-black text-black text-base">
+                            {bal === null ? '—' : bal < 0.000001 && bal > 0 ? '< 0.000001' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 8 }).format(bal ?? 0)}
+                          </p>
+                          <p style={{ fontSize: '0.65rem', color: '#888', fontWeight: 700 }}>{usdVal !== null && usdVal > 0 ? formatUSD(usdVal) : '—'}</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* EVM balance tab */}
             {!selectedNonEvm && activeTab === 'balance' && (
               <div className="space-y-3">
                 {/* Current network — clean white card matching the rest of the list */}
