@@ -942,11 +942,6 @@ export function WalletDashboard() {
     setIsRefreshing(false);
   };
 
-  const handleSessionToggle = () => {
-    if (wallet.isSessionLocked) wallet.disableSessionLock();
-    else wallet.enableSessionLock();
-  };
-
   const chainTotalUSD = tokens.reduce((sum, t) => {
     const price = prices[t.coingeckoId ?? ''] ?? prices[selectedChain.coingeckoId] ?? 0;
     return sum + parseFloat(t.balance || '0') * price;
@@ -1087,28 +1082,6 @@ export function WalletDashboard() {
                   <span style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Advanced</span>
                 </button>
               </div>
-            </div>
-            {/* Keep session toggle — right below network button */}
-            <div className="flex items-center justify-between py-3 border-y border-white/5">
-              <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant">Keep session on refresh</span>
-              <button
-                type="button"
-                onClick={handleSessionToggle}
-                style={{
-                  width: 48, height: 26, borderRadius: 13, flexShrink: 0, border: 'none', padding: 0,
-                  background: wallet.isSessionLocked ? '#52ffac' : 'rgba(255,255,255,0.12)',
-                  outline: 'none', position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
-                  WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-                }}
-              >
-                <span style={{
-                  position: 'absolute', top: 4,
-                  left: wallet.isSessionLocked ? 26 : 4,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: wallet.isSessionLocked ? '#002111' : '#888',
-                  transition: 'left 0.2s', display: 'block',
-                }} />
-              </button>
             </div>
           </div>
 

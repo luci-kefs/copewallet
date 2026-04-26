@@ -5,7 +5,7 @@ import * as bip39 from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
 import { Connection, PublicKey, Keypair, Transaction, SystemProgram, LAMPORTS_PER_SOL, sendAndConfirmTransaction } from '@solana/web3.js';
 
-const RPC = 'https://api.mainnet-beta.solana.com';
+const RPC = 'https://solana-rpc.publicnode.com';
 const connection = new Connection(RPC, 'confirmed');
 
 export interface SOLWallet {

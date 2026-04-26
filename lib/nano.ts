@@ -3,7 +3,7 @@
 
 import { wallet as nanoWallet, block } from 'nanocurrency-web';
 
-const API = 'https://mynano.ninja/api/node';
+const API = 'https://rpc.nano.to';
 
 export interface NANOWallet {
   address: string;   // nano_... format

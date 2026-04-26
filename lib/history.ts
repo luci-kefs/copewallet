@@ -8,14 +8,26 @@ export function checkSingletonTab(): boolean {
   try {
     const existing = sessionStorage.getItem(TAB_KEY);
     if (existing) {
-      // Another tab is open — redirect
-      const ext = process.env.NEXT_PUBLIC_EXTERNAL_LINK || 'https://www.google.com';
-      window.location.replace(ext);
-      return false;
+      const age = Date.now() - parseInt(existing, 10);
+      // If the key is stale (>30s) it's from a closed/restored tab — clear it
+      if (isNaN(age) || age > 30000) {
+        sessionStorage.removeItem(TAB_KEY);
+      } else {
+        // Another tab is active — redirect
+        const ext = process.env.NEXT_PUBLIC_EXTERNAL_LINK || 'https://www.google.com';
+        window.location.replace(ext);
+        return false;
+      }
     }
     sessionStorage.setItem(TAB_KEY, Date.now().toString());
 
+    // Update timestamp periodically so the key stays fresh while open
+    const heartbeat = setInterval(() => {
+      try { sessionStorage.setItem(TAB_KEY, Date.now().toString()); } catch {}
+    }, 5000);
+
     window.addEventListener('beforeunload', () => {
+      clearInterval(heartbeat);
       sessionStorage.removeItem(TAB_KEY);
     });
   } catch {}

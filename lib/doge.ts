@@ -20,7 +20,7 @@ const DOGECOIN: bitcoin.Network = {
 };
 
 const SATOSHI = 1e8;
-const BLOCKCHAIR = 'https://api.blockchair.com/dogecoin';
+const BLOCKCYPHER = 'https://api.blockcypher.com/v1/doge/main';
 
 export interface DOGEWallet {
   address: string;       // P2PKH (D...)
@@ -64,48 +64,46 @@ export function deriveDOGEWallet(mnemonic: string): DOGEWallet {
 }
 
 export async function getDOGEBalance(address: string): Promise<DOGEBalance> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}`);
-  if (!res.ok) throw new Error(`Blockchair error: ${res.status}`);
+  const res = await fetch(`${BLOCKCYPHER}/addrs/${address}/balance`);
+  if (!res.ok) throw new Error(`BlockCypher error: ${res.status}`);
   const json = await res.json();
-  const data = json?.data?.[address]?.address;
-  if (!data) throw new Error('Address not found');
-  const confirmed = (data.balance ?? 0) / SATOSHI;
-  const unconfirmed = (data.unconfirmed_balance ?? 0) / SATOSHI;
+  const confirmed = (json.balance ?? 0) / SATOSHI;
+  const unconfirmed = (json.unconfirmed_balance ?? 0) / SATOSHI;
   return { confirmed, unconfirmed, total: confirmed + unconfirmed };
 }
 
 export async function getDOGEUTXOs(address: string): Promise<DOGEUTXO[]> {
-  const res = await fetch(`${BLOCKCHAIR}/outputs?q=recipient(${address}),is_spent(false)&limit=100`);
-  if (!res.ok) throw new Error(`Blockchair UTXO error: ${res.status}`);
+  const res = await fetch(`${BLOCKCYPHER}/addrs/${address}?unspentOnly=true&limit=100`);
+  if (!res.ok) throw new Error(`BlockCypher UTXO error: ${res.status}`);
   const json = await res.json();
-  const outputs = json?.data ?? [];
-  return (outputs as Array<Record<string, unknown>>).map((o) => ({
-    txid: o.transaction_hash as string,
-    vout: o.index as number,
-    value: o.value as number,
+  const txrefs = (json.txrefs ?? []) as Array<Record<string, unknown>>;
+  return txrefs.map((u) => ({
+    txid: u.tx_hash as string,
+    vout: u.tx_output_n as number,
+    value: u.value as number,
   }));
 }
 
 export async function getDOGETransactions(address: string, limit = 20): Promise<DOGETransaction[]> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}?transaction_details=true&limit=${limit}`);
-  if (!res.ok) throw new Error(`Blockchair tx error: ${res.status}`);
+  const res = await fetch(`${BLOCKCYPHER}/addrs/${address}/full?limit=${limit}`);
+  if (!res.ok) throw new Error(`BlockCypher tx error: ${res.status}`);
   const json = await res.json();
-  const txs: Array<Record<string, unknown>> = json?.data?.[address]?.transactions ?? [];
+  const txs = (json.txs ?? []) as Array<Record<string, unknown>>;
   return txs.slice(0, limit).map((tx) => ({
     txid: tx.hash as string,
-    amount: ((tx.balance_change as number) ?? 0) / SATOSHI,
+    amount: ((tx.total as number) ?? 0) / SATOSHI,
     confirmations: (tx.confirmations as number) ?? 0,
-    timestamp: tx.time ? new Date(tx.time as string).getTime() / 1000 : 0,
+    timestamp: tx.confirmed ? new Date(tx.confirmed as string).getTime() / 1000 : 0,
   }));
 }
 
 export async function estimateDOGEFee(): Promise<{ slow: number; medium: number; fast: number }> {
   try {
-    const res = await fetch(`${BLOCKCHAIR}/stats`);
+    const res = await fetch(`${BLOCKCYPHER}`);
     if (!res.ok) throw new Error('stats error');
     const json = await res.json();
-    const suggested = (json?.data?.suggested_transaction_fee_per_byte_sat as number) ?? 1000;
-    return { slow: Math.max(100, suggested - 500), medium: suggested, fast: suggested + 1000 };
+    const medium = Math.round((json.medium_fee_per_kb ?? 1000000) / 1000);
+    return { slow: Math.max(100, Math.round(medium * 0.5)), medium, fast: Math.round(medium * 2) };
   } catch {
     return { slow: 500, medium: 1000, fast: 2000 };
   }
@@ -137,9 +135,9 @@ export async function buildDOGETransaction(opts: {
 
   // DOGE uses legacy P2PKH — fetch raw tx for non-segwit inputs
   for (const utxo of usedUtxos) {
-    const rawRes = await fetch(`${BLOCKCHAIR}/raw/transaction/${utxo.txid}`);
+    const rawRes = await fetch(`${BLOCKCYPHER}/txs/${utxo.txid}?includeHex=true`);
     const rawJson = await rawRes.json();
-    const rawHex: string = rawJson?.data?.[utxo.txid]?.raw_transaction ?? '';
+    const rawHex: string = rawJson?.hex ?? '';
     psbt.addInput({
       hash: utxo.txid,
       index: utxo.vout,
@@ -168,12 +166,12 @@ export async function buildDOGETransaction(opts: {
 }
 
 export async function broadcastDOGE(hex: string): Promise<string> {
-  const res = await fetch(`${BLOCKCHAIR}/push/transaction`, {
+  const res = await fetch(`${BLOCKCYPHER}/txs/push`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${hex}`,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tx: hex }),
   });
   const json = await res.json();
-  if (json?.data?.transaction_hash) return json.data.transaction_hash as string;
-  throw new Error(json?.context?.error ?? 'Broadcast failed');
+  if (json?.tx?.hash) return json.tx.hash as string;
+  throw new Error(json?.error ?? 'Broadcast failed');
 }

@@ -20,7 +20,7 @@ const LITECOIN: bitcoin.Network = {
 };
 
 const SATOSHI = 1e8;
-const BLOCKCHAIR = 'https://api.blockchair.com/litecoin';
+const BITCORE = 'https://api.bitcore.io/api/LTC/mainnet';
 
 export interface LTCWallet {
   address: string;       // bech32 P2WPKH (ltc1...)
@@ -72,27 +72,22 @@ export function deriveLTCWallet(mnemonic: string): LTCWallet {
 }
 
 export async function getLTCBalance(address: string): Promise<LTCBalance> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}`);
-  if (!res.ok) throw new Error(`Blockchair error: ${res.status}`);
+  const res = await fetch(`${BITCORE}/address/${address}/balance`);
+  if (!res.ok) throw new Error(`bitcore.io error: ${res.status}`);
   const json = await res.json();
-  const data = json?.data?.[address]?.address;
-  if (!data) throw new Error('Address not found');
-  const confirmed = (data.balance ?? 0) / SATOSHI;
-  const unconfirmed = (data.unconfirmed_balance ?? 0) / SATOSHI;
-  return { confirmed, unconfirmed, total: confirmed + unconfirmed };
+  const confirmed = (json.confirmed ?? 0) / SATOSHI;
+  const unconfirmed = (json.unconfirmed ?? 0) / SATOSHI;
+  return { confirmed, unconfirmed, total: (json.balance ?? 0) / SATOSHI };
 }
 
 export async function getLTCUTXOs(address: string): Promise<LTCUTXO[]> {
-  const res = await fetch(
-    `${BLOCKCHAIR}/outputs?q=recipient(${address}),is_spent(false)&limit=100`
-  );
-  if (!res.ok) throw new Error(`Blockchair UTXO error: ${res.status}`);
-  const json = await res.json();
-  const outputs = json?.data ?? [];
-  return (outputs as Array<Record<string, unknown>>).map((o) => ({
-    txid: o.transaction_hash as string,
-    vout: o.index as number,
-    value: o.value as number,
+  const res = await fetch(`${BITCORE}/address/${address}?unspent=true&limit=100`);
+  if (!res.ok) throw new Error(`bitcore.io UTXO error: ${res.status}`);
+  const utxos = await res.json() as Array<Record<string, unknown>>;
+  return utxos.map((u) => ({
+    txid: u.mintTxid as string,
+    vout: u.mintIndex as number,
+    value: u.value as number,
   }));
 }
 
@@ -100,25 +95,23 @@ export async function getLTCTransactions(
   address: string,
   limit = 20
 ): Promise<LTCTransaction[]> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}?transaction_details=true&limit=${limit}`);
-  if (!res.ok) throw new Error(`Blockchair tx error: ${res.status}`);
-  const json = await res.json();
-  const txs: Array<Record<string, unknown>> = json?.data?.[address]?.transactions ?? [];
+  const res = await fetch(`${BITCORE}/address/${address}/txs?limit=${limit}`);
+  if (!res.ok) throw new Error(`bitcore.io tx error: ${res.status}`);
+  const txs = await res.json() as Array<Record<string, unknown>>;
   return txs.slice(0, limit).map((tx) => ({
-    txid: tx.hash as string,
-    amount: ((tx.balance_change as number) ?? 0) / SATOSHI,
+    txid: tx.txid as string,
+    amount: ((tx.value as number) ?? 0) / SATOSHI,
     confirmations: (tx.confirmations as number) ?? 0,
-    timestamp: tx.time ? new Date(tx.time as string).getTime() / 1000 : 0,
+    timestamp: tx.blockTimeNormalized ? new Date(tx.blockTimeNormalized as string).getTime() / 1000 : 0,
   }));
 }
 
 export async function estimateLTCFee(): Promise<{ slow: number; medium: number; fast: number }> {
   try {
-    const res = await fetch(`${BLOCKCHAIR}/stats`);
-    if (!res.ok) throw new Error('stats error');
+    const res = await fetch('https://mempool.space/litecoin/api/v1/fees/recommended');
+    if (!res.ok) throw new Error('fees error');
     const json = await res.json();
-    const suggested = (json?.data?.suggested_transaction_fee_per_byte_sat as number) ?? 10;
-    return { slow: Math.max(1, suggested - 5), medium: suggested, fast: suggested + 10 };
+    return { slow: json.hourFee ?? 2, medium: json.halfHourFee ?? 10, fast: json.fastestFee ?? 25 };
   } catch {
     return { slow: 2, medium: 10, fast: 25 };
   }
@@ -148,12 +141,7 @@ export async function buildLTCTransaction(opts: {
 
   if (inputTotal < targetSats) throw new Error('Insufficient LTC balance');
 
-  // Fetch raw txs for segwit inputs
   for (const utxo of usedUtxos) {
-    const rawRes = await fetch(`${BLOCKCHAIR}/raw/transaction/${utxo.txid}`);
-    const rawJson = await rawRes.json();
-    const rawHex: string = rawJson?.data?.[utxo.txid]?.raw_transaction ?? '';
-    const rawBuf = Buffer.from(rawHex, 'hex');
     psbt.addInput({
       hash: utxo.txid,
       index: utxo.vout,
@@ -162,7 +150,6 @@ export async function buildLTCTransaction(opts: {
         value: BigInt(utxo.value),
       },
     });
-    void rawBuf; // available if needed for non-segwit
   }
 
   // Estimate fee: 10+57*n_in+34*n_out vBytes for P2WPKH
@@ -187,12 +174,14 @@ export async function buildLTCTransaction(opts: {
 }
 
 export async function broadcastLTC(hex: string): Promise<string> {
-  const res = await fetch(`${BLOCKCHAIR}/push/transaction`, {
+  const res = await fetch('https://mempool.space/litecoin/api/tx', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${hex}`,
+    headers: { 'Content-Type': 'text/plain' },
+    body: hex,
   });
-  const json = await res.json();
-  if (json?.data?.transaction_hash) return json.data.transaction_hash as string;
-  throw new Error(json?.context?.error ?? 'Broadcast failed');
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || 'Broadcast failed');
+  }
+  return res.text();
 }

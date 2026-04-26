@@ -13,7 +13,7 @@ const ECPair = ECPairFactory(ecc);
 // BCH uses bitcoin mainnet params for address generation
 const NETWORK = bitcoin.networks.bitcoin;
 const SATOSHI = 1e8;
-const BLOCKCHAIR = 'https://api.blockchair.com/bitcoin-cash';
+const BITCORE = 'https://api.bitcore.io/api/BCH/mainnet';
 
 export interface BCHWallet {
   address: string;       // Legacy P2PKH (1...)
@@ -57,51 +57,39 @@ export function deriveBCHWallet(mnemonic: string): BCHWallet {
 }
 
 export async function getBCHBalance(address: string): Promise<BCHBalance> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}`);
-  if (!res.ok) throw new Error(`Blockchair error: ${res.status}`);
+  const res = await fetch(`${BITCORE}/address/${address}/balance`);
+  if (!res.ok) throw new Error(`bitcore.io error: ${res.status}`);
   const json = await res.json();
-  const data = json?.data?.[address]?.address;
-  if (!data) throw new Error('Address not found');
-  const confirmed = (data.balance ?? 0) / SATOSHI;
-  const unconfirmed = (data.unconfirmed_balance ?? 0) / SATOSHI;
-  return { confirmed, unconfirmed, total: confirmed + unconfirmed };
+  const confirmed = (json.confirmed ?? 0) / SATOSHI;
+  const unconfirmed = (json.unconfirmed ?? 0) / SATOSHI;
+  return { confirmed, unconfirmed, total: (json.balance ?? 0) / SATOSHI };
 }
 
 export async function getBCHUTXOs(address: string): Promise<BCHUTXO[]> {
-  const res = await fetch(`${BLOCKCHAIR}/outputs?q=recipient(${address}),is_spent(false)&limit=100`);
-  if (!res.ok) throw new Error(`Blockchair UTXO error: ${res.status}`);
-  const json = await res.json();
-  const outputs = json?.data ?? [];
-  return (outputs as Array<Record<string, unknown>>).map((o) => ({
-    txid: o.transaction_hash as string,
-    vout: o.index as number,
-    value: o.value as number,
+  const res = await fetch(`${BITCORE}/address/${address}?unspent=true&limit=100`);
+  if (!res.ok) throw new Error(`bitcore.io UTXO error: ${res.status}`);
+  const utxos = await res.json() as Array<Record<string, unknown>>;
+  return utxos.map((u) => ({
+    txid: u.mintTxid as string,
+    vout: u.mintIndex as number,
+    value: u.value as number,
   }));
 }
 
 export async function getBCHTransactions(address: string, limit = 20): Promise<BCHTransaction[]> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}?transaction_details=true&limit=${limit}`);
-  if (!res.ok) throw new Error(`Blockchair tx error: ${res.status}`);
-  const json = await res.json();
-  const txs: Array<Record<string, unknown>> = json?.data?.[address]?.transactions ?? [];
+  const res = await fetch(`${BITCORE}/address/${address}/txs?limit=${limit}`);
+  if (!res.ok) throw new Error(`bitcore.io tx error: ${res.status}`);
+  const txs = await res.json() as Array<Record<string, unknown>>;
   return txs.slice(0, limit).map((tx) => ({
-    txid: tx.hash as string,
-    amount: ((tx.balance_change as number) ?? 0) / SATOSHI,
+    txid: tx.txid as string,
+    amount: ((tx.value as number) ?? 0) / SATOSHI,
     confirmations: (tx.confirmations as number) ?? 0,
-    timestamp: tx.time ? new Date(tx.time as string).getTime() / 1000 : 0,
+    timestamp: tx.blockTimeNormalized ? new Date(tx.blockTimeNormalized as string).getTime() / 1000 : 0,
   }));
 }
 
 export async function estimateBCHFee(): Promise<{ slow: number; medium: number; fast: number }> {
-  try {
-    const res = await fetch(`${BLOCKCHAIR}/stats`);
-    if (!res.ok) throw new Error('stats error');
-    const json = await res.json();
-    const suggested = (json?.data?.suggested_transaction_fee_per_byte_sat as number) ?? 2;
-    return { slow: Math.max(1, suggested - 1), medium: suggested, fast: suggested + 3 };
-  } catch {
-    return { slow: 1, medium: 2, fast: 5 };
-  }
+  return { slow: 1, medium: 2, fast: 5 };
 }
 
 export async function buildBCHTransaction(opts: {
@@ -129,13 +117,12 @@ export async function buildBCHTransaction(opts: {
   if (inputTotal < targetSats) throw new Error('Insufficient BCH balance');
 
   for (const utxo of usedUtxos) {
-    const rawRes = await fetch(`${BLOCKCHAIR}/raw/transaction/${utxo.txid}`);
-    const rawJson = await rawRes.json();
-    const rawHex: string = rawJson?.data?.[utxo.txid]?.raw_transaction ?? '';
+    const rawRes = await fetch(`${BITCORE}/tx/${utxo.txid}/raw`);
+    const rawHex: string = rawRes.ok ? await rawRes.text() : '';
     psbt.addInput({
       hash: utxo.txid,
       index: utxo.vout,
-      nonWitnessUtxo: Buffer.from(rawHex, 'hex'),
+      nonWitnessUtxo: Buffer.from(rawHex.replace(/"/g, ''), 'hex'),
     });
   }
 
@@ -160,12 +147,12 @@ export async function buildBCHTransaction(opts: {
 }
 
 export async function broadcastBCH(hex: string): Promise<string> {
-  const res = await fetch(`${BLOCKCHAIR}/push/transaction`, {
+  const res = await fetch(`${BITCORE}/tx/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${hex}`,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rawTx: hex }),
   });
   const json = await res.json();
-  if (json?.data?.transaction_hash) return json.data.transaction_hash as string;
-  throw new Error(json?.context?.error ?? 'Broadcast failed');
+  if (json?.txid) return json.txid as string;
+  throw new Error(json?.error ?? 'Broadcast failed');
 }

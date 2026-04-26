@@ -12,7 +12,7 @@ const ECPair = ECPairFactory(ecc);
 
 const NETWORK = bitcoin.networks.bitcoin;
 const SATOSHI = 1e8;
-const BLOCKCHAIR = 'https://api.blockchair.com/bitcoin';
+const MEMPOOL = 'https://mempool.space/api';
 
 export interface BTCWallet {
   address: string;       // bech32 P2WPKH (bc1...)
@@ -59,48 +59,50 @@ export function deriveBTCWallet(mnemonic: string): BTCWallet {
 }
 
 export async function getBTCBalance(address: string): Promise<BTCBalance> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}`);
-  if (!res.ok) throw new Error(`Blockchair error: ${res.status}`);
+  const res = await fetch(`${MEMPOOL}/address/${address}`);
+  if (!res.ok) throw new Error(`mempool.space error: ${res.status}`);
   const json = await res.json();
-  const data = json?.data?.[address]?.address;
-  if (!data) throw new Error('Address not found');
-  const confirmed = (data.balance ?? 0) / SATOSHI;
-  const unconfirmed = (data.unconfirmed_balance ?? 0) / SATOSHI;
+  const confirmed = ((json.chain_stats?.funded_txo_sum ?? 0) - (json.chain_stats?.spent_txo_sum ?? 0)) / SATOSHI;
+  const unconfirmed = ((json.mempool_stats?.funded_txo_sum ?? 0) - (json.mempool_stats?.spent_txo_sum ?? 0)) / SATOSHI;
   return { confirmed, unconfirmed, total: confirmed + unconfirmed };
 }
 
 export async function getBTCUTXOs(address: string): Promise<BTCUTXO[]> {
-  const res = await fetch(`${BLOCKCHAIR}/outputs?q=recipient(${address}),is_spent(false)&limit=100`);
-  if (!res.ok) throw new Error(`Blockchair UTXO error: ${res.status}`);
-  const json = await res.json();
-  const outputs = json?.data ?? [];
-  return (outputs as Array<Record<string, unknown>>).map((o) => ({
-    txid: o.transaction_hash as string,
-    vout: o.index as number,
-    value: o.value as number,
+  const res = await fetch(`${MEMPOOL}/address/${address}/utxo`);
+  if (!res.ok) throw new Error(`mempool.space UTXO error: ${res.status}`);
+  const utxos = await res.json() as Array<Record<string, unknown>>;
+  return utxos.map((u) => ({
+    txid: u.txid as string,
+    vout: u.vout as number,
+    value: u.value as number,
   }));
 }
 
 export async function getBTCTransactions(address: string, limit = 20): Promise<BTCTransaction[]> {
-  const res = await fetch(`${BLOCKCHAIR}/dashboards/address/${address}?transaction_details=true&limit=${limit}`);
-  if (!res.ok) throw new Error(`Blockchair tx error: ${res.status}`);
-  const json = await res.json();
-  const txs: Array<Record<string, unknown>> = json?.data?.[address]?.transactions ?? [];
-  return txs.slice(0, limit).map((tx) => ({
-    txid: tx.hash as string,
-    amount: ((tx.balance_change as number) ?? 0) / SATOSHI,
-    confirmations: (tx.confirmations as number) ?? 0,
-    timestamp: tx.time ? new Date(tx.time as string).getTime() / 1000 : 0,
-  }));
+  const res = await fetch(`${MEMPOOL}/address/${address}/txs`);
+  if (!res.ok) throw new Error(`mempool.space tx error: ${res.status}`);
+  const txs = await res.json() as Array<Record<string, unknown>>;
+  return txs.slice(0, limit).map((tx) => {
+    const vin = (tx.vin as Array<Record<string, unknown>>) ?? [];
+    const vout = (tx.vout as Array<Record<string, unknown>>) ?? [];
+    const inSum = vin.reduce((s, i) => s + ((i.prevout as Record<string, unknown>)?.value as number ?? 0), 0);
+    const outSum = vout.reduce((s, o) => s + (o.value as number ?? 0), 0);
+    const status = tx.status as Record<string, unknown>;
+    return {
+      txid: tx.txid as string,
+      amount: (outSum - inSum) / SATOSHI,
+      confirmations: status?.confirmed ? 1 : 0,
+      timestamp: (status?.block_time as number) ?? 0,
+    };
+  });
 }
 
 export async function estimateBTCFee(): Promise<{ slow: number; medium: number; fast: number }> {
   try {
-    const res = await fetch(`${BLOCKCHAIR}/stats`);
-    if (!res.ok) throw new Error('stats error');
+    const res = await fetch(`${MEMPOOL}/v1/fees/recommended`);
+    if (!res.ok) throw new Error('fees error');
     const json = await res.json();
-    const suggested = (json?.data?.suggested_transaction_fee_per_byte_sat as number) ?? 20;
-    return { slow: Math.max(1, suggested - 10), medium: suggested, fast: suggested + 20 };
+    return { slow: json.hourFee ?? 1, medium: json.halfHourFee ?? 4, fast: json.fastestFee ?? 10 };
   } catch {
     return { slow: 5, medium: 20, fast: 50 };
   }
@@ -162,12 +164,14 @@ export async function buildBTCTransaction(opts: {
 }
 
 export async function broadcastBTC(hex: string): Promise<string> {
-  const res = await fetch(`${BLOCKCHAIR}/push/transaction`, {
+  const res = await fetch(`${MEMPOOL}/tx`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${hex}`,
+    headers: { 'Content-Type': 'text/plain' },
+    body: hex,
   });
-  const json = await res.json();
-  if (json?.data?.transaction_hash) return json.data.transaction_hash as string;
-  throw new Error(json?.context?.error ?? 'Broadcast failed');
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || 'Broadcast failed');
+  }
+  return res.text();
 }
