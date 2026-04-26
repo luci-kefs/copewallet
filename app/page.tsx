@@ -246,22 +246,6 @@ export default function CopePage() {
 
       <div className="relative z-10 flex flex-col h-full justify-between gap-12 max-w-3xl mx-auto w-full">
 
-        {/* ── Session Badge ── */}
-        {wallet.isUnlocked && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem' }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 8px rgba(82,255,172,0.6)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Active Session</p>
-              <p style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {wallet.activeAddress ? `${wallet.activeAddress.slice(0, 8)}…${wallet.activeAddress.slice(-6)}` : '—'}
-              </p>
-            </div>
-            <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 8px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, background: wallet.mode === 'PERSISTENT' ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', color: wallet.mode === 'PERSISTENT' ? '#52ffac' : 'rgba(255,255,255,0.4)', border: wallet.mode === 'PERSISTENT' ? '1px solid rgba(82,255,172,0.2)' : '1px solid rgba(255,255,255,0.08)' }}>
-              {wallet.mode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'}
-            </span>
-          </div>
-        )}
-
         {/* ── IDLE ── */}
         {rightPanel === 'idle' && (
           <>
@@ -317,6 +301,22 @@ export default function CopePage() {
                 </div>
                 <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
               </button>
+
+              {/* ── Session Badge ── */}
+              {wallet.isUnlocked && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 8px rgba(82,255,172,0.6)', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Active Session</p>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {wallet.activeAddress ? `${wallet.activeAddress.slice(0, 8)}…${wallet.activeAddress.slice(-6)}` : '—'}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 8px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, background: wallet.mode === 'PERSISTENT' ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', color: wallet.mode === 'PERSISTENT' ? '#52ffac' : 'rgba(255,255,255,0.4)', border: wallet.mode === 'PERSISTENT' ? '1px solid rgba(82,255,172,0.2)' : '1px solid rgba(255,255,255,0.08)' }}>
+                    {wallet.mode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Status Table */}

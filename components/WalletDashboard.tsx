@@ -19,6 +19,18 @@ import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { WalletConnectModal } from '@/components/WalletConnectModal';
 import { AdvancedDashboard } from '@/components/AdvancedDashboard';
+import { ChainPanel, ChainTx } from '@/components/ChainPanel';
+import { LitecoinPanel } from '@/components/LitecoinPanel';
+import { deriveBTCWallet, getBTCBalance, getBTCTransactions, estimateBTCFee, buildBTCTransaction, broadcastBTC } from '@/lib/btc';
+import { deriveDOGEWallet, getDOGEBalance, getDOGETransactions, estimateDOGEFee, buildDOGETransaction, broadcastDOGE } from '@/lib/doge';
+import { deriveBCHWallet, getBCHBalance, getBCHTransactions, estimateBCHFee, buildBCHTransaction, broadcastBCH } from '@/lib/bch';
+import { deriveSOLWallet, getSOLBalance, getSOLTransactions, sendSOL, estimateSOLFee } from '@/lib/sol';
+import { deriveXRPWallet, getXRPBalance, getXRPTransactions, sendXRP } from '@/lib/xrp';
+import { deriveXLMWallet, getXLMBalance, getXLMTransactions, sendXLM } from '@/lib/xlm';
+import { deriveNANOWallet, getNANOBalance, getNANOTransactions, sendNANO } from '@/lib/nano';
+import { deriveHBARWallet, getHBARBalance, getHBARTransactions, sendHBAR } from '@/lib/hedera';
+import { deriveSUIWallet, getSUIBalance, getSUITransactions, sendSUI } from '@/lib/sui';
+import { deriveAPTOSWallet, getAPTOSBalance, getAPTOSTransactions, sendAPTOS } from '@/lib/aptos';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springs, variants } from '@/lib/animations';
 import { getHistory, addToHistory, saveWallet, removeFromHistory, makeSnapshot, WalletSnapshot } from '@/lib/wallet-history';
@@ -70,9 +82,41 @@ function ChainIcon({ chain, size = 40 }: { chain: Chain; size?: number }) {
   );
 }
 
+// ─── Non-EVM chain metadata ───────────────────────────────────────────────────
+interface NonEvmMeta {
+  coin: string; name: string; color: string;
+  explorerBase: string; symbol: string; coingeckoId: string; feeUnit?: string;
+}
+const NON_EVM_META: Record<string, NonEvmMeta> = {
+  BTC:   { coin: 'BTC',   name: 'Bitcoin',      color: '#F7931A', explorerBase: 'https://blockchair.com/bitcoin/transaction',           symbol: 'BTC',   coingeckoId: 'bitcoin',          feeUnit: 'sat/vByte' },
+  DOGE:  { coin: 'DOGE',  name: 'Dogecoin',     color: '#C2A633', explorerBase: 'https://blockchair.com/dogecoin/transaction',          symbol: 'DOGE',  coingeckoId: 'dogecoin',         feeUnit: 'sat/vByte' },
+  BCH:   { coin: 'BCH',   name: 'Bitcoin Cash', color: '#8DC351', explorerBase: 'https://blockchair.com/bitcoin-cash/transaction',      symbol: 'BCH',   coingeckoId: 'bitcoin-cash',     feeUnit: 'sat/vByte' },
+  SOL:   { coin: 'SOL',   name: 'Solana',       color: '#9945FF', explorerBase: 'https://solscan.io/tx',                               symbol: 'SOL',   coingeckoId: 'solana',           feeUnit: 'lamports' },
+  XRP:   { coin: 'XRP',   name: 'XRP',          color: '#346AA9', explorerBase: 'https://xrpscan.com/tx',                             symbol: 'XRP',   coingeckoId: 'ripple' },
+  XLM:   { coin: 'XLM',   name: 'Stellar',      color: '#7D00FF', explorerBase: 'https://stellarchain.io/transactions',               symbol: 'XLM',   coingeckoId: 'stellar' },
+  NANO:  { coin: 'NANO',  name: 'Nano',         color: '#4A90D9', explorerBase: 'https://nanolooker.com/block',                       symbol: 'NANO',  coingeckoId: 'nano' },
+  HBAR:  { coin: 'HBAR',  name: 'Hedera',       color: '#5d8fbc', explorerBase: 'https://hashscan.io/mainnet/transaction',            symbol: 'HBAR',  coingeckoId: 'hedera-hashgraph' },
+  SUI:   { coin: 'SUI',   name: 'Sui',          color: '#6FBCF0', explorerBase: 'https://suiscan.xyz/mainnet/tx',                     symbol: 'SUI',   coingeckoId: 'sui' },
+  APTOS: { coin: 'APTOS', name: 'Aptos',        color: '#00BFAE', explorerBase: 'https://explorer.aptoslabs.com/txn',                 symbol: 'APT',   coingeckoId: 'aptos' },
+  LTC:   { coin: 'LTC',   name: 'Litecoin',     color: '#A5A9B1', explorerBase: 'https://blockchair.com/litecoin/transaction',        symbol: 'LTC',   coingeckoId: 'litecoin',         feeUnit: 'sat/vByte' },
+};
+
+function NonEvmIcon({ coin, size = 34 }: { coin: string; size?: number }) {
+  const meta = NON_EVM_META[coin];
+  const color = meta?.color ?? '#888';
+  const label = meta?.symbol?.slice(0, 3) ?? coin.slice(0, 3);
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: `${color}18`, border: `1.5px solid ${color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <span style={{ color, fontSize: size * 0.28, fontWeight: 800, lineHeight: 1 }}>{label}</span>
+    </div>
+  );
+}
+
 // ─── All Networks Modal ───────────────────────────────────────────────────────
-function AllNetworksModal({ selected, onSelect, onClose }: {
-  selected: Chain; onSelect: (c: Chain) => void; onClose: () => void;
+function AllNetworksModal({ selected, onSelect, selectedNonEvm, onSelectNonEvm, onClose }: {
+  selected: Chain; onSelect: (c: Chain) => void;
+  selectedNonEvm: string | null; onSelectNonEvm: (coin: string) => void;
+  onClose: () => void;
 }) {
   const smart = CHAINS.filter(c => c.isAlchemy && !c.isTestnet);
   const eoa = CHAINS.filter(c => !c.isAlchemy && !c.isTestnet);
@@ -125,7 +169,27 @@ function AllNetworksModal({ selected, onSelect, onClose }: {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
             {testnets.map(c => <ChainCard key={c.id} c={c} />)}
           </div>
-          <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>{CHAINS.length} networks</p>
+          <p style={{ color: '#c6c6c6', fontSize: 9, letterSpacing: '0.15em', fontWeight: 900, marginBottom: 12, textTransform: 'uppercase' }}>Non-EVM Chains</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+            {Object.values(NON_EVM_META).map(m => (
+              <button key={m.coin} onClick={() => { onSelectNonEvm(m.coin); onClose(); }} style={{
+                background: selectedNonEvm === m.coin ? `${m.color}18` : 'rgba(255,255,255,0.03)',
+                border: selectedNonEvm === m.coin ? `1.5px solid ${m.color}66` : '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '1.5rem', padding: '12px 8px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                cursor: 'pointer', position: 'relative', transition: 'all 0.15s', width: '100%',
+              }}>
+                {selectedNonEvm === m.coin && (
+                  <div style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: '50%', background: m.color }} />
+                )}
+                <NonEvmIcon coin={m.coin} size={34} />
+                <span style={{ color: '#e5e7eb', fontSize: 11, fontWeight: 700 }}>{m.symbol}</span>
+                <span style={{ color: '#c6c6c6', fontSize: 9 }}>{m.name}</span>
+                <span style={{ background: 'rgba(255,255,255,0.06)', color: '#888', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>NON-EVM</span>
+              </button>
+            ))}
+          </div>
+          <p style={{ color: '#353535', fontSize: 9, textAlign: 'center' }}>{CHAINS.length} EVM + {Object.keys(NON_EVM_META).length} non-EVM networks</p>
         </div>
       </div>
     </div>
@@ -830,6 +894,91 @@ export function WalletDashboard() {
   const [showNewWalletWarning, setShowNewWalletWarning] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
 
+  // ── Non-EVM state ──────────────────────────────────────────────────────────
+  const [selectedNonEvm, setSelectedNonEvm] = useState<string | null>(null);
+  const [nonEvmAddr, setNonEvmAddr] = useState<string | null>(null);
+  const [nonEvmBal, setNonEvmBal] = useState<number | null>(null);
+  const [nonEvmUsdPrice, setNonEvmUsdPrice] = useState(0);
+  const [nonEvmLoading, setNonEvmLoading] = useState(false);
+
+  const loadNonEvmData = useCallback(async (coin: string) => {
+    if (!wallet.isUnlocked) return;
+    setNonEvmLoading(true);
+    setNonEvmAddr(null);
+    setNonEvmBal(null);
+    try {
+      const mnemonic = await wallet.getMnemonicForExport();
+      if (!mnemonic) return;
+      let addr = '';
+      let bal = 0;
+      if (coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   addr = w.address;     bal = (await getBTCBalance(addr)).total; }
+      else if (coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  addr = w.address;     bal = (await getDOGEBalance(addr)).total; }
+      else if (coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   addr = w.address;     bal = (await getBCHBalance(addr)).total; }
+      else if (coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   addr = w.address;     bal = (await getSOLBalance(addr)).sol; }
+      else if (coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   addr = w.address;     bal = (await getXRPBalance(addr)).xrp; }
+      else if (coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   addr = w.address;     bal = (await getXLMBalance(addr)).xlm; }
+      else if (coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  addr = w.address;     bal = (await getNANOBalance(addr)).nano; }
+      else if (coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  addr = w.evmAddress;  bal = (await getHBARBalance(addr)).hbar; }
+      else if (coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   addr = w.address;     bal = (await getSUIBalance(addr)).sui; }
+      else if (coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); addr = w.address;     bal = (await getAPTOSBalance(addr)).apt; }
+      setNonEvmAddr(addr);
+      setNonEvmBal(bal);
+      const meta = NON_EVM_META[coin];
+      if (meta?.coingeckoId) {
+        const p = await getPrices([meta.coingeckoId]);
+        setNonEvmUsdPrice(p[meta.coingeckoId] ?? 0);
+      }
+    } catch { setNonEvmBal(0); }
+    finally { setNonEvmLoading(false); }
+  }, [wallet]);
+
+  useEffect(() => {
+    if (selectedNonEvm && selectedNonEvm !== 'LTC') loadNonEvmData(selectedNonEvm);
+  }, [selectedNonEvm]);
+
+  const handleNonEvmSend = useCallback(async (to: string, amount: number, feeSpeed: 'slow' | 'medium' | 'fast'): Promise<string> => {
+    const mnemonic = await wallet.getMnemonicForExport();
+    if (!mnemonic) throw new Error('Wallet locked');
+    const coin = selectedNonEvm!;
+    if (coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   const fees = await estimateBTCFee();  const { hex } = await buildBTCTransaction({ from: w, to, amountBTC: amount, feeRate: fees[feeSpeed] });   return broadcastBTC(hex); }
+    if (coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  const fees = await estimateDOGEFee(); const { hex } = await buildDOGETransaction({ from: w, to, amountDOGE: amount, feeRate: fees[feeSpeed] }); return broadcastDOGE(hex); }
+    if (coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   const fees = await estimateBCHFee();  const { hex } = await buildBCHTransaction({ from: w, to, amountBCH: amount, feeRate: fees[feeSpeed] });   return broadcastBCH(hex); }
+    if (coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   return sendSOL(w, to, amount); }
+    if (coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   return sendXRP(w, to, amount); }
+    if (coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   return sendXLM(w, to, amount); }
+    if (coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  return sendNANO(w, to, amount); }
+    if (coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  return sendHBAR(w, to, amount); }
+    if (coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   return sendSUI(w, to, amount); }
+    if (coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); return sendAPTOS(w, to, amount); }
+    throw new Error('Unknown coin');
+  }, [wallet, selectedNonEvm]);
+
+  const handleNonEvmGetHistory = useCallback(async (): Promise<ChainTx[]> => {
+    if (!nonEvmAddr) return [];
+    const coin = selectedNonEvm!;
+    const toTx = (t: { txid: string; amount: number; timestamp: number }) => t;
+    if (coin === 'BTC')   return (await getBTCTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'DOGE')  return (await getDOGETransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'BCH')   return (await getBCHTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'SOL')   return (await getSOLTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'XRP')   return (await getXRPTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'XLM')   return (await getXLMTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'NANO')  return (await getNANOTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'HBAR')  return (await getHBARTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'SUI')   return (await getSUITransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'APTOS') return (await getAPTOSTransactions(nonEvmAddr)).map(toTx);
+    return [];
+  }, [nonEvmAddr, selectedNonEvm]);
+
+  const handleNonEvmGetFees = useCallback(async () => {
+    const coin = selectedNonEvm!;
+    if (coin === 'BTC')  return estimateBTCFee();
+    if (coin === 'DOGE') return estimateDOGEFee();
+    if (coin === 'BCH')  return estimateBCHFee();
+    if (coin === 'SOL')  { const f = await estimateSOLFee(); return { slow: f, medium: f, fast: f }; }
+    return { slow: 0, medium: 0, fast: 0 };
+  }, [selectedNonEvm]);
+
   // Sync theme to document root
   useEffect(() => {
     document.documentElement.dataset.theme = mode === 'advanced' ? 'advanced' : '';
@@ -866,7 +1015,14 @@ export function WalletDashboard() {
   }, [wallet.mode, wallet.isUnlocked]);
 
   const address = wallet.activeAddress ?? frozenAddress;
-  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '—';
+  const displayAddress = (selectedNonEvm && selectedNonEvm !== 'LTC' && nonEvmAddr) ? nonEvmAddr : address;
+  const shortAddr = displayAddress ? `${displayAddress.slice(0, 6)}...${displayAddress.slice(-4)}` : '—';
+
+  const handleCopyAddress = async () => {
+    const addr = displayAddress;
+    if (!addr) return;
+    try { await navigator.clipboard.writeText(addr); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  };
 
   const loadTokens = useCallback(async () => {
     if (!address) return;
@@ -931,10 +1087,7 @@ export function WalletDashboard() {
     if (activeTab === 'transactions' && wallet.isUnlocked && address) loadTxs();
   }, [activeTab, wallet.isUnlocked, address, selectedChain.id]);
 
-  const handleCopy = async () => {
-    if (!address) return;
-    try { await navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
-  };
+  const handleCopy = handleCopyAddress;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -1034,7 +1187,7 @@ export function WalletDashboard() {
   return (
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
-      {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); }} onClose={() => setShowNetworks(false)} />}
+      {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); setSelectedNonEvm(null); }} selectedNonEvm={selectedNonEvm} onSelectNonEvm={coin => { setSelectedNonEvm(coin); }} onClose={() => setShowNetworks(false)} />}
       {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
       {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
       {showTransfer && address && (
@@ -1069,7 +1222,7 @@ export function WalletDashboard() {
                   className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
                   <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
                   <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">
-                    {manualChain ? manualChain.name : 'Network'}
+                    {selectedNonEvm ? (NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm) : manualChain ? manualChain.name : 'Network'}
                   </span>
                   <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
                 </button>
@@ -1134,11 +1287,20 @@ export function WalletDashboard() {
             <div
               className="bg-white text-black p-5 md:p-8 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
               onClick={handleCopy}>
-              <div className="flex flex-col">
-                <span className="text-[0.65rem] font-black uppercase tracking-widest opacity-60 mb-1">Active Monolith Address</span>
-                <span className="text-xl md:text-3xl font-black tracking-tighter font-mono">{shortAddr}</span>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                {selectedNonEvm ? (
+                  <NonEvmIcon coin={selectedNonEvm} size={40} />
+                ) : (
+                  <ChainIcon chain={selectedChain} size={40} />
+                )}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[0.65rem] font-black uppercase tracking-widest opacity-60 mb-1">
+                    {selectedNonEvm ? `${NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm} Address` : 'Active Monolith Address'}
+                  </span>
+                  <span className="text-xl md:text-3xl font-black tracking-tighter font-mono truncate">{shortAddr}</span>
+                </div>
               </div>
-              <span className="material-symbols-outlined text-3xl md:text-4xl">{copied ? 'check' : 'content_copy'}</span>
+              <span className="material-symbols-outlined text-3xl md:text-4xl ml-3 flex-shrink-0">{copied ? 'check' : 'content_copy'}</span>
             </div>
           </div>
 
@@ -1177,7 +1339,37 @@ export function WalletDashboard() {
 
           {/* ── Tabs & List ── */}
           <div className="pt-2 md:pt-8">
-            <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5">
+            {/* Non-EVM panel — replaces tabs when a non-EVM chain is active */}
+            {selectedNonEvm && (
+              <div>
+                {selectedNonEvm === 'LTC' ? (
+                  <LitecoinPanel />
+                ) : (() => {
+                  const meta = NON_EVM_META[selectedNonEvm];
+                  return meta ? (
+                    <ChainPanel
+                      key={selectedNonEvm}
+                      coin={meta.coin}
+                      name={meta.name}
+                      color={meta.color}
+                      explorerBase={meta.explorerBase}
+                      address={nonEvmAddr}
+                      balance={nonEvmBal}
+                      usdPrice={nonEvmUsdPrice}
+                      symbol={meta.symbol}
+                      onSend={handleNonEvmSend}
+                      onGetHistory={handleNonEvmGetHistory}
+                      onGetFees={['BTC','DOGE','BCH','SOL'].includes(selectedNonEvm) ? handleNonEvmGetFees : undefined}
+                      feeUnit={meta.feeUnit}
+                      isLoading={nonEvmLoading}
+                    />
+                  ) : null;
+                })()}
+              </div>
+            )}
+
+            {/* EVM tabs — only shown when no non-EVM chain selected */}
+            {!selectedNonEvm && <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5">
               <button
                 onClick={() => setActiveTab('balance')}
                 className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'balance' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
@@ -1196,10 +1388,10 @@ export function WalletDashboard() {
               <button onClick={handleRefresh} className="ml-auto pb-4 text-on-surface-variant hover:text-white transition-colors">
                 <span className={`material-symbols-outlined text-base ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
               </button>
-            </div>
+            </div>}
 
-            {/* BALANCE TAB */}
-            {activeTab === 'balance' && (
+            {/* EVM tab content — hidden when non-EVM chain selected */}
+            {!selectedNonEvm && activeTab === 'balance' && (
               <div className="space-y-3">
                 {/* Current network — clean white card matching the rest of the list */}
                 {manualChain && (() => {
@@ -1350,7 +1542,7 @@ export function WalletDashboard() {
             )}
 
             {/* TRANSACTIONS TAB */}
-            {activeTab === 'transactions' && (
+            {!selectedNonEvm && activeTab === 'transactions' && (
               <div className="space-y-3">
                 {isLoadingTxs ? (
                   <div className="flex justify-center py-12">
@@ -1398,10 +1590,10 @@ export function WalletDashboard() {
             )}
 
             {/* LIGHTNING TAB */}
-            {activeTab === 'lightning' && <LightningTab />}
+            {!selectedNonEvm && activeTab === 'lightning' && <LightningTab />}
 
             {/* Wallet History */}
-            {activeTab === 'balance' && walletHistory.length > 0 && (
+            {!selectedNonEvm && activeTab === 'balance' && walletHistory.length > 0 && (
               <div style={{ paddingTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Wallet History</span>
@@ -1483,7 +1675,7 @@ export function WalletDashboard() {
             )}
 
             {/* Advanced Mode hint */}
-            {activeTab === 'balance' && (
+            {!selectedNonEvm && activeTab === 'balance' && (
               <div style={{ paddingTop: 8, textAlign: 'center' }}>
                 <button onClick={() => setMode('advanced')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', transition: 'color 0.2s' }}
