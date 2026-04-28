@@ -1,5 +1,7 @@
-// Cope Wallet — Background Service Worker (Manifest V3)
+// Cope Wallet — Background Service Worker (Manifest V3, module type)
 // Handles: attach flow, key storage, signing queue, dApp request routing
+
+import { Wallet } from './ethers.esm.js';
 
 const STORAGE_KEY = 'cw_vault';
 const SESSION_KEY = 'cw_session';
@@ -46,14 +48,6 @@ async function decryptMnemonic(vault, passphrase) {
   return new TextDecoder().decode(plain);
 }
 
-// ── Ethers loading ─────────────────────────────────────────────────────────
-
-function loadEthers() {
-  if (typeof self.ethers !== 'undefined') return self.ethers;
-  try { importScripts('ethers_sw.js'); } catch (e) { console.error('[CW] ethers load fail', e); }
-  return self.ethers;
-}
-
 // ── Session state (cleared when browser closes) ────────────────────────────
 
 async function getSession() {
@@ -97,8 +91,7 @@ async function clearVault() {
 // ── Signing helpers ────────────────────────────────────────────────────────
 
 async function deriveWallet(mnemonic) {
-  const ethers = loadEthers();
-  const wallet = ethers.Wallet.fromPhrase(mnemonic);
+  const wallet = Wallet.fromPhrase(mnemonic);
   return { address: wallet.address, privateKey: wallet.privateKey };
 }
 
@@ -114,20 +107,17 @@ function normalizeTx(tx) {
 }
 
 async function signTransaction(mnemonic, txRequest) {
-  const ethers = loadEthers();
-  const wallet = ethers.Wallet.fromPhrase(mnemonic);
+  const wallet = Wallet.fromPhrase(mnemonic);
   return wallet.signTransaction(normalizeTx(txRequest));
 }
 
 async function signMessage(mnemonic, message) {
-  const ethers = loadEthers();
-  const wallet = ethers.Wallet.fromPhrase(mnemonic);
+  const wallet = Wallet.fromPhrase(mnemonic);
   return wallet.signMessage(message);
 }
 
 async function signTypedData(mnemonic, domain, types, value) {
-  const ethers = loadEthers();
-  const wallet = ethers.Wallet.fromPhrase(mnemonic);
+  const wallet = Wallet.fromPhrase(mnemonic);
   return wallet.signTypedData(domain, types, value);
 }
 
