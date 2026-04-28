@@ -1074,6 +1074,7 @@ export function WalletDashboard() {
       if (e.data?.type === 'CW_ATTACH_RESULT') {
         setExtAttaching(false);
         if (e.data.ok) setExtAttached(true);
+        else alert('Extension attach failed: ' + (e.data.error || 'Unknown error. Check extension console.'));
       }
     };
     window.addEventListener('message', handler);
@@ -1195,6 +1196,7 @@ export function WalletDashboard() {
     if (!passphrase || passphrase.length < 6) return;
     setExtAttaching(true);
     window.postMessage({ type: 'CW_ATTACH_REQUEST', mnemonic, passphrase }, window.location.origin);
+    setTimeout(() => setExtAttaching(false), 10000);
   };
 
   const handleRefresh = async () => {

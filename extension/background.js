@@ -50,7 +50,7 @@ async function decryptMnemonic(vault, passphrase) {
 
 function loadEthers() {
   if (typeof self.ethers !== 'undefined') return self.ethers;
-  try { importScripts('ethers.umd.min.js'); } catch (e) { console.error('[CW] ethers load fail', e); }
+  try { importScripts('ethers_sw.js'); } catch (e) { console.error('[CW] ethers load fail', e); }
   return self.ethers;
 }
 
