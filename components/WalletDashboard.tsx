@@ -30,6 +30,7 @@ import { deriveNANOWallet, getNANOBalance, getNANOTransactions, sendNANO } from 
 import { deriveHBARWallet, getHBARBalance, getHBARTransactions, sendHBAR } from '@/lib/hedera';
 import { deriveSUIWallet, getSUIBalance, getSUITransactions, sendSUI } from '@/lib/sui';
 import { deriveAPTOSWallet, getAPTOSBalance, getAPTOSTransactions, sendAPTOS } from '@/lib/aptos';
+import { deriveLTCWallet, getLTCBalance, getLTCTransactions, buildLTCTransaction, broadcastLTC, estimateLTCFee } from '@/lib/ltc';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springs, variants } from '@/lib/animations';
 import { getHistory, addToHistory, saveWallet, removeFromHistory, makeSnapshot, WalletSnapshot } from '@/lib/wallet-history';
@@ -94,15 +95,17 @@ function AllNetworksModal({ selected, onSelect, selectedNonEvm, onSelectNonEvm, 
   const eoa = CHAINS.filter(c => !c.isAlchemy && !c.isTestnet);
   const testnets = CHAINS.filter(c => c.isTestnet);
 
-  const ChainCard = ({ c }: { c: Chain }) => (
+  const ChainCard = ({ c }: { c: Chain }) => {
+    const isActive = !selectedNonEvm && selected.id === c.id;
+    return (
     <button onClick={() => { onSelect(c); onClose(); }} style={{
-      background: selected.id === c.id ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
-      border: selected.id === c.id ? '1.5px solid rgba(82,255,172,0.4)' : '1px solid rgba(255,255,255,0.07)',
+      background: isActive ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)',
+      border: isActive ? '1.5px solid rgba(82,255,172,0.4)' : '1px solid rgba(255,255,255,0.07)',
       borderRadius: '1.5rem', padding: '12px 8px',
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
       cursor: 'pointer', position: 'relative', transition: 'all 0.15s', width: '100%',
     }}>
-      {selected.id === c.id && (
+      {isActive && (
         <div style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: '50%', background: '#52ffac' }} />
       )}
       <ChainIcon chain={c} size={34} />
@@ -115,7 +118,8 @@ function AllNetworksModal({ selected, onSelect, selectedNonEvm, onSelectNonEvm, 
           : <span style={{ background: '#353535', color: '#c6c6c6', fontSize: 7, padding: '2px 7px', borderRadius: 6, fontWeight: 700 }}>EOA</span>
       }
     </button>
-  );
+    );
+  };
 
   return (
     <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -825,6 +829,112 @@ function LightningTab() {
   );
 }
 
+// ─── Non-EVM Send Modal ───────────────────────────────────────────────────────
+function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
+  coin: string;
+  fromAddress: string;
+  onSend: (to: string, amount: number, feeSpeed: 'slow' | 'medium' | 'fast') => Promise<string>;
+  onClose: () => void;
+}) {
+  const meta = NON_EVM_META[coin];
+  const [to, setTo] = useState('');
+  const [amount, setAmount] = useState('');
+  const [feeSpeed, setFeeSpeed] = useState<'slow' | 'medium' | 'fast'>('medium');
+  const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  const [txid, setTxid] = useState('');
+  const [errMsg, setErrMsg] = useState('');
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const hasFeeSelector = ['BTC', 'DOGE', 'BCH', 'LTC'].includes(coin);
+
+  const handleSend = async () => {
+    const amt = parseFloat(amount);
+    if (!to.trim() || isNaN(amt) || amt <= 0) { setErrMsg('Enter a valid address and amount.'); return; }
+    setStatus('sending'); setErrMsg('');
+    try {
+      const id = await onSend(to.trim(), amt, feeSpeed);
+      setTxid(id);
+      setStatus('done');
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : 'Send failed.');
+      setStatus('error');
+    }
+  };
+
+  const inp: React.CSSProperties = { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 13, width: '100%', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' };
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {meta && <CoinIcon symbol={meta.symbol} color={meta.color} logoUrl={meta.logoUrl} size={30} />}
+            <span style={{ color: '#fff', fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em' }}>Send {meta?.symbol ?? coin}</span>
+          </div>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {status === 'done' ? (
+          <div style={{ padding: '40px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(82,255,172,0.1)', border: '1.5px solid rgba(82,255,172,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={22} style={{ color: '#52ffac' }} />
+            </div>
+            <p style={{ color: '#fff', fontWeight: 900, fontSize: 16, textTransform: 'uppercase', letterSpacing: '-0.01em', margin: 0 }}>Sent!</p>
+            <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', margin: 0, wordBreak: 'break-all' }}>{txid}</p>
+            {meta?.explorerBase && (
+              <a href={`${meta.explorerBase}/${txid}`} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, color: meta.color, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>
+                <ExternalLink size={12} /> View on Explorer
+              </a>
+            )}
+            <button onClick={onClose} style={{ marginTop: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 24px', color: '#ccc', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>Close</button>
+          </div>
+        ) : (
+          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6, margin: '0 0 6px' }}>From</p>
+              <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', margin: 0 }}>{fromAddress}</p>
+            </div>
+            <div>
+              <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Recipient Address</p>
+              <input style={inp} placeholder={`${meta?.name ?? coin} address`} value={to} onChange={e => setTo(e.target.value)} />
+            </div>
+            <div>
+              <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Amount ({meta?.symbol ?? coin})</p>
+              <input style={inp} type="number" step="any" min="0" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
+            </div>
+            {hasFeeSelector && (
+              <div>
+                <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Fee Speed</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['slow', 'medium', 'fast'] as const).map(s => (
+                    <button key={s} onClick={() => setFeeSpeed(s)} style={{ flex: 1, padding: '8px 0', borderRadius: 8, background: feeSpeed === s ? (meta?.color ?? '#52ffac') + '22' : 'rgba(255,255,255,0.04)', border: `1px solid ${feeSpeed === s ? (meta?.color ?? '#52ffac') + '66' : 'rgba(255,255,255,0.08)'}`, color: feeSpeed === s ? (meta?.color ?? '#52ffac') : '#666', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', cursor: 'pointer', letterSpacing: '0.05em' }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {errMsg && <p style={{ color: '#ff8888', fontSize: 11, margin: 0 }}>{errMsg}</p>}
+            <button onClick={handleSend} disabled={status === 'sending'}
+              style={{ marginTop: 4, padding: '14px', borderRadius: 12, background: status === 'sending' ? 'rgba(255,255,255,0.06)' : (meta?.color ?? '#52ffac'), color: status === 'sending' ? '#666' : '#000', fontWeight: 900, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em', border: 'none', cursor: status === 'sending' ? 'not-allowed' : 'pointer', transition: 'all 0.15s' }}>
+              {status === 'sending' ? 'Sending...' : `Send ${meta?.symbol ?? coin}`}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main WalletDashboard ─────────────────────────────────────────────────────
 export function WalletDashboard() {
   const wallet = useWallet();
@@ -841,6 +951,7 @@ export function WalletDashboard() {
   const [showNetworks, setShowNetworks] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showWC, setShowWC] = useState(false);
+  const [showNonEvmSend, setShowNonEvmSend] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
   // All chains token data for balance tab display
@@ -886,6 +997,7 @@ export function WalletDashboard() {
       else if (coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  addr = w.evmAddress;  bal = (await getHBARBalance(addr)).hbar; }
       else if (coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   addr = w.address;     bal = (await getSUIBalance(addr)).sui; }
       else if (coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); addr = w.address;     bal = (await getAPTOSBalance(addr)).apt; }
+      else if (coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   addr = w.address;     bal = (await getLTCBalance(addr)).total; }
       setNonEvmAddr(addr);
       setNonEvmBal(bal);
       const meta = NON_EVM_META[coin];
@@ -898,7 +1010,7 @@ export function WalletDashboard() {
   }, [wallet]);
 
   useEffect(() => {
-    if (selectedNonEvm && selectedNonEvm !== 'LTC') loadNonEvmData(selectedNonEvm);
+    if (selectedNonEvm) loadNonEvmData(selectedNonEvm);
   }, [selectedNonEvm]);
 
   const handleNonEvmSend = useCallback(async (to: string, amount: number, feeSpeed: 'slow' | 'medium' | 'fast'): Promise<string> => {
@@ -915,6 +1027,7 @@ export function WalletDashboard() {
     if (coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  return sendHBAR(w, to, amount); }
     if (coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   return sendSUI(w, to, amount); }
     if (coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); return sendAPTOS(w, to, amount); }
+    if (coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   const fees = await estimateLTCFee(); const { hex } = await buildLTCTransaction({ from: w, to, amountLTC: amount, feeRate: fees[feeSpeed] }); return broadcastLTC(hex); }
     throw new Error('Unknown coin');
   }, [wallet, selectedNonEvm]);
 
@@ -932,6 +1045,7 @@ export function WalletDashboard() {
     if (coin === 'HBAR')  return (await getHBARTransactions(nonEvmAddr)).map(toTx);
     if (coin === 'SUI')   return (await getSUITransactions(nonEvmAddr)).map(toTx);
     if (coin === 'APTOS') return (await getAPTOSTransactions(nonEvmAddr)).map(toTx);
+    if (coin === 'LTC')   return (await getLTCTransactions(nonEvmAddr)).map(toTx);
     return [];
   }, [nonEvmAddr, selectedNonEvm]);
 
@@ -980,7 +1094,7 @@ export function WalletDashboard() {
   }, [wallet.mode, wallet.isUnlocked]);
 
   const address = wallet.activeAddress ?? frozenAddress;
-  const displayAddress = (selectedNonEvm && selectedNonEvm !== 'LTC' && nonEvmAddr) ? nonEvmAddr : address;
+  const displayAddress = (selectedNonEvm && nonEvmAddr) ? nonEvmAddr : address;
   const shortAddr = displayAddress ? `${displayAddress.slice(0, 6)}...${displayAddress.slice(-4)}` : '—';
 
   const handleCopyAddress = async () => {
@@ -1153,8 +1267,16 @@ export function WalletDashboard() {
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); setSelectedNonEvm(null); }} selectedNonEvm={selectedNonEvm} onSelectNonEvm={coin => { setSelectedNonEvm(coin); }} onClose={() => setShowNetworks(false)} />}
-      {showQR && address && <QRModal address={address} onClose={() => setShowQR(false)} />}
-      {showWC && <WalletConnectModal onClose={() => setShowWC(false)} />}
+      {showQR && displayAddress && <QRModal address={displayAddress} onClose={() => setShowQR(false)} />}
+      {showWC && !selectedNonEvm && <WalletConnectModal onClose={() => setShowWC(false)} />}
+      {showNonEvmSend && selectedNonEvm && displayAddress && (
+        <NonEvmSendModal
+          coin={selectedNonEvm}
+          fromAddress={displayAddress}
+          onSend={handleNonEvmSend}
+          onClose={() => setShowNonEvmSend(false)}
+        />
+      )}
       {showTransfer && address && (
         <TransferModal onClose={() => setShowTransfer(false)} currentAddress={address} currentHistoryId={currentHistoryId} />
       )}
@@ -1273,18 +1395,18 @@ export function WalletDashboard() {
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             {[
-              { icon: 'power',    label: 'Connect',           onClick: () => setShowWC(true) },
-              { icon: 'north_east', label: 'Send',            onClick: () => setShowSend(true) },
-              { icon: 'qr_code_2', label: 'QR / Receive',    onClick: () => setShowQR(true) },
-              { icon: 'add_card', label: 'Create New Wallet', onClick: () => setShowNewWalletWarning(true) },
+              { icon: 'power',      label: 'Connect',           onClick: () => { if (!selectedNonEvm) setShowWC(true); }, disabled: !!selectedNonEvm },
+              { icon: 'north_east', label: 'Send',              onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
+              { icon: 'qr_code_2', label: 'QR / Receive',      onClick: () => setShowQR(true) },
+              { icon: 'add_card',  label: 'Create New Wallet', onClick: () => setShowNewWalletWarning(true) },
             ].map((item) => (
               <motion.button
                 key={item.label}
                 onClick={item.onClick}
-                whileHover={{ scale: 1.03, rotateX: 3, rotateY: -3 }}
-                whileTap={{ scale: 0.96 }}
+                whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
+                whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                 transition={springs.snappy}
-                style={{ transformStyle: 'preserve-3d', perspective: 800 }}
+                style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
                 className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                 <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
