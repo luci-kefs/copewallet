@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Cope Wallet",
+  "version": "1.0.0",
+  "description": "Cope Wallet — EVM browser wallet. Attach from copewallet.com to get started.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.copewallet.com/*", "https://copewallet.com/*", "http://localhost:3000/*"],
+      "js": ["content_copewallet.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_inject_loader.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["inject.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.copewallet.com/*",
+    "https://copewallet.com/*",
+    "<all_urls>"
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://www.copewallet.com/*",
+      "https://copewallet.com/*"
+    ]
+  }
+}

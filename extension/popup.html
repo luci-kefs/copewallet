@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cope Wallet</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 340px;
+      min-height: 480px;
+      background: #0d0d0d;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .logo { display: flex; align-items: center; gap: 8px; }
+    .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 8px rgba(168,85,247,0.5); }
+    .logo-text { font-weight: 900; font-size: 14px; letter-spacing: -0.01em; }
+    .lock-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 6px;
+      color: #888;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .lock-btn:hover { color: #ccc; }
+
+    /* ── Screens ── */
+    .screen { display: none; flex: 1; flex-direction: column; padding: 20px 16px; }
+    .screen.active { display: flex; }
+
+    /* ── Attach screen ── */
+    .attach-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 12px;
+    }
+    .attach-icon {
+      width: 64px; height: 64px; border-radius: 16px;
+      background: rgba(168,85,247,0.12);
+      border: 1.5px solid rgba(168,85,247,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; margin-bottom: 4px;
+    }
+    .attach-title { font-size: 18px; font-weight: 900; }
+    .attach-sub { color: #666; font-size: 12px; line-height: 1.5; max-width: 220px; }
+    .open-site-btn {
+      width: 100%;
+      background: #a855f7;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .open-site-btn:hover { background: #9333ea; }
+
+    /* ── Unlock screen ── */
+    .unlock-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .unlock-addr {
+      font-family: monospace;
+      font-size: 11px;
+      color: #555;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      width: 100%;
+      text-align: center;
+      word-break: break-all;
+    }
+    .pin-label { color: #888; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; align-self: flex-start; }
+    .pin-input {
+      width: 100%;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 16px;
+      letter-spacing: 4px;
+      padding: 12px 16px;
+      text-align: center;
+      outline: none;
+    }
+    .pin-input:focus { border-color: rgba(168,85,247,0.5); }
+    .unlock-btn {
+      width: 100%;
+      background: #a855f7;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .unlock-btn:hover { background: #9333ea; }
+    .err { color: #ff8888; font-size: 11px; text-align: center; min-height: 16px; }
+
+    /* ── Dashboard screen ── */
+    .address-card {
+      background: rgba(168,85,247,0.06);
+      border: 1px solid rgba(168,85,247,0.15);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .address-label { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+    .address-val {
+      font-family: monospace;
+      font-size: 11px;
+      color: #ddd;
+      word-break: break-all;
+      cursor: pointer;
+    }
+    .address-val:hover { color: #fff; }
+    .copy-hint { color: #555; font-size: 10px; margin-top: 4px; }
+
+    .balance-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .balance-eth { font-size: 28px; font-weight: 900; letter-spacing: -0.02em; }
+    .balance-usd { color: #666; font-size: 12px; margin-top: 2px; }
+
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .action-btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px;
+      color: #ccc;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .action-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+    .action-icon { font-size: 18px; }
+
+    /* Pending request */
+    .pending-card {
+      background: rgba(168,85,247,0.08);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .pending-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+    .pending-detail { font-family: monospace; font-size: 10px; color: #888; word-break: break-all; max-height: 80px; overflow-y: auto; }
+    .approve-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .btn-approve {
+      background: #a855f7; border: none; border-radius: 8px;
+      color: #fff; font-size: 12px; font-weight: 700; padding: 10px; cursor: pointer;
+    }
+    .btn-reject {
+      background: rgba(255,100,100,0.1); border: 1px solid rgba(255,100,100,0.2);
+      border-radius: 8px; color: #ff8888; font-size: 12px; font-weight: 700; padding: 10px; cursor: pointer;
+    }
+
+    /* Send form overlay */
+    .send-form { display: flex; flex-direction: column; gap: 10px; }
+    .field-label { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .field-input {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      width: 100%;
+      font-family: monospace;
+    }
+    .field-input:focus { border-color: rgba(168,85,247,0.5); }
+    .back-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      color: #888;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      align-self: flex-start;
+      margin-bottom: 4px;
+    }
+    .send-btn {
+      background: #a855f7;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .send-btn:hover { background: #9333ea; }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .section-title {
+      color: #888;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .wipe-btn {
+      background: rgba(255,100,100,0.08);
+      border: 1px solid rgba(255,100,100,0.15);
+      border-radius: 8px;
+      color: #ff8888;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 8px 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #a855f7; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <div class="logo-text">Cope Wallet</div>
+  </div>
+  <button class="lock-btn" id="lockBtn" style="display:none">Lock</button>
+</div>
+
+<!-- ── Attach screen ── -->
+<div class="screen active" id="screenAttach">
+  <div class="attach-hero">
+    <div class="attach-icon">🔗</div>
+    <div class="attach-title">Attach Wallet</div>
+    <div class="attach-sub">Open copewallet.com, then click "Connect Extension" to attach your wallet to this extension.</div>
+    <button class="open-site-btn" id="openSiteBtn">Open Cope Wallet</button>
+  </div>
+</div>
+
+<!-- ── Unlock screen ── -->
+<div class="screen" id="screenUnlock">
+  <div class="unlock-hero">
+    <div style="text-align:center">
+      <div style="font-size:32px;margin-bottom:8px;">🔒</div>
+      <div style="font-size:17px;font-weight:900;margin-bottom:4px;">Locked</div>
+      <div style="color:#666;font-size:12px;">Enter your Cope Wallet PIN</div>
+    </div>
+    <div class="unlock-addr" id="unlockAddr">—</div>
+    <div style="width:100%">
+      <div class="pin-label">PIN / Passphrase</div>
+      <input class="pin-input" type="password" id="pinInput" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div class="err" id="unlockErr"></div>
+    <button class="unlock-btn" id="unlockBtn">Unlock</button>
+    <button class="wipe-btn" id="wipeBtn">Disconnect & Wipe</button>
+  </div>
+</div>
+
+<!-- ── Dashboard screen ── -->
+<div class="screen" id="screenDash">
+  <!-- Pending request banner (hidden by default) -->
+  <div id="pendingSection" style="display:none">
+    <div class="pending-card">
+      <div class="pending-title" id="pendingTitle">Signature Request</div>
+      <div class="pending-detail" id="pendingDetail"></div>
+      <div class="approve-btns">
+        <button class="btn-approve" id="approveBtn">Approve</button>
+        <button class="btn-reject" id="rejectBtn">Reject</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Normal dashboard (hidden when pending) -->
+  <div id="dashMain">
+    <div class="address-card">
+      <div class="address-label">Connected Address</div>
+      <div class="address-val" id="dashAddr" title="Click to copy">—</div>
+      <div class="copy-hint" id="copyHint">Click to copy</div>
+    </div>
+
+    <!-- Chain selector -->
+    <div style="margin-bottom:10px;">
+      <select id="chainSelect" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#ccc;font-size:11px;font-weight:700;padding:8px 10px;outline:none;cursor:pointer;text-transform:uppercase;letter-spacing:0.05em;">
+      </select>
+    </div>
+
+    <div class="balance-card">
+      <div class="balance-eth" id="dashBalance">—</div>
+      <div class="balance-usd" id="dashBalanceUsd">Fetching balance…</div>
+    </div>
+
+    <div class="actions">
+      <button class="action-btn" id="sendBtn">
+        <span class="action-icon">↑</span>
+        <span>Send</span>
+      </button>
+      <button class="action-btn" id="receiveBtn">
+        <span class="action-icon">↓</span>
+        <span>Receive</span>
+      </button>
+    </div>
+
+    <!-- Send form (hidden by default) -->
+    <div class="send-form" id="sendForm" style="display:none">
+      <button class="back-btn" id="backBtn">← Back</button>
+      <div class="section-title">Send</div>
+      <div>
+        <div class="field-label">Recipient</div>
+        <input class="field-input" type="text" id="sendTo" placeholder="0x..." />
+      </div>
+      <div>
+        <div class="field-label">Amount</div>
+        <input class="field-input" type="number" id="sendAmount" placeholder="0.0" step="0.0001" min="0" />
+      </div>
+      <div class="err" id="sendErr"></div>
+      <button class="send-btn" id="sendSubmit">Send</button>
+    </div>
+
+    <div style="margin-top: auto; padding-top: 12px;">
+      <button class="wipe-btn" id="wipeBtnDash">Disconnect & Wipe</button>
+    </div>
+  </div>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>

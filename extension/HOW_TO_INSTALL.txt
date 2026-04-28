@@ -1,0 +1,27 @@
+HOW TO LOAD COPE WALLET EXTENSION (Chrome / Edge)
+==================================================
+
+1. Open Chrome and go to:  chrome://extensions
+2. Enable "Developer mode" (toggle, top-right corner)
+3. Click "Load unpacked"
+4. Select this folder:  C:\tmp\copewallet\extension\
+5. The Cope Wallet extension icon will appear in your toolbar.
+
+FIRST USE — ATTACH YOUR WALLET
+-------------------------------
+1. Click the extension icon → "Open Cope Wallet" → copewallet.com opens
+2. The site will show a purple banner: "Cope Wallet Extension detected"
+3. Click "Connect Extension" — enter a PIN (min 6 chars, remember it!)
+4. Extension stores your wallet encrypted — it now works independently
+
+AFTER ATTACHMENT
+----------------
+- Click the extension icon to open the popup
+- Enter your PIN to unlock
+- Send ETH, copy your address, approve dApp requests — all from the popup
+- Any dApp (Uniswap, Aave, etc.) will detect window.ethereum automatically
+
+CHROME WEB STORE (FUTURE)
+--------------------------
+For production, the extension/  folder can be zipped and submitted to the
+Chrome Web Store via https://chrome.google.com/webstore/devconsole

@@ -952,6 +952,9 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [showWC, setShowWC] = useState(false);
   const [showNonEvmSend, setShowNonEvmSend] = useState(false);
+  const [extPresent, setExtPresent] = useState(false);
+  const [extAttached, setExtAttached] = useState(false);
+  const [extAttaching, setExtAttaching] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
   // All chains token data for balance tab display
@@ -1063,6 +1066,22 @@ export function WalletDashboard() {
     document.documentElement.dataset.theme = mode === 'advanced' ? 'advanced' : '';
   }, [mode]);
 
+  // Detect Cope Wallet extension presence via postMessage handshake
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'CW_EXT_PRESENT') setExtPresent(true);
+      if (e.data?.type === 'CW_STATUS_RESULT') { setExtPresent(true); setExtAttached(!!e.data.hasVault); }
+      if (e.data?.type === 'CW_ATTACH_RESULT') {
+        setExtAttaching(false);
+        if (e.data.ok) setExtAttached(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    // Ping extension
+    window.postMessage({ type: 'CW_STATUS_REQUEST' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   // Track wallet creation in history
   useEffect(() => {
     if (!wallet.isUnlocked || !wallet.activeAddress) return;
@@ -1167,6 +1186,16 @@ export function WalletDashboard() {
   }, [activeTab, wallet.isUnlocked, address, selectedChain.id]);
 
   const handleCopy = handleCopyAddress;
+
+  const handleConnectExtension = async () => {
+    if (!wallet.isUnlocked) return;
+    const mnemonic = await wallet.getMnemonicForExport();
+    if (!mnemonic) return;
+    const passphrase = prompt('Set a PIN / passphrase for your Cope Wallet extension (min 6 chars):');
+    if (!passphrase || passphrase.length < 6) return;
+    setExtAttaching(true);
+    window.postMessage({ type: 'CW_ATTACH_REQUEST', mnemonic, passphrase }, window.location.origin);
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -1391,6 +1420,28 @@ export function WalletDashboard() {
               <span className="material-symbols-outlined text-3xl md:text-4xl ml-3 flex-shrink-0">{copied ? 'check' : 'content_copy'}</span>
             </div>
           </div>
+
+          {/* ── Extension Connect Banner ── */}
+          {extPresent && !extAttached && wallet.isUnlocked && (
+            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <p style={{ color: '#ddd', fontSize: 12, fontWeight: 700, margin: 0 }}>Cope Wallet Extension detected</p>
+                <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>Connect to use it as a browser wallet for dApps</p>
+              </div>
+              <button
+                onClick={handleConnectExtension}
+                disabled={extAttaching}
+                style={{ background: '#a855f7', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11, fontWeight: 700, padding: '8px 14px', cursor: extAttaching ? 'not-allowed' : 'pointer', opacity: extAttaching ? 0.6 : 1, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                {extAttaching ? 'Attaching…' : 'Connect Extension'}
+              </button>
+            </div>
+          )}
+          {extAttached && wallet.isUnlocked && (
+            <div style={{ background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 6px rgba(82,255,172,0.6)', flexShrink: 0 }} />
+              <p style={{ color: '#888', fontSize: 11, fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Extension connected — browser dApps can now use this wallet</p>
+            </div>
+          )}
 
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">

@@ -8,6 +8,7 @@ import { springs, variants } from '@/lib/animations';
 import { CustomChainModal } from '@/components/CustomChainModal';
 import { CustomTokenModal } from '@/components/CustomTokenModal';
 import { CustomAPIModal } from '@/components/CustomAPIModal';
+import { LitecoinPanel } from '@/components/LitecoinPanel';
 
 import { loadCustomChains, deleteCustomChain, CustomChain } from '@/lib/custom-chains';
 import { loadCustomTokens, deleteCustomToken, CustomToken } from '@/lib/custom-tokens';
@@ -66,6 +67,16 @@ export function AdvancedDashboard({ onExit }: Props) {
 
       <motion.div key="evm" variants={variants.fadeUp} initial="hidden" animate="visible" transition={springs.smooth}
         style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* Litecoin */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ color: '#888', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>
+            Litecoin (LTC)
+          </p>
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem', padding: '16px' }}>
+            <LitecoinPanel />
+          </div>
+        </div>
 
         {/* Custom Chains */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
