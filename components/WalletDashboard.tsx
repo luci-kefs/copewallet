@@ -955,6 +955,7 @@ export function WalletDashboard() {
   const [extPresent, setExtPresent] = useState(false);
   const [extAttached, setExtAttached] = useState(false);
   const [extAttaching, setExtAttaching] = useState(false);
+  const [extError, setExtError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allChainsTotal, setAllChainsTotal] = useState<number | null>(null);
   // All chains token data for balance tab display
@@ -1073,8 +1074,8 @@ export function WalletDashboard() {
       if (e.data?.type === 'CW_STATUS_RESULT') { setExtPresent(true); setExtAttached(!!e.data.hasVault); }
       if (e.data?.type === 'CW_ATTACH_RESULT') {
         setExtAttaching(false);
-        if (e.data.ok) setExtAttached(true);
-        else alert('Extension attach failed: ' + (e.data.error || 'Unknown error. Check extension console.'));
+        if (e.data.ok) { setExtAttached(true); setExtError(null); }
+        else setExtError(e.data.error || 'Unknown error — check extension console.');
       }
     };
     window.addEventListener('message', handler);
@@ -1195,6 +1196,7 @@ export function WalletDashboard() {
     const passphrase = prompt('Set a PIN / passphrase for your Cope Wallet extension (min 6 chars):');
     if (!passphrase || passphrase.length < 6) return;
     setExtAttaching(true);
+    setExtError(null);
     window.postMessage({ type: 'CW_ATTACH_REQUEST', mnemonic, passphrase }, window.location.origin);
     setTimeout(() => setExtAttaching(false), 10000);
   };
@@ -1437,6 +1439,9 @@ export function WalletDashboard() {
                 {extAttaching ? 'Attaching…' : 'Connect Extension'}
               </button>
             </div>
+          )}
+          {extError && extPresent && !extAttached && (
+            <p style={{ color: '#ff8888', fontSize: 11, margin: '-4px 0 4px', padding: '0 4px' }}>{extError}</p>
           )}
           {extAttached && wallet.isUnlocked && (
             <div style={{ background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>

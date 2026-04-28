@@ -24,7 +24,15 @@ window.addEventListener('message', async (event) => {
         error: result?.error || null,
       }, event.origin);
     } catch (err) {
-      window.postMessage({ type: 'CW_ATTACH_RESULT', ok: false, error: err.message }, event.origin);
+      const msg = err.message || String(err);
+      const isInvalidated = msg.includes('Extension context invalidated') || msg.includes('context invalidated');
+      window.postMessage({
+        type: 'CW_ATTACH_RESULT',
+        ok: false,
+        error: isInvalidated
+          ? 'Extension was reloaded — please refresh this page and try again.'
+          : msg,
+      }, event.origin);
     }
     return;
   }
