@@ -34,6 +34,7 @@ import {
   loadPersistedVault,
 } from '@/lib/persistent-vault';
 import { saveSession, loadSession, clearSession, getTabKey } from '@/lib/session-lock';
+import { getPrivateKeyAtIndex } from '@/lib/accounts';
 import { clearWalletKit } from '@/lib/walletconnect';
 
 export type WalletMode = 'EPHEMERAL' | 'PERSISTENT';
@@ -80,6 +81,7 @@ interface WalletContextType extends WalletState {
   enableSessionLock: () => Promise<void>;
   disableSessionLock: () => void;
   markSessionRestored: () => void;
+  switchAccount: (index: number) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -354,6 +356,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setState((p) => ({ ...p, isSessionLocked: true }));
   }, []);
 
+  const switchAccount = useCallback(async (index: number) => {
+    const mnemonic = mnemonicRef.current;
+    if (!mnemonic) return;
+    const privateKey = getPrivateKeyAtIndex(mnemonic, index);
+    const address = new ethers.Wallet(privateKey).address;
+    // Replace scattered key store with new account's key
+    if (scatteredKeyRef.current) wipeScatteredStore(scatteredKeyRef.current);
+    scatteredKeyRef.current = scatterStore(privateKey);
+    const sessionKey = vaultKeyRef.current ?? getCurrentKey();
+    setState(prev => ({
+      ...prev,
+      _u_ap: address,
+      _k_enc: encryptData(privateKey, sessionKey),
+    }));
+  }, []);
+
   // Check for persisted vault on mount
   useEffect(() => {
     hasPersistedVault().then(has => { if (has) setState(p => ({ ...p, hasPersisted: true })); });
@@ -477,6 +495,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       enableSessionLock,
       disableSessionLock,
       markSessionRestored,
+      switchAccount,
     }}>
       {children}
     </WalletContext.Provider>

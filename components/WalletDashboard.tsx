@@ -1520,9 +1520,10 @@ export function WalletDashboard() {
         <AccountSwitcherModal
           accounts={accounts}
           activeIndex={activeAccountIndex}
-          onSelect={(idx) => {
+          onSelect={async (idx) => {
             setActiveAccountIndex(idx);
             setActiveAccountIndexState(idx);
+            await wallet.switchAccount(idx);
             setShowAccountSwitcher(false);
           }}
           onClose={() => setShowAccountSwitcher(false)}
