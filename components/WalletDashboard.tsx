@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
-  Copy, Check, X, ExternalLink,
+  Copy, Check, X, ExternalLink, Trash2,
   ArrowUpRight, ArrowDownLeft, Zap, Wifi, WifiOff, AlertCircle, Link,
 } from 'lucide-react';
 import CountUp from '@/components/CountUp';
@@ -36,8 +36,11 @@ import { springs, variants } from '@/lib/animations';
 import { getHistory, addToHistory, saveWallet, removeFromHistory, makeSnapshot, WalletSnapshot } from '@/lib/wallet-history';
 import { WarningBanner } from '@/components/WarningBanner';
 import { TransferModal } from '@/components/TransferModal';
+import { loadContacts, addContact, deleteContact, Contact } from '@/lib/address-book';
+import { fetchNFTs, NFTItem } from '@/lib/nfts';
+import { deriveAccounts, getActiveAccountIndex, setActiveAccountIndex, DerivedAccount } from '@/lib/accounts';
 
-type Tab = 'balance' | 'transactions' | 'lightning';
+type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning';
 
 // ─── Non-EVM chain metadata ───────────────────────────────────────────────────
 interface NonEvmMeta {
@@ -188,9 +191,10 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [tokenOpen, setTokenOpen] = useState(false);
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(tokens);
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(null);
-  const [status, setStatus] = useState<'idle' | 'signing' | 'sending' | 'done' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'simulating' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
+  const [simResult, setSimResult] = useState<{ changes: Array<{ changeType: string; from: string; to: string; amount?: string; symbol?: string }>; gas: number } | null>(null);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -327,10 +331,30 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
     if (!amountNum || amountNum <= 0 || isNaN(amountNum)) { setErrMsg('Invalid amount'); return; }
     if (amountNum > selectedBal) { setErrMsg('Secili Networkta Bakiye Yetersiz'); return; }
 
+    const contractAddr = (!isNative && selectedToken) ? selectedToken.contractAddress as string : undefined;
+    const decimals = selectedToken?.decimals ?? 18;
+
+    // Simulate first if Alchemy chain
+    if (selectedChain.isAlchemy) {
+      setStatus('simulating'); setErrMsg(''); setSimResult(null);
+      try {
+        const txForSim = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id, contractAddr, decimals);
+        const simRes = await fetch('/api/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tx: { from: wallet.activeAddress, to: txForSim.to, value: txForSim.value ? '0x' + (txForSim.value as bigint).toString(16) : '0x0', data: txForSim.data ?? '0x' }, chainId: selectedChain.id }),
+        });
+        if (simRes.ok) {
+          const simData = await simRes.json();
+          if (!simData.error) {
+            setSimResult({ changes: simData.changes ?? [], gas: parseInt(simData.gasUsed ?? '0x0', 16) });
+          }
+        }
+      } catch {}
+    }
+
     setStatus('signing'); setErrMsg('');
     try {
-      const contractAddr = (!isNative && selectedToken) ? selectedToken.contractAddress as string : undefined;
-      const decimals = selectedToken?.decimals ?? 18;
       const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id, contractAddr, decimals);
       setStatus('sending');
       await stealthDelay();
@@ -549,19 +573,38 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
               </span>
             </div>
 
+            {/* Simulation preview */}
+            {simResult && simResult.changes.length > 0 && (
+              <div style={{ background: 'rgba(82,255,172,0.04)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 10, padding: '10px 12px' }}>
+                <p style={{ color: '#52ffac', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Simulation Preview</p>
+                {simResult.changes.slice(0, 4).map((c, i) => (
+                  <p key={i} style={{ color: '#888', fontSize: 10, margin: '2px 0', fontFamily: 'monospace' }}>
+                    {c.changeType === 'TRANSFER' ? (c.from?.toLowerCase() === wallet.activeAddress?.toLowerCase() ? '↑ Send' : '↓ Receive') : c.changeType}
+                    {c.amount ? ` ${parseFloat(c.amount).toFixed(4)} ${c.symbol ?? ''}` : ''}
+                  </p>
+                ))}
+                {simResult.gas > 0 && <p style={{ color: '#444', fontSize: 9, margin: '6px 0 0' }}>Gas: {simResult.gas.toLocaleString()}</p>}
+              </div>
+            )}
+
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
 
-            <button onClick={handleSend} disabled={status === 'signing' || status === 'sending'}
-              style={{
-                background: status === 'signing' || status === 'sending' ? '#1a1a1a' : '#52ffac',
-                color: status === 'signing' || status === 'sending' ? '#c6c6c6' : '#002111',
-                border: 'none', borderRadius: '1rem', padding: '16px',
-                fontSize: 14, fontWeight: 900, textTransform: 'uppercase',
-                letterSpacing: '0.05em', cursor: status === 'signing' || status === 'sending' ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s', marginTop: 4,
-              }}>
-              {status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${tokenSymbol}`}
-            </button>
+            {(() => {
+              const isProcessing = status === 'signing' || status === 'sending' || status === 'simulating';
+              return (
+                <button onClick={handleSend} disabled={isProcessing}
+                  style={{
+                    background: isProcessing ? '#1a1a1a' : '#52ffac',
+                    color: isProcessing ? '#c6c6c6' : '#002111',
+                    border: 'none', borderRadius: '1rem', padding: '16px',
+                    fontSize: 14, fontWeight: 900, textTransform: 'uppercase',
+                    letterSpacing: '0.05em', cursor: isProcessing ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s', marginTop: 4,
+                  }}>
+                  {status === 'simulating' ? 'Simulating...' : status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${tokenSymbol}`}
+                </button>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -935,6 +978,132 @@ function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
   );
 }
 
+// ─── Address Book Modal ───────────────────────────────────────────────────────
+function AddressBookModal({ contacts, onAdd, onDelete, onClose }: {
+  contacts: Contact[];
+  onAdd: (c: Omit<Contact, 'id' | 'addedAt'>) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [note, setNote] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const handleAdd = () => {
+    if (!name.trim()) { setErr('Name required'); return; }
+    if (!ethers.isAddress(address.trim())) { setErr('Invalid Ethereum address'); return; }
+    onAdd({ name: name.trim(), address: address.trim(), note: note.trim() || undefined });
+    setName(''); setAddress(''); setNote(''); setAdding(false); setErr('');
+  };
+
+  const inp: React.CSSProperties = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 12px', color: '#fff', fontSize: 13, width: '100%', outline: 'none', fontFamily: 'inherit' };
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>Address Book</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}><X size={16} /></button>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '16px 24px', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Add contact form */}
+          {!adding ? (
+            <button onClick={() => setAdding(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(82,255,172,0.07)', border: '1px solid rgba(82,255,172,0.18)', borderRadius: 10, padding: '10px 14px', cursor: 'pointer', color: '#52ffac', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              + Add Contact
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input style={inp} placeholder="Name" value={name} onChange={e => setName(e.target.value)} />
+              <input style={{ ...inp, fontFamily: 'monospace' }} placeholder="0x… address" value={address} onChange={e => setAddress(e.target.value)} />
+              <input style={inp} placeholder="Note (optional)" value={note} onChange={e => setNote(e.target.value)} />
+              {err && <p style={{ color: '#ff8888', fontSize: 11, margin: 0 }}>{err}</p>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={handleAdd} style={{ flex: 1, background: '#52ffac', border: 'none', borderRadius: 10, color: '#000', fontWeight: 900, fontSize: 12, padding: '10px', cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>
+                <button onClick={() => { setAdding(false); setErr(''); }} style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: '#888', fontWeight: 700, fontSize: 12, padding: '10px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          {/* Contact list */}
+          {contacts.length === 0 ? (
+            <p style={{ color: '#444', fontSize: 12, textAlign: 'center', margin: '12px 0' }}>No contacts yet.</p>
+          ) : (
+            contacts.map(c => (
+              <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: '#52ffac', fontSize: 14, fontWeight: 900 }}>{c.name.slice(0, 1).toUpperCase()}</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ color: '#fff', fontSize: 13, fontWeight: 700, margin: 0 }}>{c.name}</p>
+                  <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.address}</p>
+                  {c.note && <p style={{ color: '#444', fontSize: 10, margin: '2px 0 0' }}>{c.note}</p>}
+                </div>
+                <button onClick={() => onDelete(c.id)} style={{ background: 'rgba(255,100,100,0.07)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 7, padding: '5px 7px', cursor: 'pointer', color: '#ff8888', display: 'flex', flexShrink: 0 }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Account Switcher Modal ───────────────────────────────────────────────────
+function AccountSwitcherModal({ accounts, activeIndex, onSelect, onClose }: {
+  accounts: DerivedAccount[];
+  activeIndex: number;
+  onSelect: (index: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 380, maxWidth: '92vw', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>Accounts</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}><X size={16} /></button>
+        </div>
+        <div style={{ padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ color: '#555', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 4px 4px' }}>BIP44 · m/44&apos;/60&apos;/0&apos;/0/N</p>
+          {accounts.map(acc => {
+            const isActive = acc.index === activeIndex;
+            return (
+              <button key={acc.index} onClick={() => onSelect(acc.index)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, background: isActive ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isActive ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s', width: '100%' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isActive ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)', border: isActive ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ color: isActive ? '#52ffac' : '#888', fontSize: 12, fontWeight: 900 }}>#{acc.index + 1}</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ color: isActive ? '#52ffac' : '#fff', fontSize: 13, fontWeight: 700, margin: 0 }}>Account {acc.index + 1}</p>
+                  <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.address}</p>
+                </div>
+                {isActive && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 6px rgba(82,255,172,0.6)', flexShrink: 0 }} />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main WalletDashboard ─────────────────────────────────────────────────────
 export function WalletDashboard() {
   const wallet = useWallet();
@@ -946,6 +1115,8 @@ export function WalletDashboard() {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [isLoadingTxs, setIsLoadingTxs] = useState(false);
+  const [nfts, setNfts] = useState<NFTItem[]>([]);
+  const [isLoadingNfts, setIsLoadingNfts] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showNetworks, setShowNetworks] = useState(false);
@@ -973,6 +1144,16 @@ export function WalletDashboard() {
   const [showWipeWarning, setShowWipeWarning] = useState(false);
   const [showNewWalletWarning, setShowNewWalletWarning] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+
+  // ── Address book ───────────────────────────────────────────────────────────
+  const [showAddressBook, setShowAddressBook] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  useEffect(() => { setContacts(loadContacts()); }, []);
+
+  // ── Multi-account ──────────────────────────────────────────────────────────
+  const [accounts, setAccounts] = useState<DerivedAccount[]>([]);
+  const [activeAccountIndex, setActiveAccountIndexState] = useState(getActiveAccountIndex());
+  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
 
   // ── Non-EVM state ──────────────────────────────────────────────────────────
   const [selectedNonEvm, setSelectedNonEvm] = useState<string | null>(null);
@@ -1142,6 +1323,16 @@ export function WalletDashboard() {
     finally { setIsLoadingTxs(false); }
   }, [address, selectedChain.id]);
 
+  // ── NFTs (declared here — needs address + selectedNonEvm) ─────────────────
+  const loadNfts = useCallback(async () => {
+    if (!address || selectedNonEvm) return;
+    setIsLoadingNfts(true);
+    try { const items = await fetchNFTs(address, selectedChain.id); setNfts(items); }
+    finally { setIsLoadingNfts(false); }
+  }, [address, selectedChain.id, selectedNonEvm]);
+
+  useEffect(() => { if (activeTab === 'nfts' && wallet.isUnlocked && address) loadNfts(); }, [activeTab, wallet.isUnlocked, address, selectedChain.id, loadNfts]);
+
   useEffect(() => {
     if (!wallet.isUnlocked || !address) { setTokens([]); setTxs([]); return; }
     loadTokens();
@@ -1203,7 +1394,11 @@ export function WalletDashboard() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([loadTokens(), activeTab === 'transactions' ? loadTxs() : Promise.resolve()]);
+    await Promise.all([
+      activeTab === 'balance' ? loadTokens() : Promise.resolve(),
+      activeTab === 'transactions' ? loadTxs() : Promise.resolve(),
+      activeTab === 'nfts' ? loadNfts() : Promise.resolve(),
+    ]);
     setIsRefreshing(false);
   };
 
@@ -1312,6 +1507,26 @@ export function WalletDashboard() {
       )}
       {showTransfer && address && (
         <TransferModal onClose={() => setShowTransfer(false)} currentAddress={address} currentHistoryId={currentHistoryId} />
+      )}
+      {showAddressBook && (
+        <AddressBookModal
+          contacts={contacts}
+          onAdd={(c) => setContacts(addContact(c))}
+          onDelete={(id) => setContacts(deleteContact(id))}
+          onClose={() => setShowAddressBook(false)}
+        />
+      )}
+      {showAccountSwitcher && (
+        <AccountSwitcherModal
+          accounts={accounts}
+          activeIndex={activeAccountIndex}
+          onSelect={(idx) => {
+            setActiveAccountIndex(idx);
+            setActiveAccountIndexState(idx);
+            setShowAccountSwitcher(false);
+          }}
+          onClose={() => setShowAccountSwitcher(false)}
+        />
       )}
       <AnimatePresence>
         {showWipeWarning && (
@@ -1425,6 +1640,24 @@ export function WalletDashboard() {
             </div>
           </div>
 
+          {/* ── Account Switcher ── */}
+          {wallet.isUnlocked && !selectedNonEvm && (
+            <button
+              onClick={async () => {
+                const mnemonic = await wallet.getMnemonicForExport();
+                if (!mnemonic) return;
+                setAccounts(deriveAccounts(mnemonic, 6));
+                setShowAccountSwitcher(true);
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.15s', width: 'fit-content' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#52ffac'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.25)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#888'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>group</span>
+              Account {activeAccountIndex + 1} of HD Wallet
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_more</span>
+            </button>
+          )}
+
           {/* ── Extension Connect Banner ── */}
           {extPresent && !extAttached && wallet.isUnlocked && (
             <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -1453,10 +1686,12 @@ export function WalletDashboard() {
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             {[
-              { icon: 'power',      label: 'Connect',           onClick: () => { if (!selectedNonEvm) setShowWC(true); }, disabled: !!selectedNonEvm },
-              { icon: 'north_east', label: 'Send',              onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
-              { icon: 'qr_code_2', label: 'QR / Receive',      onClick: () => setShowQR(true) },
-              { icon: 'add_card',  label: 'Create New Wallet', onClick: () => setShowNewWalletWarning(true) },
+              { icon: 'power',        label: 'Connect',           onClick: () => { if (!selectedNonEvm) setShowWC(true); }, disabled: !!selectedNonEvm },
+              { icon: 'north_east',   label: 'Send',              onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
+              { icon: 'qr_code_2',   label: 'QR / Receive',      onClick: () => setShowQR(true) },
+              { icon: 'credit_card', label: 'Buy Crypto',         onClick: () => { const addr = displayAddress; if (addr) window.open(`https://buy.moonpay.com?walletAddress=${encodeURIComponent(addr)}&defaultCurrencyCode=eth`, '_blank'); } },
+              { icon: 'contacts',    label: 'Address Book',       onClick: () => setShowAddressBook(true) },
+              { icon: 'add_card',    label: 'Create New Wallet',  onClick: () => setShowNewWalletWarning(true) },
             ].map((item) => (
               <motion.button
                 key={item.label}
@@ -1503,6 +1738,11 @@ export function WalletDashboard() {
                 onClick={() => { setActiveTab('transactions'); }}
                 className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'transactions' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
                 Transactions
+              </button>
+              <button
+                onClick={() => setActiveTab('nfts')}
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'nfts' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                NFTs
               </button>
               <button
                 onClick={() => setActiveTab('lightning')}
@@ -1745,6 +1985,48 @@ export function WalletDashboard() {
                       </a>
                     );
                   })
+                )}
+              </div>
+            )}
+
+            {/* NFT TAB */}
+            {!selectedNonEvm && activeTab === 'nfts' && (
+              <div className="space-y-3">
+                {isLoadingNfts ? (
+                  <div className="flex justify-center py-12">
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(82,255,172,0.2)', borderTopColor: '#52ffac', animation: 'spin 1s linear infinite' }} />
+                  </div>
+                ) : nfts.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 p-10 bg-surface-container-low rounded-xl border border-white/5">
+                    <span className="material-symbols-outlined text-4xl text-on-surface-variant opacity-30">image</span>
+                    <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">
+                      {selectedChain.isAlchemy ? `No NFTs on ${selectedChain.name}` : 'NFT tab requires Alchemy RPC'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                    {nfts.map((nft, i) => (
+                      <div key={`${nft.contractAddress}-${nft.tokenId}-${i}`}
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem', overflow: 'hidden' }}>
+                        {nft.imageUrl ? (
+                          <img src={nft.imageUrl} alt={nft.name}
+                            style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : (
+                          <div style={{ width: '100%', aspectRatio: '1', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(255,255,255,0.15)' }}>image</span>
+                          </div>
+                        )}
+                        <div style={{ padding: '10px 12px' }}>
+                          <p style={{ color: '#fff', fontWeight: 900, fontSize: 12, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nft.name}</p>
+                          {nft.collectionName && (
+                            <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nft.collectionName}</p>
+                          )}
+                          <p style={{ color: '#444', fontSize: 9, fontFamily: 'monospace', margin: '4px 0 0' }}>#{nft.tokenId.slice(0, 10)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

@@ -5,16 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cope Wallet</title>
   <style>
+    :root {
+      --green: #52ffac;
+      --green-dim: rgba(82,255,172,0.08);
+      --green-border: rgba(82,255,172,0.18);
+      --green-glow: rgba(82,255,172,0.35);
+      --bg: #000000;
+      --surface: #0a0a0a;
+      --card: rgba(255,255,255,0.035);
+      --card-border: rgba(255,255,255,0.07);
+      --card-hover: rgba(255,255,255,0.06);
+      --text: #ffffff;
+      --muted: #888;
+      --faint: #444;
+      --danger: #ff6b6b;
+      --danger-dim: rgba(255,107,107,0.08);
+      --danger-border: rgba(255,107,107,0.18);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 7px;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      width: 340px;
-      min-height: 480px;
-      background: #0d0d0d;
-      color: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 360px;
+      min-height: 520px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 13px;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeInScale {
+      from { opacity: 0; transform: scale(0.96) translateY(4px); }
+      to   { opacity: 1; transform: scale(1)    translateY(0); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 8px var(--green-glow); }
+      50%       { box-shadow: 0 0 16px var(--green-glow), 0 0 32px rgba(82,255,172,0.15); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes shimmer {
+      0%   { opacity: 0.4; }
+      50%  { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .anim-in {
+      animation: fadeInScale 0.25s cubic-bezier(0.34,1.4,0.64,1) both;
+    }
+    .anim-up {
+      animation: slideUp 0.2s cubic-bezier(0.34,1.2,0.64,1) both;
     }
 
     /* ── Header ── */
@@ -22,28 +74,54 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 14px 16px;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
-    .logo { display: flex; align-items: center; gap: 8px; }
-    .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 8px rgba(168,85,247,0.5); }
-    .logo-text { font-weight: 900; font-size: 14px; letter-spacing: -0.01em; }
-    .lock-btn {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 6px;
-      color: #888;
-      font-size: 11px;
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .logo-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulseGlow 2.5s ease-in-out infinite;
+    }
+    .logo-text {
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .icon-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-xs);
+      color: var(--muted);
+      font-size: 10px;
       font-weight: 700;
-      padding: 4px 10px;
+      padding: 5px 10px;
       cursor: pointer;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.07em;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+      font-family: inherit;
     }
-    .lock-btn:hover { color: #ccc; }
+    .icon-btn:hover { color: var(--text); background: var(--card-hover); border-color: rgba(255,255,255,0.14); }
 
     /* ── Screens ── */
-    .screen { display: none; flex: 1; flex-direction: column; padding: 20px 16px; }
+    .screen { display: none; flex: 1; flex-direction: column; padding: 20px 16px 24px; animation: fadeInScale 0.22s cubic-bezier(0.34,1.3,0.64,1) both; }
     .screen.active { display: flex; }
 
     /* ── Attach screen ── */
@@ -54,30 +132,38 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      gap: 12px;
+      gap: 14px;
     }
     .attach-icon {
-      width: 64px; height: 64px; border-radius: 16px;
-      background: rgba(168,85,247,0.12);
-      border: 1.5px solid rgba(168,85,247,0.25);
+      width: 72px; height: 72px;
+      border-radius: 20px;
+      background: var(--green-dim);
+      border: 1.5px solid var(--green-border);
       display: flex; align-items: center; justify-content: center;
-      font-size: 28px; margin-bottom: 4px;
+      font-size: 30px;
+      margin-bottom: 4px;
+      animation: pulseGlow 3s ease-in-out infinite;
     }
-    .attach-title { font-size: 18px; font-weight: 900; }
-    .attach-sub { color: #666; font-size: 12px; line-height: 1.5; max-width: 220px; }
-    .open-site-btn {
+    .attach-title { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; }
+    .attach-sub { color: var(--muted); font-size: 12px; line-height: 1.6; max-width: 230px; }
+    .primary-btn {
       width: 100%;
-      background: #a855f7;
+      background: var(--green);
       border: none;
-      border-radius: 10px;
-      color: #fff;
+      border-radius: var(--radius);
+      color: #000;
       font-size: 13px;
-      font-weight: 700;
-      padding: 12px;
+      font-weight: 900;
+      padding: 13px;
       cursor: pointer;
-      margin-top: 8px;
+      letter-spacing: -0.01em;
+      font-family: inherit;
+      transition: opacity 0.15s, transform 0.1s;
+      margin-top: 4px;
     }
-    .open-site-btn:hover { background: #9333ea; }
+    .primary-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+    .primary-btn:active { transform: translateY(0); opacity: 0.75; }
+    .primary-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
 
     /* ── Unlock screen ── */
     .unlock-hero {
@@ -86,185 +172,345 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 16px;
+      gap: 14px;
+    }
+    .lock-icon {
+      width: 56px; height: 56px;
+      border-radius: 16px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
     }
     .unlock-addr {
-      font-family: monospace;
+      font-family: 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
       font-size: 11px;
-      color: #555;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
-      padding: 8px 12px;
+      color: var(--muted);
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 9px 14px;
       width: 100%;
       text-align: center;
       word-break: break-all;
+      letter-spacing: 0.02em;
     }
-    .pin-label { color: #888; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; align-self: flex-start; }
-    .pin-input {
-      width: 100%;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 10px;
-      color: #fff;
-      font-size: 16px;
-      letter-spacing: 4px;
-      padding: 12px 16px;
-      text-align: center;
-      outline: none;
-    }
-    .pin-input:focus { border-color: rgba(168,85,247,0.5); }
-    .unlock-btn {
-      width: 100%;
-      background: #a855f7;
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 700;
-      padding: 12px;
-      cursor: pointer;
-    }
-    .unlock-btn:hover { background: #9333ea; }
-    .err { color: #ff8888; font-size: 11px; text-align: center; min-height: 16px; }
-
-    /* ── Dashboard screen ── */
-    .address-card {
-      background: rgba(168,85,247,0.06);
-      border: 1px solid rgba(168,85,247,0.15);
-      border-radius: 12px;
-      padding: 14px;
-      margin-bottom: 16px;
-    }
-    .address-label { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
-    .address-val {
-      font-family: monospace;
-      font-size: 11px;
-      color: #ddd;
-      word-break: break-all;
-      cursor: pointer;
-    }
-    .address-val:hover { color: #fff; }
-    .copy-hint { color: #555; font-size: 10px; margin-top: 4px; }
-
-    .balance-card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-    .balance-eth { font-size: 28px; font-weight: 900; letter-spacing: -0.02em; }
-    .balance-usd { color: #666; font-size: 12px; margin-top: 2px; }
-
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
-    .action-btn {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 10px;
-      color: #ccc;
-      font-size: 12px;
-      font-weight: 700;
-      padding: 12px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-    }
-    .action-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
-    .action-icon { font-size: 18px; }
-
-    /* Pending request */
-    .pending-card {
-      background: rgba(168,85,247,0.08);
-      border: 1px solid rgba(168,85,247,0.2);
-      border-radius: 12px;
-      padding: 14px;
-      margin-bottom: 12px;
-    }
-    .pending-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; }
-    .pending-detail { font-family: monospace; font-size: 10px; color: #888; word-break: break-all; max-height: 80px; overflow-y: auto; }
-    .approve-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-    .btn-approve {
-      background: #a855f7; border: none; border-radius: 8px;
-      color: #fff; font-size: 12px; font-weight: 700; padding: 10px; cursor: pointer;
-    }
-    .btn-reject {
-      background: rgba(255,100,100,0.1); border: 1px solid rgba(255,100,100,0.2);
-      border-radius: 8px; color: #ff8888; font-size: 12px; font-weight: 700; padding: 10px; cursor: pointer;
-    }
-
-    /* Send form overlay */
-    .send-form { display: flex; flex-direction: column; gap: 10px; }
-    .field-label { color: #888; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
-    .field-input {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 10px;
-      color: #fff;
-      font-size: 13px;
-      padding: 10px 12px;
-      outline: none;
-      width: 100%;
-      font-family: monospace;
-    }
-    .field-input:focus { border-color: rgba(168,85,247,0.5); }
-    .back-btn {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 8px;
-      color: #888;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 8px 14px;
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      align-self: flex-start;
-      margin-bottom: 4px;
-    }
-    .send-btn {
-      background: #a855f7;
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 700;
-      padding: 12px;
-      cursor: pointer;
-      margin-top: 4px;
-    }
-    .send-btn:hover { background: #9333ea; }
-    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    .section-title {
-      color: #888;
+    .field-label {
+      color: var(--muted);
       font-size: 10px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
-
-    .wipe-btn {
-      background: rgba(255,100,100,0.08);
-      border: 1px solid rgba(255,100,100,0.15);
-      border-radius: 8px;
-      color: #ff8888;
+    .field-group { width: 100%; }
+    .field-input {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 14px;
+      letter-spacing: 3px;
+      padding: 12px 16px;
+      text-align: center;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+    }
+    .field-input:focus { border-color: var(--green-border); box-shadow: 0 0 0 3px rgba(82,255,172,0.07); }
+    .err { color: var(--danger); font-size: 11px; text-align: center; min-height: 16px; font-weight: 500; }
+    .danger-btn {
+      width: 100%;
+      background: var(--danger-dim);
+      border: 1px solid var(--danger-border);
+      border-radius: var(--radius-sm);
+      color: var(--danger);
       font-size: 11px;
       font-weight: 700;
-      padding: 8px 14px;
+      padding: 9px;
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      width: 100%;
-      margin-top: 8px;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .danger-btn:hover { background: rgba(255,107,107,0.14); }
+
+    /* ── Dashboard screen ── */
+    .address-card {
+      background: var(--green-dim);
+      border: 1px solid var(--green-border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+      animation: slideUp 0.18s cubic-bezier(0.34,1.2,0.64,1) 0.03s both;
+    }
+    .address-card:hover { background: rgba(82,255,172,0.12); }
+    .address-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .address-label { color: var(--green); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.12em; }
+    .copy-chip {
+      color: var(--green);
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(82,255,172,0.1);
+      border: 1px solid rgba(82,255,172,0.2);
+      border-radius: 4px;
+      padding: 2px 7px;
+      letter-spacing: 0.06em;
+    }
+    .address-val {
+      font-family: 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
+      font-size: 11px;
+      color: rgba(255,255,255,0.8);
+      word-break: break-all;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
     }
 
-    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #a855f7; border-radius: 50%; animation: spin 0.7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .chain-select-wrap { margin-bottom: 10px; animation: slideUp 0.18s cubic-bezier(0.34,1.2,0.64,1) 0.06s both; }
+    .chain-select {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px 12px;
+      outline: none;
+      cursor: pointer;
+      font-family: inherit;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+      transition: border-color 0.15s;
+    }
+    .chain-select:focus { border-color: var(--green-border); }
+    .chain-select option { background: #111; color: #fff; }
+
+    .balance-card {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 18px;
+      margin-bottom: 10px;
+      text-align: center;
+      animation: slideUp 0.18s cubic-bezier(0.34,1.2,0.64,1) 0.09s both;
+    }
+    .balance-native {
+      font-size: 30px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .balance-native span { color: var(--green); font-size: 18px; margin-left: 4px; }
+    .balance-usd { color: var(--faint); font-size: 12px; margin-top: 3px; font-weight: 500; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+      animation: slideUp 0.18s cubic-bezier(0.34,1.2,0.64,1) 0.12s both;
+    }
+    .action-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 13px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    .action-btn:hover {
+      background: var(--card-hover);
+      color: var(--text);
+      border-color: rgba(255,255,255,0.14);
+      transform: translateY(-1px);
+    }
+    .action-btn:active { transform: translateY(0); }
+    .action-icon { font-size: 20px; }
+    .action-btn.primary-action {
+      border-color: var(--green-border);
+      background: var(--green-dim);
+      color: var(--green);
+    }
+    .action-btn.primary-action:hover { background: rgba(82,255,172,0.13); }
+
+    /* Pending request */
+    .pending-card {
+      background: var(--green-dim);
+      border: 1px solid var(--green-border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 10px;
+      animation: fadeInScale 0.2s cubic-bezier(0.34,1.3,0.64,1) both;
+    }
+    .pending-badge {
+      display: inline-block;
+      background: var(--green);
+      color: #000;
+      font-size: 9px;
+      font-weight: 900;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .pending-title { font-weight: 900; font-size: 15px; margin-bottom: 8px; letter-spacing: -0.01em; }
+    .pending-detail {
+      font-family: 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      word-break: break-all;
+      max-height: 90px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 10px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .approve-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .btn-approve {
+      background: var(--green);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: #000;
+      font-size: 12px;
+      font-weight: 900;
+      padding: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity 0.15s;
+    }
+    .btn-approve:hover { opacity: 0.85; }
+    .btn-reject {
+      background: var(--danger-dim);
+      border: 1px solid var(--danger-border);
+      border-radius: var(--radius-sm);
+      color: var(--danger);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .btn-reject:hover { background: rgba(255,107,107,0.14); }
+
+    /* Send form */
+    .send-form { display: flex; flex-direction: column; gap: 10px; animation: slideUp 0.18s cubic-bezier(0.34,1.3,0.64,1) both; }
+    .send-field-input {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
+      padding: 10px 14px;
+      outline: none;
+      font-family: 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
+      letter-spacing: 0.02em;
+      transition: border-color 0.15s;
+    }
+    .send-field-input:focus { border-color: var(--green-border); box-shadow: 0 0 0 3px rgba(82,255,172,0.07); }
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      letter-spacing: 0.04em;
+      transition: color 0.15s;
+    }
+    .back-btn:hover { color: var(--text); }
+    .send-title { font-size: 16px; font-weight: 900; letter-spacing: -0.01em; }
+
+    .section-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    /* Wipe section */
+    .bottom-section {
+      margin-top: auto;
+      padding-top: 10px;
+      animation: slideUp 0.18s cubic-bezier(0.34,1.2,0.64,1) 0.18s both;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.12);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+
+    /* Receive overlay */
+    .receive-overlay {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+      animation: slideUp 0.18s cubic-bezier(0.34,1.3,0.64,1) both;
+    }
+    .receive-title { font-size: 16px; font-weight: 900; letter-spacing: -0.01em; }
+    .receive-addr {
+      font-family: 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      word-break: break-all;
+      line-height: 1.6;
+      width: 100%;
+      letter-spacing: 0.03em;
+    }
+    .qr-placeholder {
+      width: 140px; height: 140px;
+      border-radius: 12px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--faint);
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -274,7 +520,9 @@
     <div class="logo-dot"></div>
     <div class="logo-text">Cope Wallet</div>
   </div>
-  <button class="lock-btn" id="lockBtn" style="display:none">Lock</button>
+  <div class="header-actions">
+    <button class="icon-btn" id="lockBtn" style="display:none">Lock</button>
+  </div>
 </div>
 
 <!-- ── Attach screen ── -->
@@ -282,36 +530,37 @@
   <div class="attach-hero">
     <div class="attach-icon">🔗</div>
     <div class="attach-title">Attach Wallet</div>
-    <div class="attach-sub">Open copewallet.com, then click "Connect Extension" to attach your wallet to this extension.</div>
-    <button class="open-site-btn" id="openSiteBtn">Open Cope Wallet</button>
+    <div class="attach-sub">Open copewallet.com and click <strong>"Connect Extension"</strong> to link your wallet.</div>
+    <button class="primary-btn" id="openSiteBtn">Open Cope Wallet →</button>
   </div>
 </div>
 
 <!-- ── Unlock screen ── -->
 <div class="screen" id="screenUnlock">
   <div class="unlock-hero">
+    <div class="lock-icon">🔒</div>
     <div style="text-align:center">
-      <div style="font-size:32px;margin-bottom:8px;">🔒</div>
-      <div style="font-size:17px;font-weight:900;margin-bottom:4px;">Locked</div>
-      <div style="color:#666;font-size:12px;">Enter your Cope Wallet PIN</div>
+      <div style="font-size:17px;font-weight:900;letter-spacing:-0.01em;margin-bottom:4px;">Locked</div>
+      <div style="color:var(--muted);font-size:12px;">Enter your Cope Wallet passphrase</div>
     </div>
     <div class="unlock-addr" id="unlockAddr">—</div>
-    <div style="width:100%">
-      <div class="pin-label">PIN / Passphrase</div>
-      <input class="pin-input" type="password" id="pinInput" placeholder="••••••••" autocomplete="current-password" />
+    <div class="field-group">
+      <div class="field-label">Passphrase</div>
+      <input class="field-input" type="password" id="pinInput" placeholder="••••••••" autocomplete="current-password" />
     </div>
     <div class="err" id="unlockErr"></div>
-    <button class="unlock-btn" id="unlockBtn">Unlock</button>
-    <button class="wipe-btn" id="wipeBtn">Disconnect & Wipe</button>
+    <button class="primary-btn" id="unlockBtn">Unlock</button>
+    <button class="danger-btn" id="wipeBtn">Disconnect & Wipe</button>
   </div>
 </div>
 
 <!-- ── Dashboard screen ── -->
 <div class="screen" id="screenDash">
-  <!-- Pending request banner (hidden by default) -->
+  <!-- Pending request (hidden by default) -->
   <div id="pendingSection" style="display:none">
     <div class="pending-card">
-      <div class="pending-title" id="pendingTitle">Signature Request</div>
+      <div class="pending-badge">Action Required</div>
+      <div class="pending-title" id="pendingTitle">Request</div>
       <div class="pending-detail" id="pendingDetail"></div>
       <div class="approve-btns">
         <button class="btn-approve" id="approveBtn">Approve</button>
@@ -320,27 +569,31 @@
     </div>
   </div>
 
-  <!-- Normal dashboard (hidden when pending) -->
+  <!-- Normal dashboard -->
   <div id="dashMain">
-    <div class="address-card">
-      <div class="address-label">Connected Address</div>
-      <div class="address-val" id="dashAddr" title="Click to copy">—</div>
-      <div class="copy-hint" id="copyHint">Click to copy</div>
+    <!-- Address -->
+    <div class="address-card" id="addressCard">
+      <div class="address-top">
+        <div class="address-label">Address</div>
+        <div class="copy-chip" id="copyChip">Copy</div>
+      </div>
+      <div class="address-val" id="dashAddr">—</div>
     </div>
 
     <!-- Chain selector -->
-    <div style="margin-bottom:10px;">
-      <select id="chainSelect" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#ccc;font-size:11px;font-weight:700;padding:8px 10px;outline:none;cursor:pointer;text-transform:uppercase;letter-spacing:0.05em;">
-      </select>
+    <div class="chain-select-wrap">
+      <select class="chain-select" id="chainSelect"></select>
     </div>
 
+    <!-- Balance -->
     <div class="balance-card">
-      <div class="balance-eth" id="dashBalance">—</div>
-      <div class="balance-usd" id="dashBalanceUsd">Fetching balance…</div>
+      <div class="balance-native" id="dashBalance">—<span id="dashSymbol">ETH</span></div>
+      <div class="balance-usd" id="dashBalanceUsd">Fetching…</div>
     </div>
 
+    <!-- Actions grid -->
     <div class="actions">
-      <button class="action-btn" id="sendBtn">
+      <button class="action-btn primary-action" id="sendBtn">
         <span class="action-icon">↑</span>
         <span>Send</span>
       </button>
@@ -350,24 +603,33 @@
       </button>
     </div>
 
-    <!-- Send form (hidden by default) -->
+    <!-- Send form (hidden) -->
     <div class="send-form" id="sendForm" style="display:none">
-      <button class="back-btn" id="backBtn">← Back</button>
-      <div class="section-title">Send</div>
+      <button class="back-btn" id="backSendBtn">← Back</button>
+      <div class="send-title">Send</div>
       <div>
-        <div class="field-label">Recipient</div>
-        <input class="field-input" type="text" id="sendTo" placeholder="0x..." />
+        <div class="field-label" style="margin-bottom:6px">Recipient</div>
+        <input class="send-field-input" type="text" id="sendTo" placeholder="0x…" />
       </div>
       <div>
-        <div class="field-label">Amount</div>
-        <input class="field-input" type="number" id="sendAmount" placeholder="0.0" step="0.0001" min="0" />
+        <div class="field-label" style="margin-bottom:6px">Amount</div>
+        <input class="send-field-input" type="number" id="sendAmount" placeholder="0.000" step="0.0001" min="0" />
       </div>
       <div class="err" id="sendErr"></div>
-      <button class="send-btn" id="sendSubmit">Send</button>
+      <button class="primary-btn" id="sendSubmit">Send</button>
     </div>
 
-    <div style="margin-top: auto; padding-top: 12px;">
-      <button class="wipe-btn" id="wipeBtnDash">Disconnect & Wipe</button>
+    <!-- Receive overlay (hidden) -->
+    <div class="receive-overlay" id="receiveOverlay" style="display:none">
+      <button class="back-btn" id="backReceiveBtn">← Back</button>
+      <div class="receive-title">Receive</div>
+      <div class="qr-placeholder">QR — copy address</div>
+      <div class="receive-addr" id="receiveAddr">—</div>
+      <button class="primary-btn" id="copyReceiveBtn">Copy Address</button>
+    </div>
+
+    <div class="bottom-section">
+      <button class="danger-btn" id="wipeBtnDash">Disconnect & Wipe</button>
     </div>
   </div>
 </div>

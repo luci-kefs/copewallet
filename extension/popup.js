@@ -17,10 +17,28 @@ function showScreen(name) {
   $('lockBtn').style.display = (name === 'dash') ? '' : 'none';
 }
 
-// ── Startup ────────────────────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────────────────────
 
 let _currentAddress = null;
 let _currentChainId = 1;
+
+// Price cache — 2 minute TTL to avoid hammering CoinGecko on every balance refresh
+const _priceCache = new Map(); // cgId → { usd, ts }
+const PRICE_TTL_MS = 120_000;
+
+async function getCachedPrice(cgId) {
+  const cached = _priceCache.get(cgId);
+  if (cached && (Date.now() - cached.ts < PRICE_TTL_MS)) return cached.usd;
+  try {
+    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`);
+    const d = await r.json();
+    const usd = d?.[cgId]?.usd || 0;
+    _priceCache.set(cgId, { usd, ts: Date.now() });
+    return usd;
+  } catch { return cached?.usd || 0; }
+}
+
+// ── Startup ────────────────────────────────────────────────────────────────
 
 async function init() {
   const status = await bg('CW_STATUS');
@@ -43,13 +61,14 @@ async function init() {
 async function loadDashboard(address) {
   _currentAddress = address;
   $('dashAddr').textContent = address || '—';
-  $('dashBalance').textContent = '…';
+  $('receiveAddr').textContent = address || '—';
+  $('dashBalance').innerHTML = '…<span id="dashSymbol">' + (CHAIN_META[_currentChainId]?.symbol || 'ETH') + '</span>';
   $('dashBalanceUsd').textContent = 'Fetching…';
-  updateChainLabel();
+  updateChainDropdown();
 
   if (address) {
     fetchBalance(address).catch(() => {
-      $('dashBalance').textContent = 'Error';
+      $('dashBalance').innerHTML = '<span style="color:#ff6b6b">Error</span><span id="dashSymbol">' + (CHAIN_META[_currentChainId]?.symbol || 'ETH') + '</span>';
       $('dashBalanceUsd').textContent = '';
     });
   }
@@ -68,14 +87,13 @@ async function fetchBalance(address) {
   const wei = BigInt(data.result || '0x0');
   const eth = Number(wei) / 1e18;
   const symbol = CHAIN_META[_currentChainId]?.symbol || 'ETH';
-  $('dashBalance').textContent = eth.toFixed(6) + ' ' + symbol;
+  const displayVal = eth < 0.000001 ? eth.toExponential(2) : eth.toFixed(eth < 0.01 ? 6 : 4);
+  $('dashBalance').innerHTML = displayVal + '<span id="dashSymbol">' + symbol + '</span>';
 
   try {
     const cgId = CHAIN_META[_currentChainId]?.coingeckoId || 'ethereum';
-    const priceResp = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`);
-    const priceData = await priceResp.json();
-    const price = priceData?.[cgId]?.usd || 0;
-    $('dashBalanceUsd').textContent = price ? '≈ $' + (eth * price).toFixed(2) : '';
+    const price = await getCachedPrice(cgId);
+    $('dashBalanceUsd').textContent = price ? '≈ $' + (eth * price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
   } catch {
     $('dashBalanceUsd').textContent = '';
   }
@@ -84,25 +102,26 @@ async function fetchBalance(address) {
 // ── Chain selector ─────────────────────────────────────────────────────────
 
 const CHAIN_META = {
-  1:       { name: 'Ethereum',   symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://cloudflare-eth.com' },
-  8453:    { name: 'Base',       symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://mainnet.base.org' },
-  42161:   { name: 'Arbitrum',   symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://arb1.arbitrum.io/rpc' },
-  10:      { name: 'Optimism',   symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://mainnet.optimism.io' },
-  137:     { name: 'Polygon',    symbol: 'POL',  coingeckoId: 'matic-network', rpc: 'https://polygon-rpc.com' },
-  56:      { name: 'BNB Chain',  symbol: 'BNB',  coingeckoId: 'binancecoin',   rpc: 'https://bsc-dataseed.binance.org' },
-  43114:   { name: 'Avalanche',  symbol: 'AVAX', coingeckoId: 'avalanche-2',   rpc: 'https://api.avax.network/ext/bc/C/rpc' },
-  250:     { name: 'Fantom',     symbol: 'FTM',  coingeckoId: 'fantom',        rpc: 'https://rpc.ftm.tools' },
-  324:     { name: 'zkSync Era', symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://mainnet.era.zksync.io' },
-  59144:   { name: 'Linea',      symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://rpc.linea.build' },
-  100:     { name: 'Gnosis',     symbol: 'xDAI', coingeckoId: 'xdai',          rpc: 'https://rpc.gnosischain.com' },
+  1:       { name: 'Ethereum',    symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://cloudflare-eth.com' },
+  8453:    { name: 'Base',        symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://mainnet.base.org' },
+  42161:   { name: 'Arbitrum',    symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://arb1.arbitrum.io/rpc' },
+  10:      { name: 'Optimism',    symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://mainnet.optimism.io' },
+  137:     { name: 'Polygon',     symbol: 'POL',  coingeckoId: 'matic-network', rpc: 'https://polygon-rpc.com' },
+  56:      { name: 'BNB Chain',   symbol: 'BNB',  coingeckoId: 'binancecoin',   rpc: 'https://bsc-dataseed.binance.org' },
+  43114:   { name: 'Avalanche',   symbol: 'AVAX', coingeckoId: 'avalanche-2',   rpc: 'https://api.avax.network/ext/bc/C/rpc' },
+  250:     { name: 'Fantom',      symbol: 'FTM',  coingeckoId: 'fantom',        rpc: 'https://rpc.ftm.tools' },
+  324:     { name: 'zkSync Era',  symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://mainnet.era.zksync.io' },
+  59144:   { name: 'Linea',       symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://rpc.linea.build' },
+  534352:  { name: 'Scroll',      symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://rpc.scroll.io' },
+  81457:   { name: 'Blast',       symbol: 'ETH',  coingeckoId: 'ethereum',      rpc: 'https://rpc.blast.io' },
+  100:     { name: 'Gnosis',      symbol: 'xDAI', coingeckoId: 'xdai',          rpc: 'https://rpc.gnosischain.com' },
 };
 
 function getRpcUrl(chainId) {
   return CHAIN_META[chainId]?.rpc || 'https://cloudflare-eth.com';
 }
 
-function updateChainLabel() {
-  const meta = CHAIN_META[_currentChainId];
+function updateChainDropdown() {
   $('chainSelect').value = String(_currentChainId);
 }
 
@@ -111,7 +130,7 @@ const chainSelect = $('chainSelect');
 Object.entries(CHAIN_META).forEach(([id, meta]) => {
   const opt = document.createElement('option');
   opt.value = id;
-  opt.textContent = meta.name;
+  opt.textContent = meta.name + ' (' + meta.symbol + ')';
   chainSelect.appendChild(opt);
 });
 chainSelect.value = '1';
@@ -144,7 +163,6 @@ function showPendingRequest(payload) {
 
   if (payload.type === 'personal_sign') {
     $('pendingTitle').textContent = 'Signature Request';
-    // Decode hex message to readable text if possible
     let msg = payload.message || '';
     if (msg.startsWith('0x')) {
       try { msg = decodeURIComponent(escape(String.fromCharCode(...new Uint8Array(msg.slice(2).match(/.{2}/g).map(b => parseInt(b, 16)))))); } catch {}
@@ -163,7 +181,6 @@ function showPendingRequest(payload) {
   }
 }
 
-// Auto-refresh when a new pending request arrives while popup is open
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'session') return;
   const newPending = Object.keys(changes).find(k => k.startsWith('cw_pending_') && changes[k].newValue);
@@ -235,39 +252,44 @@ async function doUnlock() {
 
 // ── Address copy ───────────────────────────────────────────────────────────
 
-$('dashAddr').addEventListener('click', () => {
-  const addr = $('dashAddr').textContent;
-  if (!addr || addr === '—') return;
+$('addressCard').addEventListener('click', () => {
+  const addr = _currentAddress;
+  if (!addr) return;
   navigator.clipboard.writeText(addr).then(() => {
-    $('copyHint').textContent = 'Copied!';
-    setTimeout(() => { $('copyHint').textContent = 'Click to copy'; }, 1500);
+    $('copyChip').textContent = 'Copied!';
+    setTimeout(() => { $('copyChip').textContent = 'Copy'; }, 1800);
   });
 });
 
 // ── Send flow ──────────────────────────────────────────────────────────────
 
-$('sendBtn').addEventListener('click', () => {
-  $('sendForm').style.display = '';
+function showSendForm() {
   $('sendBtn').style.display = 'none';
   $('receiveBtn').style.display = 'none';
+  $('receiveOverlay').style.display = 'none';
   $('sendErr').textContent = '';
-  $('sendErr').style.color = '#ff8888';
-});
+  $('sendErr').style.color = 'var(--danger)';
+  $('sendForm').style.display = 'flex';
+  $('sendTo').focus();
+}
 
-$('backBtn').addEventListener('click', () => {
+function hideSendForm() {
   $('sendForm').style.display = 'none';
   $('sendBtn').style.display = '';
   $('receiveBtn').style.display = '';
-  $('sendErr').textContent = '';
-});
+}
+
+$('sendBtn').addEventListener('click', showSendForm);
+$('backSendBtn').addEventListener('click', hideSendForm);
 
 $('sendSubmit').addEventListener('click', async () => {
   const to = $('sendTo').value.trim();
   const amount = $('sendAmount').value.trim();
   $('sendErr').textContent = '';
+  $('sendErr').style.color = 'var(--danger)';
 
   if (!to || !/^0x[0-9a-fA-F]{40}$/.test(to)) {
-    $('sendErr').textContent = 'Invalid address (must be 0x + 40 hex chars)';
+    $('sendErr').textContent = 'Invalid address';
     return;
   }
   const amtFloat = parseFloat(amount);
@@ -279,8 +301,7 @@ $('sendSubmit').addEventListener('click', async () => {
   $('sendSubmit').disabled = true;
   $('sendSubmit').textContent = 'Sending…';
 
-  // Build tx — nonce + gasPrice from RPC
-  let nonce = '0x0', gasPrice = '0x3B9ACA00'; // 1 gwei fallback
+  let nonce = '0x0', gasPrice = '0x3B9ACA00';
   try {
     const rpc = getRpcUrl(_currentChainId);
     const [nonceResp, gpResp] = await Promise.all([
@@ -289,10 +310,8 @@ $('sendSubmit').addEventListener('click', async () => {
       fetch(rpc, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc:'2.0', method:'eth_gasPrice', params:[], id:2 }) }),
     ]);
-    const nonceData = await nonceResp.json();
-    const gpData    = await gpResp.json();
-    nonce    = nonceData.result || '0x0';
-    gasPrice = gpData.result    || gasPrice;
+    nonce    = (await nonceResp.json()).result || '0x0';
+    gasPrice = (await gpResp.json()).result    || gasPrice;
   } catch {}
 
   const weiVal = BigInt(Math.round(amtFloat * 1e18));
@@ -302,7 +321,7 @@ $('sendSubmit').addEventListener('click', async () => {
     chainId:  _currentChainId,
     nonce,
     gasPrice,
-    gasLimit: '0x5208', // 21000 — standard ETH transfer
+    gasLimit: '0x5208',
   };
 
   const reqId = String(Date.now());
@@ -317,23 +336,39 @@ $('sendSubmit').addEventListener('click', async () => {
   }
 
   const txHash = result.result || '';
-  $('sendErr').style.color = '#88ff88';
-  $('sendErr').textContent = 'Sent! ' + txHash.slice(0, 18) + '…';
+  $('sendErr').style.color = 'var(--green)';
+  $('sendErr').textContent = '✓ Sent! ' + txHash.slice(0, 16) + '…';
   $('sendTo').value = '';
   $('sendAmount').value = '';
-  // Refresh balance after 3s
   setTimeout(() => { if (_currentAddress) fetchBalance(_currentAddress).catch(() => {}); }, 3000);
-  setTimeout(() => { $('sendErr').textContent = ''; $('sendErr').style.color = '#ff8888'; }, 6000);
+  setTimeout(() => { $('sendErr').textContent = ''; $('sendErr').style.color = 'var(--danger)'; }, 7000);
 });
 
-// ── Receive ────────────────────────────────────────────────────────────────
+// ── Receive flow ───────────────────────────────────────────────────────────
 
-$('receiveBtn').addEventListener('click', () => {
-  const addr = $('dashAddr').textContent;
-  if (!addr || addr === '—') return;
+function showReceiveOverlay() {
+  $('receiveAddr').textContent = _currentAddress || '—';
+  $('sendBtn').style.display = 'none';
+  $('receiveBtn').style.display = 'none';
+  $('sendForm').style.display = 'none';
+  $('receiveOverlay').style.display = 'flex';
+}
+
+function hideReceiveOverlay() {
+  $('receiveOverlay').style.display = 'none';
+  $('sendBtn').style.display = '';
+  $('receiveBtn').style.display = '';
+}
+
+$('receiveBtn').addEventListener('click', showReceiveOverlay);
+$('backReceiveBtn').addEventListener('click', hideReceiveOverlay);
+
+$('copyReceiveBtn').addEventListener('click', () => {
+  const addr = _currentAddress;
+  if (!addr) return;
   navigator.clipboard.writeText(addr).then(() => {
-    $('copyHint').textContent = 'Address copied!';
-    setTimeout(() => { $('copyHint').textContent = 'Click to copy'; }, 2000);
+    $('copyReceiveBtn').textContent = '✓ Copied!';
+    setTimeout(() => { $('copyReceiveBtn').textContent = 'Copy Address'; }, 2000);
   });
 });
 
