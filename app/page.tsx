@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Shield, Download, RefreshCw, Upload, Lock, Check } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '@/context/WalletContext';
 import { fetchAssetUrls } from '@/lib/supabase';
 import { startEntropyCollection } from '@/lib/entropy';
@@ -15,6 +15,7 @@ import { embedInPNG, extractFromPNG } from '@/lib/steganography';
 import { encryptData, decryptData } from '@/lib/crypto';
 import { loadSession, getTabKey, clearShadow } from '@/lib/session-lock';
 import { FAKE_CRASH_HTML } from '@/lib/decoy';
+import { getHistory, loadSavedMnemonic, makeSnapshot, addToHistory, persistWallet as historyPersistWallet } from '@/lib/wallet-history';
 
 type View = 'main' | 'fake_crash';
 type RightPanel = 'idle' | 'persist_confirm' | 'new_vault' | 'access_vault' | 'success' | 'success_access';
@@ -141,18 +142,28 @@ export default function CopePage() {
     if (passphrase !== passphraseConfirm) { setPersistError('Passphrases do not match'); return; }
     setIsProcessing(true); setPersistError('');
     try {
-      let mnemonic = '';
+      let sessionMnemonic = '';
       try {
         const saved = loadSession();
         if (saved) {
           const decoded = decryptData(saved, getTabKey());
-          if (decoded && decoded.trim().split(/\s+/).length >= 12) mnemonic = decoded;
+          if (decoded && decoded.trim().split(/\s+/).length >= 12) sessionMnemonic = decoded;
         }
       } catch {}
-      await wallet.enablePersistentMode(passphrase, mnemonic);
-      const finalMnemonic = await wallet.getMnemonicForExport();
-      if (!finalMnemonic) throw new Error('Vault empty');
-      await embedInPNG(encryptData(finalMnemonic, passphrase), 'copewallet');
+      await wallet.enablePersistentMode(passphrase, sessionMnemonic);
+      const activeMnemonic = await wallet.getMnemonicForExport();
+      if (!activeMnemonic) throw new Error('Vault empty');
+
+      // Bundle active wallet + all Saved Vaults into the PNG
+      const allMnemonics: string[] = [activeMnemonic];
+      for (const snap of getHistory().filter(s => s.isSaved)) {
+        try {
+          const m = await loadSavedMnemonic(snap.id);
+          if (m && m !== activeMnemonic && m.trim().split(/\s+/).length >= 12) allMnemonics.push(m);
+        } catch {}
+      }
+      const payload = JSON.stringify(allMnemonics.map(m => encryptData(m, passphrase)));
+      await embedInPNG(payload, 'copewallet');
       setRightPanel('success');
     } catch (e) { setPersistError(e instanceof Error ? e.message : 'Operation failed. Try again.'); }
     finally { setIsProcessing(false); }
@@ -172,10 +183,49 @@ export default function CopePage() {
     setIsProcessing(true); setAccessError('');
     try {
       const encPayload = await extractFromPNG(file);
-      const mnemonic = decryptData(encPayload, passphrase);
-      if (mnemonic && mnemonic.trim().split(/\s+/).length >= 12) {
-        await wallet.importCopeWallet(mnemonic);
-        await wallet.enablePersistentMode(passphrase, mnemonic);
+
+      // Support both legacy format (single encrypted string) and new format (JSON array of encrypted strings)
+      let primaryMnemonic = '';
+      const extraMnemonics: string[] = [];
+      try {
+        const parsed = JSON.parse(encPayload);
+        if (Array.isArray(parsed)) {
+          for (const enc of parsed) {
+            try {
+              const m = decryptData(enc, passphrase);
+              if (m && m.trim().split(/\s+/).length >= 12) {
+                if (!primaryMnemonic) primaryMnemonic = m;
+                else extraMnemonics.push(m);
+              }
+            } catch {}
+          }
+        }
+      } catch {
+        // Not JSON — legacy single-mnemonic PNG
+        try { primaryMnemonic = decryptData(encPayload, passphrase); } catch {}
+      }
+
+      if (primaryMnemonic && primaryMnemonic.trim().split(/\s+/).length >= 12) {
+        await wallet.importCopeWallet(primaryMnemonic);
+        await wallet.enablePersistentMode(passphrase, primaryMnemonic);
+        // Restore extra saved vaults into history as Saved Vaults (without switching active wallet)
+        for (const m of extraMnemonics) {
+          try {
+            const { ethers: ethersLib } = await import('ethers');
+            const hdNode = ethersLib.HDNodeWallet.fromPhrase(m);
+            const addr = hdNode.address;
+            const existing = getHistory().find(s => s.address === addr);
+            if (!existing) {
+              const snap = makeSnapshot(addr, 'PERSISTENT');
+              addToHistory(snap);
+              await historyPersistWallet(snap.id, m);
+            } else if (!existing.isSaved) {
+              await historyPersistWallet(existing.id, m);
+            }
+          } catch {}
+        }
+        // Notify WalletDashboard to re-read history
+        window.dispatchEvent(new CustomEvent('cw:history:updated'));
         setRightPanel('success_access');
         return;
       }
@@ -250,7 +300,7 @@ export default function CopePage() {
         {rightPanel === 'idle' && (
           <>
             {/* Vault Header */}
-            <div className="space-y-6">
+            <motion.div className="space-y-6" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }}>
               <div className="flex items-center gap-5 text-tertiary">
                 <span className="material-symbols-outlined text-5xl">shield_lock</span>
                 <h2 className="text-5xl font-black tracking-tighter uppercase">Secure Vault</h2>
@@ -267,44 +317,50 @@ export default function CopePage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Interactive Zone */}
-            <div className="space-y-5">
-              <button
+            <motion.div className="space-y-5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}>
+              <motion.button
                 onClick={() => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }}
-                disabled={!wallet.isUnlocked}
-                className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-10 rounded-xl flex justify-between items-center transition-all shadow-[0_20px_50px_rgba(82,255,172,0.1)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed">
+                className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-10 rounded-xl flex justify-between items-center transition-all shadow-[0_20px_50px_rgba(82,255,172,0.1)] active:scale-[0.98]"
+                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                 <div className="flex items-center gap-8">
                   <span className="material-symbols-outlined text-5xl">verified_user</span>
                   <span className="text-3xl font-black tracking-tighter uppercase text-left">Persist Current Session</span>
                 </div>
                 <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 onClick={handleInitNewVault}
-                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]">
+                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]"
+                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                 <div className="flex items-center gap-8">
                   <span className="material-symbols-outlined text-5xl">add_moderator</span>
                   <span className="text-3xl font-black tracking-tighter uppercase text-left">Initialize New Vault</span>
                 </div>
                 <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
                 onClick={() => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); }}
-                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]">
+                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]"
+                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                 <div className="flex items-center gap-8">
                   <span className="material-symbols-outlined text-5xl">key</span>
                   <span className="text-3xl font-black tracking-tighter uppercase text-left">Access Existing Vault</span>
                 </div>
                 <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
-              </button>
+              </motion.button>
 
               {/* ── Session Badge ── */}
+              <AnimatePresence>
               {wallet.isUnlocked && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem' }}>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.25 }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem', overflow: 'hidden' }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 8px rgba(82,255,172,0.6)', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Active Session</p>
@@ -315,12 +371,14 @@ export default function CopePage() {
                   <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 8px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, background: wallet.mode === 'PERSISTENT' ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', color: wallet.mode === 'PERSISTENT' ? '#52ffac' : 'rgba(255,255,255,0.4)', border: wallet.mode === 'PERSISTENT' ? '1px solid rgba(82,255,172,0.2)' : '1px solid rgba(255,255,255,0.08)' }}>
                     {wallet.mode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'}
                   </span>
-                </div>
+                </motion.div>
               )}
-            </div>
+              </AnimatePresence>
+            </motion.div>
 
             {/* Status Table */}
-            <div className="bg-white/5 rounded-xl overflow-hidden border border-white/5 backdrop-blur-xl">
+            <motion.div className="bg-white/5 rounded-xl overflow-hidden border border-white/5 backdrop-blur-xl"
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2, ease: 'easeOut' }}>
               <div className="px-8 py-5 border-b border-white/10 bg-white/[0.02]">
                 <p className="text-[0.7rem] font-black uppercase tracking-[0.3em] text-on-surface-variant">System Diagnostics</p>
               </div>
@@ -350,10 +408,11 @@ export default function CopePage() {
                   </span>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Visual Anchor */}
-            <div className="w-full h-56 rounded-2xl overflow-hidden relative grayscale hover:grayscale-0 transition-all duration-1000 border border-white/10">
+            <motion.div className="w-full h-56 rounded-2xl overflow-hidden relative grayscale hover:grayscale-0 transition-all duration-1000 border border-white/10"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}>
               {/* Brand logo clickable area (panic trigger) */}
               <div ref={logoRef} data-aethilm="brand" onClick={handleLogoPanic} className="absolute inset-0 cursor-pointer z-10">
                 {logoUrl && !logoError && (
@@ -367,7 +426,7 @@ export default function CopePage() {
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV3rq0CBGGIjwUWM3L1b8JPDzLlg1fqKTm7Z1IXPglOv1hxAsNZnbqDgpnF5oetmxLAT8XIDpVAmeYQh6D9OQXCq5g3jmI8XFn6VLyLdFpVTBCEH4v4UV7H8iyy1DgGYwIFYeG8qhxAqCpcBI2JbSoCHwr4iK-hN2Fu-e0VX6N4b9yOdDoRaqiVmiUxdVKX2_DS2uUflmw_9zHKvYgqQe5slou1PZ7Fjy6bYpPbt8LzxfveI2OBKz-Sh5R6tGh-dLVNyZh_63flbA"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
-            </div>
+            </motion.div>
 
             {/* Footer */}
             <a href={extLink} target="_blank" rel="noopener noreferrer" data-aethilm="brand"

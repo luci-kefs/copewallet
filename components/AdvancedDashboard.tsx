@@ -31,7 +31,7 @@ export function AdvancedDashboard({ onExit }: Props) {
   }, []);
 
   const addBtn = (label: string, onClick: () => void) => (
-    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--theme-accent-dim)', border: '1px solid var(--theme-accent-border)', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', color: 'var(--theme-accent)', fontSize: 11, fontWeight: 900, textTransform: 'uppercase' as const }}>
+    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#52ffac', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase' as const }}>
       <Plus size={13} /> {label}
     </button>
   );
@@ -60,7 +60,7 @@ export function AdvancedDashboard({ onExit }: Props) {
             </p>
           </div>
         </div>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--theme-accent)', boxShadow: '0 0 8px rgba(168,85,247,0.5)', opacity: wallet.isUnlocked ? 1 : 0.2 }} />
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 8px rgba(82,255,172,0.5)', opacity: wallet.isUnlocked ? 1 : 0.2 }} />
       </div>
 
       <motion.div key="evm" variants={variants.fadeUp} initial="hidden" animate="visible" transition={springs.smooth}

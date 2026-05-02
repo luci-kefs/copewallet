@@ -33,12 +33,11 @@ import { deriveAPTOSWallet, getAPTOSBalance, getAPTOSTransactions, sendAPTOS } f
 import { deriveLTCWallet, getLTCBalance, getLTCTransactions, buildLTCTransaction, broadcastLTC, estimateLTCFee } from '@/lib/ltc';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springs, variants } from '@/lib/animations';
-import { getHistory, addToHistory, saveWallet, removeFromHistory, makeSnapshot, WalletSnapshot } from '@/lib/wallet-history';
+import { getHistory, addToHistory, makeSnapshot, removeFromHistory, deleteSavedVault, WalletSnapshot } from '@/lib/wallet-history';
 import { WarningBanner } from '@/components/WarningBanner';
 import { TransferModal } from '@/components/TransferModal';
 import { loadContacts, addContact, deleteContact, Contact } from '@/lib/address-book';
 import { fetchNFTs, NFTItem } from '@/lib/nfts';
-import { deriveAccounts, getActiveAccountIndex, setActiveAccountIndex, DerivedAccount } from '@/lib/accounts';
 
 type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning';
 
@@ -1059,11 +1058,12 @@ function AddressBookModal({ contacts, onAdd, onDelete, onClose }: {
   );
 }
 
-// ─── Account Switcher Modal ───────────────────────────────────────────────────
-function AccountSwitcherModal({ accounts, activeIndex, onSelect, onClose }: {
-  accounts: DerivedAccount[];
-  activeIndex: number;
-  onSelect: (index: number) => void;
+// ─── Saved Vaults Modal ───────────────────────────────────────────────────────
+function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
+  vaults: WalletSnapshot[];
+  currentId: string | null;
+  onSwitch: (id: string) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -1072,30 +1072,45 @@ function AccountSwitcherModal({ accounts, activeIndex, onSelect, onClose }: {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  const saved = vaults.filter(s => s.isSaved);
+
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 380, maxWidth: '92vw', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 400, maxWidth: '92vw', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>Accounts</span>
+          <span style={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: '-0.02em' }}>Saved Vaults</span>
           <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}><X size={16} /></button>
         </div>
         <div style={{ padding: '12px 16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <p style={{ color: '#555', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 4px 4px' }}>BIP44 · m/44&apos;/60&apos;/0&apos;/0/N</p>
-          {accounts.map(acc => {
-            const isActive = acc.index === activeIndex;
+          {saved.length === 0 ? (
+            <p style={{ color: '#555', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No saved vaults yet.<br/>Use Save on a wallet in the history section.</p>
+          ) : saved.map(snap => {
+            const isCurrent = snap.id === currentId;
             return (
-              <button key={acc.index} onClick={() => onSelect(acc.index)}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, background: isActive ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isActive ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s', width: '100%' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isActive ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)', border: isActive ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ color: isActive ? '#52ffac' : '#888', fontSize: 12, fontWeight: 900 }}>#{acc.index + 1}</span>
+              <div key={snap.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, background: isCurrent ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isCurrent ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? '#52ffac' : '#666' }}>account_balance_wallet</span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ color: isActive ? '#52ffac' : '#fff', fontSize: 13, fontWeight: 700, margin: 0 }}>Account {acc.index + 1}</p>
-                  <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.address}</p>
+                  <p style={{ color: isCurrent ? '#52ffac' : '#fff', fontSize: 13, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{snap.shortAddress}</p>
+                  <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0' }}>
+                    {snap.vaultMode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'} · {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {isCurrent && <span style={{ marginLeft: 6, color: '#52ffac', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.1em' }}>Active</span>}
+                  </p>
                 </div>
-                {isActive && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 6px rgba(82,255,172,0.6)', flexShrink: 0 }} />}
-              </button>
+                {!isCurrent && (
+                  <button onClick={() => onSwitch(snap.id)}
+                    style={{ flexShrink: 0, background: '#52ffac', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#000', fontSize: 11, fontWeight: 900, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Switch
+                  </button>
+                )}
+                <button onClick={() => onDelete(snap.id)}
+                  style={{ flexShrink: 0, background: 'rgba(255,100,100,0.07)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: '#ff8888', display: 'flex' }}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -1150,10 +1165,9 @@ export function WalletDashboard() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   useEffect(() => { setContacts(loadContacts()); }, []);
 
-  // ── Multi-account ──────────────────────────────────────────────────────────
-  const [accounts, setAccounts] = useState<DerivedAccount[]>([]);
-  const [activeAccountIndex, setActiveAccountIndexState] = useState(getActiveAccountIndex());
-  const [showAccountSwitcher, setShowAccountSwitcher] = useState(false);
+  // ── Saved Vaults ───────────────────────────────────────────────────────────
+  const [showSavedVaults, setShowSavedVaults] = useState(false);
+  const [isSavingVault, setIsSavingVault] = useState(false);
 
   // ── Non-EVM state ──────────────────────────────────────────────────────────
   const [selectedNonEvm, setSelectedNonEvm] = useState<string | null>(null);
@@ -1280,6 +1294,13 @@ export function WalletDashboard() {
       setWalletHistory(getHistory());
     }
   }, [wallet.isUnlocked, wallet.activeAddress]);
+
+  // Re-read history when vault access restores extra saved wallets
+  useEffect(() => {
+    const handler = () => setWalletHistory(getHistory());
+    window.addEventListener('cw:history:updated', handler);
+    return () => window.removeEventListener('cw:history:updated', handler);
+  }, []);
 
   // Freeze last known address so UI doesn't blank during transient wipe
   const [frozenAddress, setFrozenAddress] = useState<string | null>(null);
@@ -1516,17 +1537,24 @@ export function WalletDashboard() {
           onClose={() => setShowAddressBook(false)}
         />
       )}
-      {showAccountSwitcher && (
-        <AccountSwitcherModal
-          accounts={accounts}
-          activeIndex={activeAccountIndex}
-          onSelect={async (idx) => {
-            setActiveAccountIndex(idx);
-            setActiveAccountIndexState(idx);
-            await wallet.switchAccount(idx);
-            setShowAccountSwitcher(false);
+      {showSavedVaults && (
+        <SavedVaultsModal
+          vaults={walletHistory}
+          currentId={currentHistoryId}
+          onSwitch={async (id) => {
+            try {
+              await wallet.switchToSavedWallet(id);
+              setShowSavedVaults(false);
+            } catch {
+              alert('Vault data not found.');
+            }
           }}
-          onClose={() => setShowAccountSwitcher(false)}
+          onDelete={(id) => {
+            deleteSavedVault(id);
+            removeFromHistory(id);
+            setWalletHistory(getHistory());
+          }}
+          onClose={() => setShowSavedVaults(false)}
         />
       )}
       <AnimatePresence>
@@ -1538,7 +1566,7 @@ export function WalletDashboard() {
         )}
       </AnimatePresence>
 
-      <section className="flex-1 pt-[64px] px-4 pb-24 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
+      <section className="flex-1 pt-[64px] px-4 pb-40 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
         <div className="max-w-3xl mx-auto w-full space-y-6 md:space-y-12">
 
           {/* ── Session Heading with Chain Selector + Toggle ── */}
@@ -1641,20 +1669,15 @@ export function WalletDashboard() {
             </div>
           </div>
 
-          {/* ── Account Switcher ── */}
-          {wallet.isUnlocked && !selectedNonEvm && (
+          {/* ── Saved Vaults Switcher ── */}
+          {wallet.isUnlocked && !selectedNonEvm && walletHistory.filter(s => s.isSaved).length > 0 && (
             <button
-              onClick={async () => {
-                const mnemonic = await wallet.getMnemonicForExport();
-                if (!mnemonic) return;
-                setAccounts(deriveAccounts(mnemonic, 6));
-                setShowAccountSwitcher(true);
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.15s', width: 'fit-content' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#52ffac'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.25)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#888'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.08)'; }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>group</span>
-              Account {activeAccountIndex + 1} of HD Wallet
+              onClick={() => setShowSavedVaults(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', color: '#52ffac', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.15s', width: 'fit-content' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.1)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.05)'; }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>account_balance_wallet</span>
+              {walletHistory.filter(s => s.isSaved).length} Saved Vault{walletHistory.filter(s => s.isSaved).length > 1 ? 's' : ''}
               <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_more</span>
             </button>
           )}
@@ -2039,76 +2062,106 @@ export function WalletDashboard() {
             {!selectedNonEvm && activeTab === 'balance' && walletHistory.length > 0 && (
               <div style={{ paddingTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Wallet History</span>
+                  <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Wallet History</span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <AnimatePresence>
                     {walletHistory.map((snap, i) => {
                       const isCurrent = snap.id === currentHistoryId;
                       return (
                         <motion.div
                           key={snap.id}
-                          initial={{ opacity: 0, y: 8 }}
+                          initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -8 }}
-                          transition={{ ...springs.smooth, delay: i * 0.04 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          transition={{ ...springs.smooth, delay: i * 0.03 }}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '10px 14px',
-                            background: isCurrent ? 'rgba(var(--theme-accent-rgb, 82,255,172),0.06)' : 'rgba(255,255,255,0.03)',
-                            border: `1px solid ${isCurrent ? 'rgba(var(--theme-accent-rgb, 82,255,172),0.2)' : 'rgba(255,255,255,0.06)'}`,
-                            borderRadius: '0.75rem', cursor: isCurrent ? 'default' : 'pointer',
-                            transition: 'all 0.15s',
+                            display: 'flex', alignItems: 'center', gap: 12,
+                            padding: '12px 16px',
+                            background: isCurrent ? 'rgba(82,255,172,0.06)' : '#111',
+                            border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                            borderRadius: '0.75rem',
+                            cursor: isCurrent ? 'default' : 'pointer',
+                            transition: 'border-color 0.15s, background 0.15s',
                           }}
-                          onClick={() => {
+                          onClick={async () => {
                             if (isCurrent) return;
-                            // Switch to this wallet — show warning if different address
-                            // For now navigate to advanced for non-current wallets;
-                            // actual session switch requires vault restore flow
+                            try { await wallet.switchToSavedWallet(snap.id); }
+                            catch { alert('Vault data not found.'); }
                           }}
                         >
-                          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? 'var(--theme-accent)' : 'rgba(255,255,255,0.4)' }}>account_balance_wallet</span>
+                          {/* Icon */}
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: isCurrent ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.25)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? '#52ffac' : '#555' }}>account_balance_wallet</span>
                           </div>
+
+                          {/* Info */}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: isCurrent ? 'var(--theme-accent)' : 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                              <span style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: isCurrent ? '#52ffac' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {snap.shortAddress}
                               </span>
                               {isCurrent && (
-                                <span style={{ fontSize: 8, fontWeight: 900, color: 'var(--theme-accent)', background: 'rgba(var(--theme-accent-rgb, 82,255,172),0.12)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
-                                  Current
+                                <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.12)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
+                                  Active
                                 </span>
                               )}
                               {snap.isSaved && !isCurrent && (
-                                <span style={{ fontSize: 8, fontWeight: 900, color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
+                                <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.08)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
                                   Saved
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
-                              {snap.vaultMode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'} · {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            <div style={{ fontSize: 10, color: '#444', fontWeight: 600 }}>
+                              {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </div>
                           </div>
-                          {!snap.isSaved ? (
+
+                          {/* Actions */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {/* Save to Saved Vaults — only if not yet saved */}
+                            {!snap.isSaved && (
+                              <button
+                                disabled={isSavingVault}
+                                onClick={async e => {
+                                  e.stopPropagation();
+                                  setIsSavingVault(true);
+                                  try {
+                                    await wallet.persistCurrentWallet(snap.id);
+                                    setWalletHistory(getHistory());
+                                  } catch { alert('Failed to save vault.'); }
+                                  finally { setIsSavingVault(false); }
+                                }}
+                                style={{ background: 'none', border: '1px solid rgba(82,255,172,0.35)', borderRadius: 6, padding: '5px 10px', color: '#52ffac', cursor: isSavingVault ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: isSavingVault ? 0.5 : 1 }}>
+                                {isSavingVault ? '…' : 'Save'}
+                              </button>
+                            )}
+                            {/* Switch — available for all non-current entries */}
+                            {!isCurrent && (
+                              <button
+                                onClick={async e => {
+                                  e.stopPropagation();
+                                  try { await wallet.switchToSavedWallet(snap.id); }
+                                  catch { alert('Vault data not found.'); }
+                                }}
+                                style={{ background: '#52ffac', border: 'none', borderRadius: 6, padding: '5px 12px', color: '#000', cursor: 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                Switch
+                              </button>
+                            )}
                             <button
-                              onClick={e => { e.stopPropagation(); saveWallet(snap.id); setWalletHistory(getHistory()); }}
-                              style={{ flexShrink: 0, background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.4rem', padding: '3px 8px', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.15s' }}
-                              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--theme-accent)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--theme-accent)'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.4)'; }}>
-                              Kaydet
-                            </button>
-                          ) : (
-                            <button
-                              onClick={e => { e.stopPropagation(); removeFromHistory(snap.id); setWalletHistory(getHistory()); }}
-                              style={{ flexShrink: 0, background: 'none', border: 'none', padding: '3px 6px', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', borderRadius: '0.4rem', transition: 'color 0.15s' }}
+                              onClick={e => {
+                                e.stopPropagation();
+                                deleteSavedVault(snap.id);
+                                removeFromHistory(snap.id);
+                                setWalletHistory(getHistory());
+                              }}
+                              style={{ background: 'none', border: 'none', padding: '4px 6px', color: '#333', cursor: 'pointer', borderRadius: 6, transition: 'color 0.15s', display: 'flex' }}
                               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ff6b6b'; }}
-                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.2)'; }}
-                              title="Remove from history">
+                              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#333'; }}>
                               <X size={12} />
                             </button>
-                          )}
+                          </div>
                         </motion.div>
                       );
                     })}
@@ -2122,7 +2175,7 @@ export function WalletDashboard() {
               <div style={{ paddingTop: 8, textAlign: 'center' }}>
                 <button onClick={() => setMode('advanced')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', transition: 'color 0.2s' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--theme-accent)'; }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#52ffac'; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#555'; }}>
                   Didn&apos;t find what you&apos;re looking for? Try Advanced Mode →
                 </button>

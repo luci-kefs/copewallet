@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@aptos-labs/ts-sdk": "^6.3.1",
@@ -39,6 +41,7 @@
     "xrpl": "^4.6.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@testing-library/react": "^16.3.2",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^20",
