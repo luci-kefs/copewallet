@@ -8,6 +8,7 @@ import { ephemeralSign } from '@/lib/signer';
 import { ledgerSign, LedgerEntry } from '@/lib/ledger';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
+import { scanToken, type TokenRisk, riskColor, riskBg } from '@/lib/security-scan';
 
 // LiFi-supported chain IDs that we also have in CHAINS
 const SWAP_CHAIN_IDS = new Set([1, 10, 56, 137, 324, 8453, 42161, 43114, 59144, 81457, 534352]);
@@ -164,6 +165,9 @@ export function SwapModal({ onClose, activeLedger }: { onClose: () => void; acti
   const [errMsg, setErrMsg] = useState('');
   const [txHash, setTxHash] = useState('');
   const [approveTxHash, setApproveTxHash] = useState('');
+  const [fromTokenRisk, setFromTokenRisk] = useState<TokenRisk | null>(null);
+  const [toTokenRisk, setToTokenRisk] = useState<TokenRisk | null>(null);
+  const [riskDismissed, setRiskDismissed] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && status !== 'signing' && status !== 'sending' && status !== 'approving') onClose(); };
@@ -174,6 +178,19 @@ export function SwapModal({ onClose, activeLedger }: { onClose: () => void; acti
   // Reset tokens when chains change
   useEffect(() => { setFromToken(null); }, [fromChain.id]);
   useEffect(() => { setToToken(null); }, [toChain.id]);
+
+  // Scan tokens for security risks when selected
+  useEffect(() => {
+    setFromTokenRisk(null); setRiskDismissed(false);
+    if (!fromToken || fromToken.address === '0x0000000000000000000000000000000000000000') return;
+    scanToken(fromChain.id, fromToken.address).then(setFromTokenRisk).catch(() => {});
+  }, [fromToken?.address, fromChain.id]);
+
+  useEffect(() => {
+    setToTokenRisk(null); setRiskDismissed(false);
+    if (!toToken || toToken.address === '0x0000000000000000000000000000000000000000') return;
+    scanToken(toChain.id, toToken.address).then(setToTokenRisk).catch(() => {});
+  }, [toToken?.address, toChain.id]);
 
   const getQuote = useCallback(async () => {
     if (!fromToken || !toToken || !amount || !wallet.activeAddress) return;
@@ -396,12 +413,56 @@ export function SwapModal({ onClose, activeLedger }: { onClose: () => void; acti
 
               {errMsg && <p style={{ color: '#ff8888', fontSize: 12, margin: 0 }}>{errMsg}</p>}
 
-              <button
-                onClick={getQuote}
-                disabled={!fromToken || !toToken || !amount}
-                style={{ background: fromToken && toToken && amount ? '#52ffac' : 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '1rem', color: fromToken && toToken && amount ? '#000' : '#555', fontWeight: 900, fontSize: 14, padding: '14px', cursor: fromToken && toToken && amount ? 'pointer' : 'not-allowed', fontFamily: 'inherit', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.2s' }}>
-                Get Quote
-              </button>
+              {/* Token security risk warnings */}
+              {!riskDismissed && (() => {
+                const risks: { label: string; flags: string[]; level: 'danger' | 'warning' }[] = [];
+                if (fromTokenRisk && fromTokenRisk.level !== 'safe' && fromTokenRisk.level !== 'unknown' && fromTokenRisk.flags.length > 0) {
+                  risks.push({ label: `From token (${fromToken?.symbol})`, flags: fromTokenRisk.flags, level: fromTokenRisk.level as 'danger' | 'warning' });
+                }
+                if (toTokenRisk && toTokenRisk.level !== 'safe' && toTokenRisk.level !== 'unknown' && toTokenRisk.flags.length > 0) {
+                  risks.push({ label: `To token (${toToken?.symbol})`, flags: toTokenRisk.flags, level: toTokenRisk.level as 'danger' | 'warning' });
+                }
+                if (risks.length === 0) return null;
+                const topLevel = risks.some(r => r.level === 'danger') ? 'danger' : 'warning';
+                return (
+                  <div style={{ background: riskBg(topLevel), border: `1px solid ${riskColor(topLevel)}44`, borderRadius: '1rem', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: riskColor(topLevel) }}>
+                        {topLevel === 'danger' ? '⚠ Token Risk Detected' : '⚡ Caution'}
+                      </span>
+                      <button onClick={() => setRiskDismissed(true)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✕</button>
+                    </div>
+                    {risks.map((r, ri) => (
+                      <div key={ri}>
+                        <p style={{ fontSize: 9, color: '#888', fontWeight: 900, textTransform: 'uppercase', margin: '0 0 2px' }}>{r.label}</p>
+                        {r.flags.map((f, fi) => (
+                          <p key={fi} style={{ fontSize: 11, color: riskColor(r.level), margin: '1px 0', fontWeight: 600 }}>• {f}</p>
+                        ))}
+                      </div>
+                    ))}
+                    <p style={{ fontSize: 9, color: '#666', margin: '4px 0 0', fontStyle: 'italic' }}>
+                      Powered by GoPlus Security · dismiss to proceed anyway
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const hasBlockingRisk = !riskDismissed && (
+                  (fromTokenRisk?.level === 'danger' && (fromTokenRisk.flags.length > 0)) ||
+                  (toTokenRisk?.level === 'danger' && (toTokenRisk.flags.length > 0))
+                );
+                const canQuote = !!(fromToken && toToken && amount) && !hasBlockingRisk;
+                return (
+                  <button
+                    onClick={getQuote}
+                    disabled={!fromToken || !toToken || !amount || hasBlockingRisk}
+                    style={{ background: canQuote ? '#52ffac' : hasBlockingRisk ? '#3a1a1a' : 'rgba(255,255,255,0.08)', border: hasBlockingRisk ? '1px solid rgba(248,113,113,0.3)' : 'none', borderRadius: '1rem', color: canQuote ? '#000' : hasBlockingRisk ? '#f87171' : '#555', fontWeight: 900, fontSize: hasBlockingRisk ? 11 : 14, padding: '14px', cursor: canQuote ? 'pointer' : 'not-allowed', fontFamily: 'inherit', textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.2s' }}>
+                    {hasBlockingRisk ? 'Dismiss Risk Warning First' : 'Get Quote'}
+                  </button>
+                );
+              })()}
             </div>
           )}
 
