@@ -19,6 +19,7 @@ import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { WalletConnectModal } from '@/components/WalletConnectModal';
 import { AdvancedDashboard } from '@/components/AdvancedDashboard';
+import { SwapModal } from '@/components/SwapModal';
 import type { ChainTx } from '@/components/ChainPanel';
 import { deriveBTCWallet, getBTCBalance, getBTCTransactions, estimateBTCFee, buildBTCTransaction, broadcastBTC } from '@/lib/btc';
 import { deriveDOGEWallet, getDOGEBalance, getDOGETransactions, estimateDOGEFee, buildDOGETransaction, broadcastDOGE } from '@/lib/doge';
@@ -1265,6 +1266,7 @@ export function WalletDashboard() {
   const [showWC, setShowWC] = useState(false);
   const [showNonEvmSend, setShowNonEvmSend] = useState(false);
   const [showBuyCrypto, setShowBuyCrypto] = useState(false);
+  const [showSwap, setShowSwap] = useState(false);
   const [extPresent, setExtPresent] = useState(false);
   const [extAttached, setExtAttached] = useState(false);
   const [extAttaching, setExtAttaching] = useState(false);
@@ -1687,6 +1689,7 @@ export function WalletDashboard() {
   return (
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
+      {showSwap && !selectedNonEvm && <SwapModal onClose={() => setShowSwap(false)} />}
       {showBuyCrypto && displayAddress && <BuyCryptoModal address={displayAddress} onClose={() => setShowBuyCrypto(false)} />}
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); setSelectedNonEvm(null); }} selectedNonEvm={selectedNonEvm} onSelectNonEvm={coin => { setSelectedNonEvm(coin); }} onClose={() => setShowNetworks(false)} />}
       {showQR && displayAddress && <QRModal address={displayAddress} onClose={() => setShowQR(false)} />}
@@ -1887,6 +1890,7 @@ export function WalletDashboard() {
               { icon: 'north_east',   label: 'Send',              onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
               { icon: 'qr_code_2',   label: 'QR / Receive',      onClick: () => setShowQR(true) },
               { icon: 'credit_card', label: 'Buy Crypto',         onClick: () => { if (displayAddress) setShowBuyCrypto(true); } },
+              { icon: 'swap_vert',   label: 'Swap',               onClick: () => { if (!selectedNonEvm) setShowSwap(true); }, disabled: !!selectedNonEvm },
               { icon: 'contacts',    label: 'Address Book',       onClick: () => setShowAddressBook(true) },
               { icon: 'add_card',    label: 'Create New Wallet',  onClick: () => setShowNewWalletWarning(true) },
             ].map((item) => (
