@@ -1009,6 +1009,27 @@ function LightningTab() {
   );
 }
 
+// ─── Non-EVM address format validators ───────────────────────────────────────
+const NON_EVM_ADDR_RE: Record<string, RegExp> = {
+  BTC:   /^(bc1[ac-hj-np-z02-9]{6,87}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/,
+  LTC:   /^(ltc1[ac-hj-np-z02-9]{6,87}|[LM3][a-km-zA-HJ-NP-Z1-9]{25,34})$/,
+  DOGE:  /^D[5-9A-HJ-NP-U][1-9A-HJ-NP-Za-km-z]{32}$/,
+  BCH:   /^(bitcoincash:)?(q|p)[a-z0-9]{41}$|^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/,
+  SOL:   /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
+  XRP:   /^r[0-9a-zA-Z]{24,34}$/,
+  XLM:   /^G[A-Z2-7]{55}$/,
+  NANO:  /^nano_[13][13456789abcdefghijkmnopqrstuwxyz]{59}$|^xrb_[13][13456789abcdefghijkmnopqrstuwxyz]{59}$/,
+  HBAR:  /^(0\.)?(0\.)?[0-9]+\.[0-9]+\.[0-9]+$|^[0-9a-fA-F]{64}$/,
+  SUI:   /^0x[0-9a-fA-F]{64}$/,
+  APTOS: /^0x[0-9a-fA-F]{64}$/,
+};
+
+function validateNonEvmAddress(coin: string, address: string): string | null {
+  const re = NON_EVM_ADDR_RE[coin];
+  if (!re) return null; // unknown coin — skip validation
+  return re.test(address.trim()) ? null : `Invalid ${coin} address format`;
+}
+
 // ─── Non-EVM Send Modal ───────────────────────────────────────────────────────
 function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
   coin: string;
@@ -1037,6 +1058,8 @@ function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
   const handleSend = async () => {
     const amt = parseFloat(amount);
     if (!to.trim() || isNaN(amt) || amt <= 0) { setErrMsg('Enter a valid address and amount.'); return; }
+    const addrErr = validateNonEvmAddress(coin, to.trim());
+    if (addrErr) { setErrMsg(addrErr); return; }
     setStatus('sending'); setErrMsg('');
     try {
       const id = await onSend(to.trim(), amt, feeSpeed);
@@ -1111,6 +1134,15 @@ function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
                   </div>
                 )}
               </div>
+              {/* Inline address format hint */}
+              {to.trim().length > 10 && (() => {
+                const err = validateNonEvmAddress(coin, to.trim());
+                return err ? (
+                  <p style={{ fontSize: 10, color: '#f87171', marginTop: 5, fontWeight: 600 }}>✕ {err}</p>
+                ) : (
+                  <p style={{ fontSize: 10, color: '#4ade80', marginTop: 5, fontWeight: 600 }}>✓ Address format valid</p>
+                );
+              })()}
             </div>
             <div>
               <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Amount ({meta?.symbol ?? coin})</p>
