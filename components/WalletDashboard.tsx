@@ -188,6 +188,8 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [selectedChain, setSelectedChain] = useState<Chain>(defaultChain);
   const [networkOpen, setNetworkOpen] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contacts, setContacts] = useState(() => loadContacts());
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(tokens);
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(null);
   const [status, setStatus] = useState<'idle' | 'simulating' | 'signing' | 'sending' | 'done' | 'error'>('idle');
@@ -510,27 +512,51 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
             )}
 
             {/* Recipient */}
-            <div style={{ ...box, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="text" placeholder="Recipient address (0x...)" autoComplete="off"
-                value={to} onChange={e => setTo(e.target.value)} style={{ ...inp, flex: 1 }} />
-              <button
-                type="button"
-                onClick={() => qrInputRef.current?.click()}
-                title="Scan QR code"
-                style={{ flexShrink: 0, background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 8, padding: '5px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#52ffac" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-                  <line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="21" y2="14"/><line x1="14" y1="17" x2="14" y2="21"/><line x1="21" y1="17" x2="17" y2="21"/>
-                </svg>
-              </button>
-              <input
-                ref={qrInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleQRScan(f); e.target.value = ''; }}
-              />
+            <div style={{ position: 'relative' }}>
+              <div style={{ ...box, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input type="text" placeholder="Recipient address (0x...)" autoComplete="off"
+                  value={to} onChange={e => { setTo(e.target.value); setContactOpen(false); }} style={{ ...inp, flex: 1 }} />
+                {contacts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setContactOpen(o => !o)}
+                    title="Address book"
+                    style={{ flexShrink: 0, background: contactOpen ? 'rgba(82,255,172,0.15)' : 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 8, padding: '5px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#52ffac" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => qrInputRef.current?.click()}
+                  title="Scan QR code"
+                  style={{ flexShrink: 0, background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 8, padding: '5px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="#52ffac" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                    <line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="21" y2="14"/><line x1="14" y1="17" x2="14" y2="21"/><line x1="21" y1="17" x2="17" y2="21"/>
+                  </svg>
+                </button>
+                <input
+                  ref={qrInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleQRScan(f); e.target.value = ''; }}
+                />
+              </div>
+              {contactOpen && contacts.length > 0 && (
+                <div className="popup-enter" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 60, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 180, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                  {contacts.map(c => (
+                    <button key={c.id} onClick={() => { setTo(c.address); setContactOpen(false); }}
+                      style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 14px', width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{c.name}</span>
+                      <span style={{ fontSize: 10, color: '#555', fontFamily: 'monospace' }}>{c.address.slice(0,10)}...{c.address.slice(-6)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Amount */}
@@ -893,6 +919,8 @@ function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
   }, [onClose]);
 
   const hasFeeSelector = ['BTC', 'DOGE', 'BCH', 'LTC'].includes(coin);
+  const [contactOpen, setContactOpen] = useState(false);
+  const contacts = loadContacts();
 
   const handleSend = async () => {
     const amt = parseFloat(amount);
@@ -947,7 +975,30 @@ function NonEvmSendModal({ coin, fromAddress, onSend, onClose }: {
             </div>
             <div>
               <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Recipient Address</p>
-              <input style={inp} placeholder={`${meta?.name ?? coin} address`} value={to} onChange={e => setTo(e.target.value)} />
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <input style={{ ...inp, flex: 1 }} placeholder={`${meta?.name ?? coin} address`} value={to} onChange={e => { setTo(e.target.value); setContactOpen(false); }} />
+                  {contacts.length > 0 && (
+                    <button type="button" onClick={() => setContactOpen(o => !o)} title="Address book"
+                      style={{ flexShrink: 0, background: contactOpen ? 'rgba(82,255,172,0.15)' : 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 10, padding: '0 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="#52ffac" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {contactOpen && contacts.length > 0 && (
+                  <div className="popup-enter" style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 60, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', maxHeight: 180, overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}>
+                    {contacts.map(c => (
+                      <button key={c.id} onClick={() => { setTo(c.address); setContactOpen(false); }}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '10px 14px', width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{c.name}</span>
+                        <span style={{ fontSize: 10, color: '#555', fontFamily: 'monospace' }}>{c.address.slice(0,10)}...{c.address.slice(-6)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div>
               <p style={{ color: '#888', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Amount ({meta?.symbol ?? coin})</p>
@@ -2107,7 +2158,7 @@ export function WalletDashboard() {
                                   Active
                                 </span>
                               )}
-                              {snap.isSaved && !isCurrent && (
+                              {snap.isSaved && (
                                 <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.08)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
                                   Saved
                                 </span>
