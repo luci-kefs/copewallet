@@ -149,13 +149,14 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
         setPendingProposal(proposal);
       },
       onRequest: async (event) => {
-        // Get dApp name
+        // Get dApp name + URL, then trigger a fresh security scan for this request
         try {
           const raw = await wcGetActiveSessions();
           const sess = raw[event.topic] as unknown as Record<string, unknown> | undefined;
           const peer = sess?.peer as Record<string, unknown> | undefined;
           const meta = peer?.metadata as Record<string, unknown> | undefined;
           const dAppName = (meta?.name as string) || 'Unknown dApp';
+          const dAppUrl = (meta?.url as string) || '';
           setPendingRequest({
             event,
             method: event.params.request.method,
@@ -163,6 +164,11 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
             params: event.params.request.params,
             dAppName,
           });
+          // Re-scan on every signing request — user may have connected to a new dApp
+          if (dAppUrl) {
+            setDappRisk(null); setDappRiskDismissed(false);
+            scanDApp(dAppUrl).then(setDappRisk).catch(() => {});
+          }
         } catch {
           setPendingRequest({
             event,
@@ -428,6 +434,23 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
                 </pre>
               </div>
 
+              {/* GoPlus security risk warning for this dApp */}
+              {dappRisk && !dappRiskDismissed && dappRisk.level !== 'safe' && dappRisk.level !== 'unknown' && dappRisk.flags.length > 0 && (
+                <div style={{ background: riskBg(dappRisk.level), border: `1px solid ${riskColor(dappRisk.level)}44`, borderRadius: '1rem', padding: '12px 14px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: riskColor(dappRisk.level) }}>
+                      {dappRisk.level === 'danger' ? '⚠ Suspicious dApp' : '⚡ Caution'}
+                    </span>
+                    <button onClick={() => setDappRiskDismissed(true)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✕</button>
+                  </div>
+                  {dappRisk.flags.map((f, i) => (
+                    <p key={i} style={{ fontSize: 11, color: riskColor(dappRisk.level), margin: '1px 0', fontWeight: 600 }}>• {f}</p>
+                  ))}
+                  <p style={{ fontSize: 9, color: '#666', margin: '4px 0 0', fontStyle: 'italic' }}>Powered by GoPlus Security</p>
+                </div>
+              )}
+
               {/* Warning */}
               <div style={{ display: 'flex', gap: 10, padding: '10px 14px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '0.75rem', marginBottom: 20 }}>
                 <AlertTriangle size={14} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 1 }} />
@@ -442,16 +465,21 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
                 <p style={{ color: '#ffdad6', fontSize: 11, marginBottom: 14 }}>{requestError}</p>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <button onClick={handleRejectRequest} disabled={requestLoading}
-                  style={{ padding: '14px', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#c6c6c6', fontWeight: 900, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}>
-                  Reject
-                </button>
-                <button onClick={handleApproveRequest} disabled={requestLoading}
-                  style={{ padding: '14px', borderRadius: '1rem', border: 'none', background: requestLoading ? '#1a1a1a' : '#52ffac', color: requestLoading ? '#555' : '#002111', fontWeight: 900, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: requestLoading ? 'not-allowed' : 'pointer' }}>
-                  {requestLoading ? 'Signing...' : 'Confirm'}
-                </button>
-              </div>
+              {(() => {
+                const blocked = !dappRiskDismissed && dappRisk?.level === 'danger' && (dappRisk.flags.length > 0);
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <button onClick={handleRejectRequest} disabled={requestLoading}
+                      style={{ padding: '14px', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#c6c6c6', fontWeight: 900, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}>
+                      Reject
+                    </button>
+                    <button onClick={handleApproveRequest} disabled={requestLoading || !!blocked}
+                      style={{ padding: '14px', borderRadius: '1rem', border: blocked ? '1px solid rgba(248,113,113,0.3)' : 'none', background: requestLoading ? '#1a1a1a' : blocked ? '#3a1a1a' : '#52ffac', color: requestLoading ? '#555' : blocked ? '#f87171' : '#002111', fontWeight: 900, fontSize: blocked ? 10 : 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: (requestLoading || blocked) ? 'not-allowed' : 'pointer' }}>
+                      {requestLoading ? 'Signing...' : blocked ? 'Dismiss Warning First' : 'Confirm'}
+                    </button>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
