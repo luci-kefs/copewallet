@@ -5,6 +5,7 @@ import { X, Check, ArrowDownUp } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
 import { CHAINS, Chain } from '@/lib/chains';
 import { ephemeralSign } from '@/lib/signer';
+import { ledgerSign, LedgerEntry } from '@/lib/ledger';
 import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 
@@ -150,7 +151,7 @@ function TokenPicker({ chainId, value, onChange, label }: {
   );
 }
 
-export function SwapModal({ onClose }: { onClose: () => void }) {
+export function SwapModal({ onClose, activeLedger }: { onClose: () => void; activeLedger?: LedgerEntry | null }) {
   const wallet = useWallet();
 
   const [fromChain, setFromChain] = useState<Chain>(SWAP_CHAINS[0]);
@@ -204,7 +205,7 @@ export function SwapModal({ onClose }: { onClose: () => void }) {
   }, [fromToken, toToken, amount, wallet.activeAddress, fromChain.id, toChain.id]);
 
   const executeSwap = async () => {
-    if (!quote?.transactionRequest || !wallet.activeAddress || !wallet.scatteredKeyStore) return;
+    if (!quote?.transactionRequest || !wallet.activeAddress || (!wallet.scatteredKeyStore && !activeLedger)) return;
     const tx = quote.transactionRequest;
 
     // Check if ERC-20 approval needed
@@ -223,7 +224,9 @@ export function SwapModal({ onClose }: { onClose: () => void }) {
             data: approveTx.data,
             chainId: fromChain.id,
           };
-          const signedApprove = await ephemeralSign(wallet.scatteredKeyStore, approveTxRequest);
+          const signedApprove = activeLedger
+            ? await ledgerSign(activeLedger.derivationPath, { ...approveTxRequest, from: wallet.activeAddress })
+            : await ephemeralSign(wallet.scatteredKeyStore!, approveTxRequest);
           const approveSent = await provider.send('eth_sendRawTransaction', [signedApprove]);
           if (approveSent && typeof approveSent === 'object') {
             const msg = (approveSent as Record<string, unknown>).message;
@@ -250,7 +253,9 @@ export function SwapModal({ onClose }: { onClose: () => void }) {
         ...(tx.gasLimit ? { gasLimit: BigInt(tx.gasLimit) } : {}),
         ...(tx.gasPrice ? { gasPrice: BigInt(tx.gasPrice) } : {}),
       };
-      const signed = await ephemeralSign(wallet.scatteredKeyStore, swapTxRequest);
+      const signed = activeLedger
+        ? await ledgerSign(activeLedger.derivationPath, { ...swapTxRequest, from: wallet.activeAddress })
+        : await ephemeralSign(wallet.scatteredKeyStore!, swapTxRequest);
       setStatus('sending');
       const provider = getProvider(fromChain.id);
       const result = await provider.send('eth_sendRawTransaction', [signed]);
@@ -323,7 +328,7 @@ export function SwapModal({ onClose }: { onClose: () => void }) {
               <span style={{ color: '#c6c6c6', fontSize: 13, fontWeight: 700 }}>
                 {status === 'quoting' ? 'Getting best route…'
                   : status === 'approving' ? 'Approving token spend…'
-                  : status === 'signing' ? 'Signing transaction…'
+                  : status === 'signing' ? (activeLedger ? 'Check your Ledger and confirm…' : 'Signing transaction…')
                   : 'Broadcasting swap…'}
               </span>
             </div>
@@ -430,6 +435,11 @@ export function SwapModal({ onClose }: { onClose: () => void }) {
               {!fromToken || fromToken.address !== '0x0000000000000000000000000000000000000000' && quote.estimate.approvalAddress && (
                 <p style={{ color: '#aaa', fontSize: 11, background: 'rgba(255,200,0,0.06)', border: '1px solid rgba(255,200,0,0.15)', borderRadius: 10, padding: '8px 12px', margin: 0 }}>
                   Token approval will be sent first (~12s wait), then the swap.
+                </p>
+              )}
+              {activeLedger && (
+                <p style={{ color: '#c7d2fe', fontSize: 11, background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.2)', borderRadius: 10, padding: '8px 12px', margin: 0 }}>
+                  <strong>Ledger:</strong> Your device will show contract call data. Enable &ldquo;Blind signing&rdquo; in the Ethereum app settings if prompted.
                 </p>
               )}
 

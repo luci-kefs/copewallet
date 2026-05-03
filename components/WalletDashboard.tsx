@@ -39,6 +39,8 @@ import { WarningBanner } from '@/components/WarningBanner';
 import { TransferModal } from '@/components/TransferModal';
 import { loadContacts, addContact, deleteContact, Contact } from '@/lib/address-book';
 import { fetchNFTs, NFTItem } from '@/lib/nfts';
+import { LedgerConnectModal } from '@/components/LedgerConnectModal';
+import { ledgerSign, LedgerEntry } from '@/lib/ledger';
 
 type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning';
 
@@ -176,11 +178,12 @@ function AllNetworksModal({ selected, onSelect, selectedNonEvm, onSelectNonEvm, 
 }
 
 // ─── Send Modal ───────────────────────────────────────────────────────────────
-function SendModal({ tokens, prices, defaultChain, onClose }: {
+function SendModal({ tokens, prices, defaultChain, onClose, activeLedger }: {
   tokens: TokenBalance[];
   prices: Record<string, number>;
   defaultChain: Chain;
   onClose: () => void;
+  activeLedger?: LedgerEntry | null;
 }) {
   const wallet = useWallet();
   const [to, setTo] = useState('');
@@ -362,14 +365,16 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   };
 
   const executeSend = async (contractAddr?: string, decimals = 18) => {
-    if (!wallet.activeAddress || !wallet.scatteredKeyStore) return;
+    if (!wallet.activeAddress || (!wallet.scatteredKeyStore && !activeLedger)) return;
     setStatus('signing'); setErrMsg('');
     try {
       const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id, contractAddr, decimals);
       setStatus('sending');
       await stealthDelay();
       void fireDummyEchoes();
-      const signed = await ephemeralSign(wallet.scatteredKeyStore, tx);
+      const signed = activeLedger
+        ? await ledgerSign(activeLedger.derivationPath, { ...tx, from: wallet.activeAddress })
+        : await ephemeralSign(wallet.scatteredKeyStore!, tx);
       const provider = getProvider(selectedChain.id);
       const result = await provider.send('eth_sendRawTransaction', [signed]);
       if (result && typeof result === 'object') {
@@ -1267,6 +1272,8 @@ export function WalletDashboard() {
   const [showNonEvmSend, setShowNonEvmSend] = useState(false);
   const [showBuyCrypto, setShowBuyCrypto] = useState(false);
   const [showSwap, setShowSwap] = useState(false);
+  const [showLedger, setShowLedger] = useState(false);
+  const [activeLedger, setActiveLedger] = useState<LedgerEntry | null>(null);
   const [extPresent, setExtPresent] = useState(false);
   const [extAttached, setExtAttached] = useState(false);
   const [extAttaching, setExtAttaching] = useState(false);
@@ -1688,8 +1695,14 @@ export function WalletDashboard() {
 
   return (
     <>
-      {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
-      {showSwap && !selectedNonEvm && <SwapModal onClose={() => setShowSwap(false)} />}
+      {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} activeLedger={activeLedger} />}
+      {showSwap && !selectedNonEvm && <SwapModal onClose={() => setShowSwap(false)} activeLedger={activeLedger} />}
+      {showLedger && (
+        <LedgerConnectModal
+          onConnect={(entry) => { setActiveLedger(entry); setShowLedger(false); }}
+          onClose={() => setShowLedger(false)}
+        />
+      )}
       {showBuyCrypto && displayAddress && <BuyCryptoModal address={displayAddress} onClose={() => setShowBuyCrypto(false)} />}
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); setSelectedNonEvm(null); }} selectedNonEvm={selectedNonEvm} onSelectNonEvm={coin => { setSelectedNonEvm(coin); }} onClose={() => setShowNetworks(false)} />}
       {showQR && displayAddress && <QRModal address={displayAddress} onClose={() => setShowQR(false)} />}
@@ -1883,6 +1896,24 @@ export function WalletDashboard() {
             </div>
           )}
 
+          {/* ── Ledger Active Banner ── */}
+          {activeLedger && (
+            <div style={{ background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.25)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#818cf8' }}>usb</span>
+                <div>
+                  <p style={{ color: '#c7d2fe', fontSize: 12, fontWeight: 700, margin: 0 }}>Ledger Active</p>
+                  <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', margin: '1px 0 0' }}>{activeLedger.address.slice(0, 10)}...{activeLedger.address.slice(-6)}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveLedger(null)}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', color: '#888', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Disconnect
+              </button>
+            </div>
+          )}
+
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             {[
@@ -1893,6 +1924,7 @@ export function WalletDashboard() {
               { icon: 'swap_vert',   label: 'Swap',               onClick: () => { if (!selectedNonEvm) setShowSwap(true); }, disabled: !!selectedNonEvm },
               { icon: 'contacts',    label: 'Address Book',       onClick: () => setShowAddressBook(true) },
               { icon: 'add_card',    label: 'Create New Wallet',  onClick: () => setShowNewWalletWarning(true) },
+              { icon: 'usb',         label: 'Ledger',             onClick: () => setShowLedger(true) },
             ].map((item) => (
               <motion.button
                 key={item.label}
