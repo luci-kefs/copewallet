@@ -192,7 +192,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
   const [contacts, setContacts] = useState(() => loadContacts());
   const [chainTokens, setChainTokens] = useState<TokenBalance[]>(tokens);
   const [selectedToken, setSelectedToken] = useState<TokenBalance | null>(null);
-  const [status, setStatus] = useState<'idle' | 'simulating' | 'signing' | 'sending' | 'done' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'simulating' | 'confirm' | 'signing' | 'sending' | 'done' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
   const [simResult, setSimResult] = useState<{ changes: Array<{ changeType: string; from: string; to: string; amount?: string; symbol?: string }>; gas: number } | null>(null);
@@ -335,7 +335,7 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
     const contractAddr = (!isNative && selectedToken) ? selectedToken.contractAddress as string : undefined;
     const decimals = selectedToken?.decimals ?? 18;
 
-    // Simulate first if Alchemy chain
+    // Simulate first if Alchemy chain — then show confirm step
     if (selectedChain.isAlchemy) {
       setStatus('simulating'); setErrMsg(''); setSimResult(null);
       try {
@@ -352,8 +352,16 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
           }
         }
       } catch {}
+      // Pause here — user must confirm before broadcasting
+      setStatus('confirm');
+      return;
     }
 
+    await executeSend(contractAddr, decimals);
+  };
+
+  const executeSend = async (contractAddr?: string, decimals = 18) => {
+    if (!wallet.activeAddress || !wallet.scatteredKeyStore) return;
     setStatus('signing'); setErrMsg('');
     try {
       const tx = await buildMaskedTransaction(to, amountStr, wallet.activeAddress, selectedChain.id, contractAddr, decimals);
@@ -598,23 +606,58 @@ function SendModal({ tokens, prices, defaultChain, onClose }: {
               </span>
             </div>
 
-            {/* Simulation preview */}
-            {simResult && simResult.changes.length > 0 && (
-              <div style={{ background: 'rgba(82,255,172,0.04)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 10, padding: '10px 12px' }}>
-                <p style={{ color: '#52ffac', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Simulation Preview</p>
-                {simResult.changes.slice(0, 4).map((c, i) => (
-                  <p key={i} style={{ color: '#888', fontSize: 10, margin: '2px 0', fontFamily: 'monospace' }}>
-                    {c.changeType === 'TRANSFER' ? (c.from?.toLowerCase() === wallet.activeAddress?.toLowerCase() ? '↑ Send' : '↓ Receive') : c.changeType}
-                    {c.amount ? ` ${parseFloat(c.amount).toFixed(4)} ${c.symbol ?? ''}` : ''}
-                  </p>
-                ))}
-                {simResult.gas > 0 && <p style={{ color: '#444', fontSize: 9, margin: '6px 0 0' }}>Gas: {simResult.gas.toLocaleString()}</p>}
+            {/* Confirm screen — shown after simulation completes */}
+            {status === 'confirm' && (
+              <div style={{ background: 'rgba(82,255,172,0.04)', border: '1px solid rgba(82,255,172,0.2)', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ color: '#52ffac', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em', margin: 0 }}>Transaction Preview</p>
+                {/* Summary row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 11, color: '#aaa', fontWeight: 700 }}>Sending</span>
+                  <span style={{ fontSize: 13, color: '#fff', fontWeight: 900, fontFamily: 'monospace' }}>{amountStr} {tokenSymbol}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+                  <span style={{ fontSize: 11, color: '#aaa', fontWeight: 700 }}>To</span>
+                  <span style={{ fontSize: 10, color: '#fff', fontWeight: 700, fontFamily: 'monospace' }}>{to.slice(0, 10)}…{to.slice(-6)}</span>
+                </div>
+                {feeEth && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+                    <span style={{ fontSize: 11, color: '#aaa', fontWeight: 700 }}>Network Fee</span>
+                    <span style={{ fontSize: 10, color: '#aaa', fontWeight: 700 }}>~{feeEth} {selectedChain.symbol}{feeUsd !== null && feeUsd > 0 ? ` (${formatUSD(feeUsd)})` : ''}</span>
+                  </div>
+                )}
+                {/* Simulation balance changes */}
+                {simResult && simResult.changes.length > 0 && (
+                  <div>
+                    <p style={{ color: '#555', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '4px 0' }}>Simulated Balance Changes</p>
+                    {simResult.changes.slice(0, 4).map((c, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+                        <span style={{ fontSize: 10, color: '#666', fontFamily: 'monospace' }}>
+                          {c.changeType === 'TRANSFER' ? (c.from?.toLowerCase() === wallet.activeAddress?.toLowerCase() ? '↑ Out' : '↓ In') : c.changeType}
+                        </span>
+                        {c.amount && <span style={{ fontSize: 10, color: c.from?.toLowerCase() === wallet.activeAddress?.toLowerCase() ? '#ff8888' : '#52ffac', fontWeight: 900 }}>
+                          {parseFloat(c.amount).toFixed(4)} {c.symbol ?? ''}
+                        </span>}
+                      </div>
+                    ))}
+                    {simResult.gas > 0 && <p style={{ color: '#444', fontSize: 9, margin: '4px 0 0' }}>Gas: {simResult.gas.toLocaleString()}</p>}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button onClick={() => { setStatus('idle'); setSimResult(null); }}
+                    style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', fontSize: 12, fontWeight: 900, color: '#aaa', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Cancel
+                  </button>
+                  <button onClick={() => { const contractAddr = (!isNative && selectedToken) ? selectedToken.contractAddress as string : undefined; executeSend(contractAddr, selectedToken?.decimals ?? 18); }}
+                    style={{ flex: 2, padding: '12px', background: '#52ffac', border: 'none', borderRadius: '1rem', fontSize: 12, fontWeight: 900, color: '#002111', cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Confirm & Send
+                  </button>
+                </div>
               </div>
             )}
 
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
 
-            {(() => {
+            {status !== 'confirm' && (() => {
               const isProcessing = status === 'signing' || status === 'sending' || status === 'simulating';
               return (
                 <button onClick={handleSend} disabled={isProcessing}
@@ -1170,6 +1213,38 @@ function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
   );
 }
 
+// ─── Buy Crypto Modal (Transak embedded widget) ───────────────────────────────
+function BuyCryptoModal({ address, onClose }: { address: string; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const src = `https://global.transak.com?apiKey=f1e06c72-99c7-4028-8e76-bfebe14f5724&walletAddress=${encodeURIComponent(address)}&defaultCryptoCurrency=ETH&network=ethereum&themeColor=52ffac&exchangeScreenTitle=Buy%20Crypto&hideMenu=true`;
+
+  return (
+    <div onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="popup-backdrop"
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div className="popup-enter" style={{ background: '#111', borderRadius: '2rem', width: 420, maxWidth: '96vw', height: '80vh', maxHeight: 700, display: 'flex', flexDirection: 'column', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <span style={{ color: '#fff', fontSize: 16, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>Buy Crypto</span>
+          <button onClick={onClose} style={{ color: '#c6c6c6', background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '0.75rem', padding: 8, cursor: 'pointer', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <iframe
+          src={src}
+          allow="camera; microphone; payment; clipboard-read; clipboard-write"
+          style={{ flex: 1, border: 'none', borderRadius: '0 0 2rem 2rem' }}
+          title="Transak — Buy Crypto"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Main WalletDashboard ─────────────────────────────────────────────────────
 export function WalletDashboard() {
   const wallet = useWallet();
@@ -1189,6 +1264,7 @@ export function WalletDashboard() {
   const [showQR, setShowQR] = useState(false);
   const [showWC, setShowWC] = useState(false);
   const [showNonEvmSend, setShowNonEvmSend] = useState(false);
+  const [showBuyCrypto, setShowBuyCrypto] = useState(false);
   const [extPresent, setExtPresent] = useState(false);
   const [extAttached, setExtAttached] = useState(false);
   const [extAttaching, setExtAttaching] = useState(false);
@@ -1390,9 +1466,18 @@ export function WalletDashboard() {
 
   const loadTxs = useCallback(async () => {
     if (!address) return;
+    const cacheKey = `${address}:${selectedChain.id}`;
+    const cached = txCacheRef.current.get(cacheKey);
+    if (cached && Date.now() - cached.fetchedAt < TX_CACHE_TTL) {
+      setTxs(cached.data);
+      return;
+    }
     setIsLoadingTxs(true);
-    try { const history = await fetchTxHistory(address, selectedChain.id); setTxs(history); }
-    finally { setIsLoadingTxs(false); }
+    try {
+      const history = await fetchTxHistory(address, selectedChain.id);
+      setTxs(history);
+      txCacheRef.current.set(cacheKey, { data: history, fetchedAt: Date.now() });
+    } finally { setIsLoadingTxs(false); }
   }, [address, selectedChain.id]);
 
   // ── NFTs (declared here — needs address + selectedNonEvm) ─────────────────
@@ -1410,6 +1495,10 @@ export function WalletDashboard() {
     loadTokens();
   }, [wallet.isUnlocked, address, selectedChain.id]);
 
+  // Session-scoped TX history cache — key: `${address}:${chainId}`, value: { data, fetchedAt }
+  const txCacheRef = useRef<Map<string, { data: TxRecord[]; fetchedAt: number }>>(new Map());
+  const TX_CACHE_TTL = 90_000; // 90 seconds
+
   // Compute all-chains total + auto-select highest-balance chain on first unlock
   const autoSelectedRef = useRef(false);
   useEffect(() => {
@@ -1418,22 +1507,51 @@ export function WalletDashboard() {
     autoSelectedRef.current = true;
     // Fetch ALL Alchemy chains (including testnets — user may hold testnet ETH)
     const alchemyChains = CHAINS.filter(c => c.isAlchemy);
-    Promise.all(
-      alchemyChains.map(async c => {
+    // Fetch EVM chains in parallel with non-EVM balances
+    const nonEvmCoins = Object.values(NON_EVM_META);
+    const nonEvmFetch = wallet.getMnemonicForExport().then(async (mnemonic) => {
+      if (!mnemonic) return 0;
+      const cgIds = nonEvmCoins.map(m => m.coingeckoId);
+      const prices = await getPrices(cgIds).catch(() => ({} as Record<string, number>));
+      const results = await Promise.allSettled(nonEvmCoins.map(async m => {
+        let bal = 0;
         try {
-          const toks = await fetchTokenBalances(address, c.id);
-          const cgIds = [...new Set([c.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
-          const p = await getPrices(cgIds);
-          const usd = toks.reduce((s, t) => {
-            const cg = t.coingeckoId ?? c.coingeckoId;
-            return s + parseFloat(t.balance || '0') * (p[cg] ?? 0);
-          }, 0);
-          return { chain: c, usd, toks, p };
-        } catch { return { chain: c, usd: 0, toks: [], p: {} }; }
-      })
-    ).then(results => {
-      const total = results.reduce((s, r) => s + r.usd, 0);
-      setAllChainsTotal(total);
+          if (m.coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   bal = (await getBTCBalance(w.address)).total; }
+          else if (m.coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  bal = (await getDOGEBalance(w.address)).total; }
+          else if (m.coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   bal = (await getBCHBalance(w.address)).total; }
+          else if (m.coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   bal = (await getSOLBalance(w.address)).sol; }
+          else if (m.coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   bal = (await getXRPBalance(w.address)).xrp; }
+          else if (m.coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   bal = (await getXLMBalance(w.address)).xlm; }
+          else if (m.coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  bal = (await getNANOBalance(w.address)).nano; }
+          else if (m.coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  bal = (await getHBARBalance(w.evmAddress)).hbar; }
+          else if (m.coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   bal = (await getSUIBalance(w.address)).sui; }
+          else if (m.coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); bal = (await getAPTOSBalance(w.address)).apt; }
+          else if (m.coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   bal = (await getLTCBalance(w.address)).total; }
+        } catch { bal = 0; }
+        return bal * (prices[m.coingeckoId] ?? 0);
+      }));
+      return results.reduce((s, r) => s + (r.status === 'fulfilled' ? r.value : 0), 0);
+    }).catch(() => 0);
+
+    Promise.all([
+      Promise.all(
+        alchemyChains.map(async c => {
+          try {
+            const toks = await fetchTokenBalances(address, c.id);
+            const cgIds = [...new Set([c.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
+            const p = await getPrices(cgIds);
+            const usd = toks.reduce((s, t) => {
+              const cg = t.coingeckoId ?? c.coingeckoId;
+              return s + parseFloat(t.balance || '0') * (p[cg] ?? 0);
+            }, 0);
+            return { chain: c, usd, toks, p };
+          } catch { return { chain: c, usd: 0, toks: [], p: {} }; }
+        })
+      ),
+      nonEvmFetch,
+    ]).then(([results, nonEvmTotal]) => {
+      const evmTotal = results.reduce((s, r) => s + r.usd, 0);
+      setAllChainsTotal(evmTotal + nonEvmTotal);
       setAllChainTokens(results.map(r => ({ chain: r.chain, toks: r.toks, p: r.p })));
       if (doAutoSelect) {
         const best = results.reduce((a, b) => b.usd > a.usd ? b : a, results[0]);
@@ -1466,6 +1584,9 @@ export function WalletDashboard() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    if (activeTab === 'transactions' && address) {
+      txCacheRef.current.delete(`${address}:${selectedChain.id}`);
+    }
     await Promise.all([
       activeTab === 'balance' ? loadTokens() : Promise.resolve(),
       activeTab === 'transactions' ? loadTxs() : Promise.resolve(),
@@ -1566,6 +1687,7 @@ export function WalletDashboard() {
   return (
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} />}
+      {showBuyCrypto && displayAddress && <BuyCryptoModal address={displayAddress} onClose={() => setShowBuyCrypto(false)} />}
       {showNetworks && <AllNetworksModal selected={selectedChain} onSelect={c => { setSelectedChain(c); setManualChain(c); setSelectedNonEvm(null); }} selectedNonEvm={selectedNonEvm} onSelectNonEvm={coin => { setSelectedNonEvm(coin); }} onClose={() => setShowNetworks(false)} />}
       {showQR && displayAddress && <QRModal address={displayAddress} onClose={() => setShowQR(false)} />}
       {showWC && !selectedNonEvm && <WalletConnectModal onClose={() => setShowWC(false)} />}
@@ -1764,7 +1886,7 @@ export function WalletDashboard() {
               { icon: 'power',        label: 'Connect',           onClick: () => { if (!selectedNonEvm) setShowWC(true); }, disabled: !!selectedNonEvm },
               { icon: 'north_east',   label: 'Send',              onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
               { icon: 'qr_code_2',   label: 'QR / Receive',      onClick: () => setShowQR(true) },
-              { icon: 'credit_card', label: 'Buy Crypto',         onClick: () => { const addr = displayAddress; if (addr) window.open(`https://buy.moonpay.com?walletAddress=${encodeURIComponent(addr)}&defaultCurrencyCode=eth`, '_blank'); } },
+              { icon: 'credit_card', label: 'Buy Crypto',         onClick: () => { if (displayAddress) setShowBuyCrypto(true); } },
               { icon: 'contacts',    label: 'Address Book',       onClick: () => setShowAddressBook(true) },
               { icon: 'add_card',    label: 'Create New Wallet',  onClick: () => setShowNewWalletWarning(true) },
             ].map((item) => (
