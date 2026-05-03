@@ -18,6 +18,7 @@ import {
   wcClearListeners,
 } from '@/lib/walletconnect';
 import type { WalletKitTypes } from '@reown/walletkit';
+import { scanDApp, type DAppRisk, riskColor, riskBg } from '@/lib/security-scan';
 
 interface ActiveSession {
   topic: string;
@@ -120,6 +121,8 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
   const [requestError, setRequestError] = useState('');
   const [requestDone, setRequestDone] = useState(false);
   const [dappFilter, setDappFilter] = useState('');
+  const [dappRisk, setDappRisk] = useState<DAppRisk | null>(null);
+  const [dappRiskDismissed, setDappRiskDismissed] = useState(false);
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -180,6 +183,15 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
 
     return () => { wcClearListeners(); };
   }, [refreshSessions]);
+
+  // Scan dApp URL when a new session proposal arrives
+  useEffect(() => {
+    setDappRisk(null); setDappRiskDismissed(false);
+    if (!pendingProposal) return;
+    const url = pendingProposal.params.proposer.metadata.url;
+    if (!url) return;
+    scanDApp(url).then(setDappRisk).catch(() => {});
+  }, [pendingProposal]);
 
   const handlePair = async () => {
     if (!uri.trim()) { setPairError('Paste a wc: URI first'); return; }
@@ -286,6 +298,25 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
+          {/* dApp security risk warning */}
+          {dappRisk && !dappRiskDismissed && dappRisk.level !== 'safe' && dappRisk.level !== 'unknown' && dappRisk.flags.length > 0 && (
+            <div style={{ background: riskBg(dappRisk.level), border: `1px solid ${riskColor(dappRisk.level)}44`, borderRadius: '1rem', padding: '12px 14px', marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: riskColor(dappRisk.level) }}>
+                  {dappRisk.level === 'danger' ? '⚠ Suspicious dApp' : '⚡ Caution'}
+                </span>
+                <button onClick={() => setDappRiskDismissed(true)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✕</button>
+              </div>
+              {dappRisk.flags.map((f, i) => (
+                <p key={i} style={{ fontSize: 11, color: riskColor(dappRisk.level), margin: '1px 0', fontWeight: 600 }}>• {f}</p>
+              ))}
+              <p style={{ fontSize: 9, color: '#666', margin: '4px 0 0', fontStyle: 'italic' }}>
+                Powered by GoPlus Security · dismiss to approve anyway
+              </p>
+            </div>
+          )}
+
           {/* Requested chains */}
           {uniqueChains.length > 0 && (() => {
             const chainNameMap: Record<number, string> = Object.fromEntries(
@@ -330,9 +361,15 @@ export function WalletConnectModal({ onClose }: { onClose: () => void }) {
             <button onClick={handleReject} style={{ padding: '14px', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#c6c6c6', fontWeight: 900, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}>
               Reject
             </button>
-            <button onClick={handleApprove} style={{ padding: '14px', borderRadius: '1rem', border: 'none', background: '#52ffac', color: '#002111', fontWeight: 900, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer' }}>
-              Approve
-            </button>
+            {(() => {
+              const blocked = !dappRiskDismissed && dappRisk?.level === 'danger' && (dappRisk.flags.length > 0);
+              return (
+                <button onClick={handleApprove} disabled={!!blocked}
+                  style={{ padding: '14px', borderRadius: '1rem', border: blocked ? '1px solid rgba(248,113,113,0.3)' : 'none', background: blocked ? '#3a1a1a' : '#52ffac', color: blocked ? '#f87171' : '#002111', fontWeight: 900, fontSize: blocked ? 10 : 13, textTransform: 'uppercase', letterSpacing: '0.05em', cursor: blocked ? 'not-allowed' : 'pointer' }}>
+                  {blocked ? 'Dismiss Warning First' : 'Approve'}
+                </button>
+              );
+            })()}
           </div>
         </div>
       </div>

@@ -41,6 +41,7 @@ import { loadContacts, addContact, deleteContact, Contact } from '@/lib/address-
 import { fetchNFTs, NFTItem } from '@/lib/nfts';
 import { LedgerConnectModal } from '@/components/LedgerConnectModal';
 import { ledgerSign, LedgerEntry } from '@/lib/ledger';
+import { scanAddress, scanToken, type AddressRisk, type TokenRisk, riskColor, riskBg } from '@/lib/security-scan';
 
 type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning';
 
@@ -200,6 +201,9 @@ function SendModal({ tokens, prices, defaultChain, onClose, activeLedger }: {
   const [txHash, setTxHash] = useState('');
   const [errMsg, setErrMsg] = useState('');
   const [simResult, setSimResult] = useState<{ changes: Array<{ changeType: string; from: string; to: string; amount?: string; symbol?: string }>; gas: number } | null>(null);
+  const [addrRisk, setAddrRisk] = useState<AddressRisk | null>(null);
+  const [tokenRisk, setTokenRisk] = useState<TokenRisk | null>(null);
+  const [riskDismissed, setRiskDismissed] = useState(false);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
@@ -317,6 +321,22 @@ function SendModal({ tokens, prices, defaultChain, onClose, activeLedger }: {
     refreshFee(to, amtStr, selectedToken, selectedChain, wallet.activeAddress);
     return () => { if (feeTimerRef.current) clearTimeout(feeTimerRef.current); };
   }, [to, whole, dec, selectedToken?.contractAddress, selectedChain.id, wallet.activeAddress]);
+
+  // Scan recipient address and token for security risks (debounced)
+  useEffect(() => {
+    setAddrRisk(null); setRiskDismissed(false);
+    if (!ethers.isAddress(to)) return;
+    const timer = setTimeout(() => { scanAddress(to).then(setAddrRisk).catch(() => {}); }, 700);
+    return () => clearTimeout(timer);
+  }, [to]);
+
+  useEffect(() => {
+    setTokenRisk(null);
+    const addr = selectedToken?.contractAddress;
+    if (!addr || addr === 'native') return;
+    const timer = setTimeout(() => { scanToken(selectedChain.id, addr).then(setTokenRisk).catch(() => {}); }, 700);
+    return () => clearTimeout(timer);
+  }, [selectedToken?.contractAddress, selectedChain.id]);
 
   const isNative = !selectedToken || selectedToken.contractAddress === 'native';
   const amountStr = `${whole || '0'}.${dec || '0'}`;
@@ -663,19 +683,62 @@ function SendModal({ tokens, prices, defaultChain, onClose, activeLedger }: {
 
             {errMsg && <span style={{ color: '#ffdad6', fontSize: 11 }}>{errMsg}</span>}
 
+            {/* Security risk warnings */}
+            {!riskDismissed && (() => {
+              const risks: { label: string; flags: string[]; level: 'danger' | 'warning' }[] = [];
+              if (addrRisk && addrRisk.level !== 'safe' && addrRisk.level !== 'unknown' && addrRisk.flags.length > 0) {
+                risks.push({ label: 'Recipient address risk', flags: addrRisk.flags, level: addrRisk.level as 'danger' | 'warning' });
+              }
+              if (tokenRisk && tokenRisk.level !== 'safe' && tokenRisk.level !== 'unknown' && tokenRisk.flags.length > 0) {
+                risks.push({ label: 'Token risk', flags: tokenRisk.flags, level: tokenRisk.level as 'danger' | 'warning' });
+              }
+              if (risks.length === 0) return null;
+              const topLevel = risks.some(r => r.level === 'danger') ? 'danger' : 'warning';
+              return (
+                <div style={{ background: riskBg(topLevel), border: `1px solid ${riskColor(topLevel)}44`, borderRadius: '1rem', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: riskColor(topLevel) }}>
+                      {topLevel === 'danger' ? '⚠ Security Risk Detected' : '⚡ Caution'}
+                    </span>
+                    <button onClick={() => setRiskDismissed(true)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 12, padding: '0 2px', lineHeight: 1 }}>✕</button>
+                  </div>
+                  {risks.map((r, ri) => (
+                    <div key={ri}>
+                      <p style={{ fontSize: 9, color: '#888', fontWeight: 900, textTransform: 'uppercase', margin: '0 0 2px' }}>{r.label}</p>
+                      {r.flags.map((f, fi) => (
+                        <p key={fi} style={{ fontSize: 11, color: riskColor(r.level), margin: '1px 0', fontWeight: 600 }}>• {f}</p>
+                      ))}
+                    </div>
+                  ))}
+                  <p style={{ fontSize: 9, color: '#666', margin: '4px 0 0', fontStyle: 'italic' }}>
+                    Powered by GoPlus Security · dismiss to proceed anyway
+                  </p>
+                </div>
+              );
+            })()}
+
             {status !== 'confirm' && (() => {
               const isProcessing = status === 'signing' || status === 'sending' || status === 'simulating';
+              const hasBlockingRisk = !riskDismissed && (
+                (addrRisk?.level === 'danger' && addrRisk.flags.length > 0) ||
+                (tokenRisk?.level === 'danger' && tokenRisk.flags.length > 0)
+              );
               return (
-                <button onClick={handleSend} disabled={isProcessing}
+                <button onClick={handleSend} disabled={isProcessing || hasBlockingRisk}
                   style={{
-                    background: isProcessing ? '#1a1a1a' : '#52ffac',
-                    color: isProcessing ? '#c6c6c6' : '#002111',
-                    border: 'none', borderRadius: '1rem', padding: '16px',
+                    background: isProcessing ? '#1a1a1a' : hasBlockingRisk ? '#3a1a1a' : '#52ffac',
+                    color: isProcessing ? '#c6c6c6' : hasBlockingRisk ? '#f87171' : '#002111',
+                    border: hasBlockingRisk ? '1px solid rgba(248,113,113,0.3)' : 'none',
+                    borderRadius: '1rem', padding: '16px',
                     fontSize: 14, fontWeight: 900, textTransform: 'uppercase',
-                    letterSpacing: '0.05em', cursor: isProcessing ? 'not-allowed' : 'pointer',
+                    letterSpacing: '0.05em', cursor: (isProcessing || hasBlockingRisk) ? 'not-allowed' : 'pointer',
                     transition: 'all 0.15s', marginTop: 4,
                   }}>
-                  {status === 'simulating' ? 'Simulating...' : status === 'signing' ? 'Signing...' : status === 'sending' ? 'Broadcasting...' : `Send ${tokenSymbol}`}
+                  {isProcessing
+                    ? (status === 'simulating' ? 'Simulating...' : status === 'signing' ? 'Signing...' : 'Broadcasting...')
+                    : hasBlockingRisk ? 'Dismiss Risk Warning First'
+                    : `Send ${tokenSymbol}`}
                 </button>
               );
             })()}
