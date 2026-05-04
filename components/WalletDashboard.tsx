@@ -44,8 +44,9 @@ import { ledgerSign, LedgerEntry } from '@/lib/ledger';
 import { scanAddress, scanToken, type AddressRisk, type TokenRisk, riskColor, riskBg } from '@/lib/security-scan';
 import { getGasPrices, type GasPrices } from '@/lib/gas';
 import { fetchApprovals, type TokenApproval } from '@/lib/approvals';
+import { StakingPanel } from '@/components/StakingPanel';
 
-type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning' | 'approvals';
+type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning' | 'approvals' | 'staking';
 
 // ─── Non-EVM chain metadata ───────────────────────────────────────────────────
 interface NonEvmMeta {
@@ -2169,6 +2170,13 @@ export function WalletDashboard() {
                   Approvals
                 </button>
               )}
+              {!selectedNonEvm && (
+                <button
+                  onClick={() => setActiveTab('staking')}
+                  className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'staking' ? 'text-white border-b-2 border-yellow-400' : 'text-on-surface-variant hover:text-white'}`}>
+                  Staking
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('lightning')}
                 className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'lightning' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
@@ -2532,6 +2540,14 @@ export function WalletDashboard() {
               </div>
             )}
 
+            {/* STAKING TAB */}
+            {!selectedNonEvm && activeTab === 'staking' && (
+              <StakingPanel
+                activeLedger={activeLedger}
+                ethPrice={prices['ethereum'] ?? 0}
+              />
+            )}
+
             {/* LIGHTNING TAB */}
             {!selectedNonEvm && activeTab === 'lightning' && <LightningTab />}
 
@@ -2660,6 +2676,60 @@ export function WalletDashboard() {
             )}
           </div>
 
+          {/* ── Security & Trust Footer ── */}
+          {wallet.isUnlocked && (
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Security & Trust</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[
+                  {
+                    icon: 'bug_report',
+                    label: 'Responsible Disclosure',
+                    desc: 'Found a vulnerability? Report it.',
+                    href: 'mailto:security@copewallet.com',
+                    color: '#f87171',
+                  },
+                  {
+                    icon: 'code',
+                    label: 'Open Source',
+                    desc: 'Audit the code yourself.',
+                    href: 'https://github.com/copewallet/copewallet',
+                    color: '#52ffac',
+                  },
+                  {
+                    icon: 'verified_user',
+                    label: 'Zero Backend',
+                    desc: 'Keys never leave your device.',
+                    href: null,
+                    color: '#818cf8',
+                  },
+                  {
+                    icon: 'privacy_tip',
+                    label: 'No Tracking',
+                    desc: 'No analytics, no telemetry.',
+                    href: null,
+                    color: '#facc15',
+                  },
+                ].map(item => (
+                  <div key={item.label}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15, color: item.color, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 900, color: '#bbb', margin: 0, letterSpacing: '0.03em' }}>{item.label}</p>
+                      {item.href ? (
+                        <a href={item.href} target={item.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
+                          style={{ fontSize: 9, color: item.color, textDecoration: 'none', fontWeight: 700 }}>
+                          {item.desc} ↗
+                        </a>
+                      ) : (
+                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', margin: 0 }}>{item.desc}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </section>
