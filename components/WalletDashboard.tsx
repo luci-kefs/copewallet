@@ -11,7 +11,7 @@ import { useWallet } from '@/context/WalletContext';
 import { clearShadow } from '@/lib/session-lock';
 import { CHAINS, Chain } from '@/lib/chains';
 import { fetchTokenBalances, fetchTxHistory, TokenBalance, TxRecord } from '@/lib/tokens';
-import { getPrices, formatUSD } from '@/lib/prices';
+import { getPrices, getPriceData, formatUSD, type PriceData } from '@/lib/prices';
 import { buildMaskedTransaction, stealthDelay, fireDummyEchoes, estimateFee } from '@/lib/transaction';
 import { ephemeralSign } from '@/lib/signer';
 import { getProvider } from '@/lib/provider';
@@ -1355,6 +1355,7 @@ export function WalletDashboard() {
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [txs, setTxs] = useState<TxRecord[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [changes24h, setChanges24h] = useState<Record<string, number | null>>({});
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
   const [isLoadingTxs, setIsLoadingTxs] = useState(false);
   const [nfts, setNfts] = useState<NFTItem[]>([]);
@@ -1564,7 +1565,11 @@ export function WalletDashboard() {
       const toks = await fetchTokenBalances(address, selectedChain.id);
       setTokens(toks);
       const cgIds = [...new Set([selectedChain.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
-      if (cgIds.length > 0) { const p = await getPrices(cgIds); setPrices(p); }
+      if (cgIds.length > 0) {
+        const pd = await getPriceData(cgIds);
+        setPrices(Object.fromEntries(Object.entries(pd).map(([k, v]) => [k, v.price])));
+        setChanges24h(Object.fromEntries(Object.entries(pd).map(([k, v]) => [k, v.change24h])));
+      }
     } finally { setIsLoadingTokens(false); }
   }, [address, selectedChain.id]);
 
@@ -2199,6 +2204,7 @@ export function WalletDashboard() {
                           const cgId = token.coingeckoId ?? c.coingeckoId;
                           const price = cgId ? (p[cgId] ?? 0) : 0;
                           const usdVal = parseFloat(token.balance || '0') * price;
+                          const chg = cgId ? (changes24h[cgId] ?? null) : null;
                           return (
                             <motion.div key={`${c.id}-${token.contractAddress}-${i}`}
                               variants={variants.staggerItem}
@@ -2226,6 +2232,11 @@ export function WalletDashboard() {
                                 <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
                                   {price > 0 ? formatUSD(usdVal) : '—'}
                                 </p>
+                                {chg !== null && (
+                                  <p style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? '#4ade80' : '#f87171' }}>
+                                    {chg >= 0 ? '▲' : '▼'} {Math.abs(chg).toFixed(2)}%
+                                  </p>
+                                )}
                               </div>
                             </motion.div>
                           );
@@ -2237,6 +2248,7 @@ export function WalletDashboard() {
                   const cgId = token.coingeckoId ?? selectedChain.coingeckoId;
                   const price = cgId ? (prices[cgId] ?? 0) : 0;
                   const usdVal = parseFloat(token.balance || '0') * price;
+                  const chg = cgId ? (changes24h[cgId] ?? null) : null;
                   return (
                     <div key={`${token.contractAddress}-${i}`}
                       className="slide-up flex items-center justify-between p-6 bg-surface-container-low rounded-xl border border-white/5 hover:bg-surface-container-high transition-all cursor-pointer"
@@ -2262,6 +2274,11 @@ export function WalletDashboard() {
                         <p className="text-[0.65rem] text-on-surface-variant tracking-widest font-bold">
                           {price > 0 ? formatUSD(usdVal) : '—'}
                         </p>
+                        {chg !== null && (
+                          <p style={{ fontSize: 9, fontWeight: 700, color: chg >= 0 ? '#4ade80' : '#f87171' }}>
+                            {chg >= 0 ? '▲' : '▼'} {Math.abs(chg).toFixed(2)}%
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
@@ -2351,6 +2368,11 @@ export function WalletDashboard() {
                             <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nft.collectionName}</p>
                           )}
                           <p style={{ color: '#444', fontSize: 9, fontFamily: 'monospace', margin: '4px 0 0' }}>#{nft.tokenId.slice(0, 10)}</p>
+                          {nft.floorPrice != null && (
+                            <p style={{ color: '#52ffac', fontSize: 9, fontWeight: 700, margin: '3px 0 0' }}>
+                              Floor {nft.floorPrice < 0.001 ? '< 0.001' : nft.floorPrice.toFixed(3)} {nft.floorPriceCurrency ?? 'ETH'}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ))}

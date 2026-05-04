@@ -8,6 +8,8 @@ export interface NFTItem {
   imageUrl?: string;
   collectionName?: string;
   chainId: number;
+  floorPrice?: number | null;    // ETH
+  floorPriceCurrency?: string;   // e.g. "ETH"
 }
 
 export async function fetchNFTs(address: string, chainId: number): Promise<NFTItem[]> {

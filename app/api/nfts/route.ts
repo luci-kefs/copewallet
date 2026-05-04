@@ -23,15 +23,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!res.ok) return NextResponse.json([]);
 
     const data = await res.json();
-    const nfts = (data.ownedNfts ?? []).map((nft: any) => ({
-      contractAddress: nft.contract?.address ?? '',
-      tokenId: nft.tokenId ?? '',
-      name: nft.name ?? nft.contract?.name ?? 'Unnamed NFT',
-      description: nft.description ?? '',
-      imageUrl: nft.image?.cachedUrl ?? nft.image?.thumbnailUrl ?? nft.image?.originalUrl ?? null,
-      collectionName: nft.contract?.name ?? '',
-      chainId,
-    }));
+    const ownedNfts: any[] = data.ownedNfts ?? [];
+
+    // Batch-fetch floor prices for unique contract addresses
+    const uniqueContracts = [...new Set(ownedNfts.map((n: any) => n.contract?.address).filter(Boolean))] as string[];
+    const floorMap: Record<string, { price: number | null; currency: string }> = {};
+    await Promise.allSettled(
+      uniqueContracts.map(async (addr) => {
+        try {
+          const r = await fetch(`${baseUrl}/getFloorPrice?contractAddress=${addr}`, { headers: { Accept: 'application/json' } });
+          if (!r.ok) return;
+          const fp: any = await r.json();
+          // Alchemy returns floor prices from multiple marketplaces; pick lowest available
+          const sources = [fp.openSea, fp.looksRare, fp.blur].filter(s => s && typeof s.floorPrice === 'number' && s.floorPrice > 0);
+          if (sources.length === 0) return;
+          const lowest = sources.reduce((a, b) => b.floorPrice < a.floorPrice ? b : a);
+          floorMap[addr.toLowerCase()] = { price: lowest.floorPrice, currency: lowest.priceCurrency ?? 'ETH' };
+        } catch {}
+      })
+    );
+
+    const nfts = ownedNfts.map((nft: any) => {
+      const contractAddr = (nft.contract?.address ?? '').toLowerCase();
+      const fp = floorMap[contractAddr];
+      return {
+        contractAddress: nft.contract?.address ?? '',
+        tokenId: nft.tokenId ?? '',
+        name: nft.name ?? nft.contract?.name ?? 'Unnamed NFT',
+        description: nft.description ?? '',
+        imageUrl: nft.image?.cachedUrl ?? nft.image?.thumbnailUrl ?? nft.image?.originalUrl ?? null,
+        collectionName: nft.contract?.name ?? '',
+        chainId,
+        floorPrice: fp?.price ?? null,
+        floorPriceCurrency: fp?.currency ?? null,
+      };
+    });
 
     return NextResponse.json(nfts);
   } catch {
