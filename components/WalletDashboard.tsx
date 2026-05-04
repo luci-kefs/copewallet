@@ -42,8 +42,10 @@ import { fetchNFTs, NFTItem } from '@/lib/nfts';
 import { LedgerConnectModal } from '@/components/LedgerConnectModal';
 import { ledgerSign, LedgerEntry } from '@/lib/ledger';
 import { scanAddress, scanToken, type AddressRisk, type TokenRisk, riskColor, riskBg } from '@/lib/security-scan';
+import { getGasPrices, type GasPrices } from '@/lib/gas';
+import { fetchApprovals, type TokenApproval } from '@/lib/approvals';
 
-type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning';
+type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning' | 'approvals';
 
 // ─── Non-EVM chain metadata ───────────────────────────────────────────────────
 interface NonEvmMeta {
@@ -52,6 +54,8 @@ interface NonEvmMeta {
   logoUrl?: string;
 }
 const CG_IMG = 'https://assets.coingecko.com/coins/images';
+// Number of DEX/bridge spenders scanned in the Approvals tab (kept in sync with api/approvals/route.ts)
+const KNOWN_SPENDERS_COUNT = 7;
 const NON_EVM_META: Record<string, NonEvmMeta> = {
   BTC:   { coin: 'BTC',   name: 'Bitcoin',      color: '#F7931A', explorerBase: 'https://blockchair.com/bitcoin/transaction',      symbol: 'BTC',   coingeckoId: 'bitcoin',          feeUnit: 'sat/vByte', logoUrl: `${CG_IMG}/1/small/bitcoin.png` },
   DOGE:  { coin: 'DOGE',  name: 'Dogecoin',     color: '#C2A633', explorerBase: 'https://blockchair.com/dogecoin/transaction',     symbol: 'DOGE',  coingeckoId: 'dogecoin',         feeUnit: 'sat/vByte', logoUrl: `${CG_IMG}/5/small/dogecoin.png` },
@@ -1360,6 +1364,11 @@ export function WalletDashboard() {
   const [isLoadingTxs, setIsLoadingTxs] = useState(false);
   const [nfts, setNfts] = useState<NFTItem[]>([]);
   const [isLoadingNfts, setIsLoadingNfts] = useState(false);
+  const [gasPrices, setGasPrices] = useState<GasPrices | null>(null);
+  const gasIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [approvals, setApprovals] = useState<TokenApproval[]>([]);
+  const [isLoadingApprovals, setIsLoadingApprovals] = useState(false);
+  const [revokingApproval, setRevokingApproval] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showNetworks, setShowNetworks] = useState(false);
@@ -1599,6 +1608,27 @@ export function WalletDashboard() {
 
   useEffect(() => { if (activeTab === 'nfts' && wallet.isUnlocked && address) loadNfts(); }, [activeTab, wallet.isUnlocked, address, selectedChain.id, loadNfts]);
 
+  // Approvals loader
+  const loadApprovals = useCallback(async () => {
+    if (!address || selectedNonEvm || !selectedChain.isAlchemy) return;
+    setIsLoadingApprovals(true);
+    try { const items = await fetchApprovals(address, selectedChain.id); setApprovals(items); }
+    finally { setIsLoadingApprovals(false); }
+  }, [address, selectedChain.id, selectedNonEvm, selectedChain.isAlchemy]);
+
+  useEffect(() => { if (activeTab === 'approvals' && wallet.isUnlocked && address) loadApprovals(); }, [activeTab, wallet.isUnlocked, address, selectedChain.id, loadApprovals]);
+
+  // Gas price polling — every 15s while dashboard is open, EVM chains only
+  useEffect(() => {
+    if (!wallet.isUnlocked || selectedNonEvm) { setGasPrices(null); return; }
+    getGasPrices(selectedChain.id).then(setGasPrices).catch(() => {});
+    if (gasIntervalRef.current) clearInterval(gasIntervalRef.current);
+    gasIntervalRef.current = setInterval(() => {
+      getGasPrices(selectedChain.id).then(setGasPrices).catch(() => {});
+    }, 15_000);
+    return () => { if (gasIntervalRef.current) clearInterval(gasIntervalRef.current); };
+  }, [wallet.isUnlocked, selectedChain.id, selectedNonEvm]);
+
   useEffect(() => {
     if (!wallet.isUnlocked || !address) { setTokens([]); setTxs([]); return; }
     loadTokens();
@@ -1700,8 +1730,41 @@ export function WalletDashboard() {
       activeTab === 'balance' ? loadTokens() : Promise.resolve(),
       activeTab === 'transactions' ? loadTxs() : Promise.resolve(),
       activeTab === 'nfts' ? loadNfts() : Promise.resolve(),
+      activeTab === 'approvals' ? loadApprovals() : Promise.resolve(),
     ]);
     setIsRefreshing(false);
+  };
+
+  const handleRevokeApproval = async (approval: TokenApproval) => {
+    if (!address || (!wallet.scatteredKeyStore && !activeLedger)) return;
+    const key = `${approval.token}-${approval.spender}`;
+    setRevokingApproval(key);
+    try {
+      const provider = getProvider(selectedChain.id);
+      const iface = new ethers.Interface(['function approve(address spender, uint256 amount) returns (bool)']);
+      const data = iface.encodeFunctionData('approve', [approval.spender, 0n]);
+      const nonce = await provider.getTransactionCount(address, 'latest');
+      const feeData = await provider.getFeeData();
+      const tx: ethers.TransactionRequest = {
+        to: approval.token,
+        from: address,
+        data,
+        nonce,
+        chainId: selectedChain.id,
+        gasLimit: 60000n,
+        maxFeePerGas: feeData.maxFeePerGas ?? undefined,
+        maxPriorityFeePerGas: feeData.maxPriorityFeePerGas ?? undefined,
+      };
+      const signed = activeLedger
+        ? await ledgerSign(activeLedger.derivationPath, tx)
+        : await ephemeralSign(wallet.scatteredKeyStore!, tx);
+      await provider.broadcastTransaction(signed);
+      setApprovals(prev => prev.filter(a => !(a.token === approval.token && a.spender === approval.spender)));
+    } catch (e: unknown) {
+      alert(`Revoke failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRevokingApproval(null);
+    }
   };
 
   const chainTotalUSD = tokens.reduce((sum, t) => {
@@ -2059,30 +2122,59 @@ export function WalletDashboard() {
             })()}
           </div>
 
+          {/* ── Gas Tracker Widget ── */}
+          {!selectedNonEvm && wallet.isUnlocked && gasPrices && gasPrices.medium > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 14px', overflow: 'hidden' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#facc15', flexShrink: 0 }}>local_gas_station</span>
+              <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.12em', flexShrink: 0 }}>Gas</span>
+              {[
+                { label: 'Slow',   value: gasPrices.slow,   color: '#4ade80' },
+                { label: 'Med',    value: gasPrices.medium, color: '#facc15' },
+                { label: 'Fast',   value: gasPrices.fast,   color: '#f87171' },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 900, color }}>{value < 0.1 ? '<0.1' : value.toFixed(1)}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>Gwei</span>
+                </div>
+              ))}
+              {gasPrices.baseFee > 0 && (
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginLeft: 'auto', flexShrink: 0 }}>Base {gasPrices.baseFee.toFixed(1)}</span>
+              )}
+            </div>
+          )}
+
           {/* ── Tabs & List ── */}
           <div className="pt-2 md:pt-8">
-            <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5">
+            <div className="flex gap-6 md:gap-12 mb-4 md:mb-8 border-b border-white/5 overflow-x-auto">
               <button
                 onClick={() => setActiveTab('balance')}
-                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'balance' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'balance' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
                 Balance
               </button>
               <button
                 onClick={() => { setActiveTab('transactions'); }}
-                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'transactions' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'transactions' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
                 Transactions
               </button>
               <button
                 onClick={() => setActiveTab('nfts')}
-                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'nfts' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'nfts' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
                 NFTs
               </button>
+              {!selectedNonEvm && (
+                <button
+                  onClick={() => setActiveTab('approvals')}
+                  className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'approvals' ? 'text-white border-b-2 border-red-400' : 'text-on-surface-variant hover:text-white'}`}>
+                  Approvals
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('lightning')}
-                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors ${activeTab === 'lightning' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'lightning' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
                 ⚡ Lightning
               </button>
-              <button onClick={handleRefresh} className="ml-auto pb-4 text-on-surface-variant hover:text-white transition-colors">
+              <button onClick={handleRefresh} className="ml-auto pb-4 text-on-surface-variant hover:text-white transition-colors flex-shrink-0">
                 <span className={`material-symbols-outlined text-base ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
               </button>
             </div>
@@ -2377,6 +2469,65 @@ export function WalletDashboard() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* APPROVALS TAB */}
+            {!selectedNonEvm && activeTab === 'approvals' && (
+              <div className="space-y-3">
+                {!selectedChain.isAlchemy ? (
+                  <div className="flex items-center gap-3 p-6 bg-surface-container-low rounded-xl border border-white/5">
+                    <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 18 }}>info</span>
+                    <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">Approval scanning requires Alchemy RPC</p>
+                  </div>
+                ) : isLoadingApprovals ? (
+                  <div className="flex justify-center py-12">
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid rgba(248,113,113,0.2)', borderTopColor: '#f87171', animation: 'spin 1s linear infinite' }} />
+                  </div>
+                ) : approvals.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 p-10 bg-surface-container-low rounded-xl border border-white/5">
+                    <span className="material-symbols-outlined text-4xl" style={{ color: '#4ade80', opacity: 0.6 }}>verified_user</span>
+                    <p className="text-on-surface-variant font-black text-xs uppercase tracking-widest">No active approvals found</p>
+                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>Scanned {KNOWN_SPENDERS_COUNT} common DEX/bridge spenders on {selectedChain.name}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 4px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#f87171' }}>warning</span>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{approvals.length} Active Approval{approvals.length > 1 ? 's' : ''}</p>
+                      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', marginLeft: 4 }}>— revoke unused allowances to reduce risk</p>
+                    </div>
+                    {approvals.map((a) => {
+                      const key = `${a.token}-${a.spender}`;
+                      const isRevoking = revokingApproval === key;
+                      return (
+                        <div key={key}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: a.unlimited ? 'rgba(248,113,113,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${a.unlimited ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 12, gap: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <p style={{ fontWeight: 900, color: '#fff', fontSize: 13, margin: 0 }}>{a.symbol}</p>
+                              {a.unlimited && (
+                                <span style={{ fontSize: 8, fontWeight: 900, color: '#f87171', background: 'rgba(248,113,113,0.15)', borderRadius: 4, padding: '2px 6px', textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0 }}>Unlimited</span>
+                              )}
+                            </div>
+                            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', margin: '2px 0 0', fontWeight: 700 }}>→ {a.spenderName}</p>
+                            {!a.unlimited && (
+                              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', margin: '1px 0 0', fontFamily: 'monospace' }}>{parseFloat(a.allowance).toLocaleString()} {a.symbol}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleRevokeApproval(a)}
+                            disabled={isRevoking}
+                            style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, color: '#f87171', fontSize: 10, fontWeight: 900, padding: '7px 14px', cursor: isRevoking ? 'not-allowed' : 'pointer', opacity: isRevoking ? 0.5 : 1, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, transition: 'all 0.15s' }}
+                            onMouseEnter={e => { if (!isRevoking) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.2)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.1)'; }}>
+                            {isRevoking ? 'Revoking…' : 'Revoke'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </>
                 )}
               </div>
             )}
