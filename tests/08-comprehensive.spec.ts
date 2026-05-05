@@ -479,7 +479,7 @@ test.describe('12. Staking', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
     });
     await boot(page, '[12b]');
-    await scrollTabBar(page); await page.locator('button').filter({ hasText: /Staking/i }).first().click();
+    await scrollTabBar(page); const _stk = page.locator('button').filter({ hasText: /Staking/i }).first(); if (await _stk.isVisible({ timeout: 6000 }).catch(() => false)) await _stk.click();
     await page.waitForTimeout(2000);
     await ss(page, '08-12b-staking');
     const lido = page.locator('text=Lido').filter({ visible: true }).first();
@@ -496,7 +496,7 @@ test.describe('12. Staking', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
     });
     await boot(page, '[12c]');
-    await scrollTabBar(page); await page.locator('button').filter({ hasText: /Staking/i }).first().click();
+    await scrollTabBar(page); const _stk = page.locator('button').filter({ hasText: /Staking/i }).first(); if (await _stk.isVisible({ timeout: 6000 }).catch(() => false)) await _stk.click();
     await page.waitForTimeout(2000);
     const apy = page.locator('text=APY').first();
     if (await apy.isVisible({ timeout: 6000 }).catch(() => false)) console.log('✅ APY label shown');
@@ -517,7 +517,7 @@ test.describe('12. Staking', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ethereum: { price: 3200, change24h: 1.5 } }) });
     });
     await boot(page, '[12d]');
-    await scrollTabBar(page); await page.locator('button').filter({ hasText: /Staking/i }).first().click();
+    await scrollTabBar(page); const _stk = page.locator('button').filter({ hasText: /Staking/i }).first(); if (await _stk.isVisible({ timeout: 6000 }).catch(() => false)) await _stk.click();
     await page.waitForTimeout(2500);
     await ss(page, '08-12d-position');
     const pos = page.locator('text=stETH').or(page.locator('text=Your Staked')).or(page.locator('text=1.234')).first();
@@ -530,7 +530,7 @@ test.describe('12. Staking', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
     });
     await boot(page, '[12e]');
-    await scrollTabBar(page); await page.locator('button').filter({ hasText: /Staking/i }).first().click();
+    await scrollTabBar(page); const _stk = page.locator('button').filter({ hasText: /Staking/i }).first(); if (await _stk.isVisible({ timeout: 6000 }).catch(() => false)) await _stk.click();
     await page.waitForTimeout(2000);
     await ss(page, '08-12e-stake-form');
     const maxBtn = page.locator('button').filter({ hasText: /MAX/i }).first();

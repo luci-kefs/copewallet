@@ -18,7 +18,6 @@ import { getProvider } from '@/lib/provider';
 import { ethers } from 'ethers';
 import { GhostCapsule } from '@/components/GhostCapsule';
 import { WalletConnectModal } from '@/components/WalletConnectModal';
-import { AdvancedDashboard } from '@/components/AdvancedDashboard';
 import { SwapModal } from '@/components/SwapModal';
 import type { ChainTx } from '@/components/ChainPanel';
 import { deriveBTCWallet, getBTCBalance, getBTCTransactions, estimateBTCFee, buildBTCTransaction, broadcastBTC } from '@/lib/btc';
@@ -45,6 +44,12 @@ import { scanAddress, scanToken, type AddressRisk, type TokenRisk, riskColor, ri
 import { getGasPrices, type GasPrices } from '@/lib/gas';
 import { fetchApprovals, type TokenApproval } from '@/lib/approvals';
 import { StakingPanel } from '@/components/StakingPanel';
+import { CustomChainModal } from '@/components/CustomChainModal';
+import { CustomTokenModal } from '@/components/CustomTokenModal';
+import { CustomAPIModal } from '@/components/CustomAPIModal';
+import { loadCustomChains, deleteCustomChain, CustomChain } from '@/lib/custom-chains';
+import { loadCustomTokens, deleteCustomToken, CustomToken } from '@/lib/custom-tokens';
+import { loadCustomAPIs, deleteCustomAPI, CustomAPI } from '@/lib/custom-apis';
 
 type Tab = 'balance' | 'transactions' | 'nfts' | 'lightning' | 'approvals' | 'staking';
 
@@ -1407,6 +1412,26 @@ export function WalletDashboard() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   useEffect(() => { setContacts(loadContacts()); }, []);
 
+  // Reset advanced-only tabs when switching back to simple
+  useEffect(() => {
+    if (mode === 'simple' && ['nfts', 'approvals', 'staking', 'lightning'].includes(activeTab)) {
+      setActiveTab('balance');
+    }
+  }, [mode]);
+
+  // ── Advanced custom modals ─────────────────────────────────────────────────
+  const [showCustomChainModal, setShowCustomChainModal] = useState(false);
+  const [showCustomTokenModal, setShowCustomTokenModal] = useState(false);
+  const [showCustomAPIModal, setShowCustomAPIModal] = useState(false);
+  const [customChains, setCustomChains] = useState<CustomChain[]>([]);
+  const [customTokens, setCustomTokens] = useState<CustomToken[]>([]);
+  const [customAPIs, setCustomAPIs] = useState<CustomAPI[]>([]);
+  useEffect(() => {
+    setCustomChains(loadCustomChains());
+    setCustomTokens(loadCustomTokens());
+    setCustomAPIs(loadCustomAPIs());
+  }, []);
+
   // ── Saved Vaults ───────────────────────────────────────────────────────────
   const [showSavedVaults, setShowSavedVaults] = useState(false);
   const [isSavingVault, setIsSavingVault] = useState(false);
@@ -1843,20 +1868,6 @@ export function WalletDashboard() {
     );
   }
 
-  if (mode === 'advanced') return (
-    <motion.div
-      key="advanced"
-      variants={variants.pageSwitch}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      transition={springs.cinematic}
-      style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-    >
-      <AdvancedDashboard onExit={() => setMode('simple')} />
-    </motion.div>
-  );
-
   return (
     <>
       {showSend && <SendModal tokens={tokens} prices={prices} defaultChain={selectedChain} onClose={() => setShowSend(false)} activeLedger={activeLedger} />}
@@ -1890,6 +1901,9 @@ export function WalletDashboard() {
           onClose={() => setShowAddressBook(false)}
         />
       )}
+      {showCustomChainModal && <CustomChainModal onClose={() => setShowCustomChainModal(false)} onSaved={() => setCustomChains(loadCustomChains())} />}
+      {showCustomTokenModal && <CustomTokenModal customChains={customChains} activeAddress={wallet.activeAddress} onClose={() => setShowCustomTokenModal(false)} onSaved={() => setCustomTokens(loadCustomTokens())} />}
+      {showCustomAPIModal && <CustomAPIModal activeAddress={wallet.activeAddress} onClose={() => setShowCustomAPIModal(false)} onSaved={() => setCustomAPIs(loadCustomAPIs())} />}
       {showSavedVaults && (
         <SavedVaultsModal
           vaults={walletHistory}
@@ -1944,12 +1958,30 @@ export function WalletDashboard() {
                   <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
                 </button>
                 <button
-                  onClick={() => setMode('advanced')}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0 }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.07)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.2)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.1)'; }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#52ffac' }}>settings</span>
-                  <span style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Advanced</span>
+                  onClick={() => setMode(m => m === 'simple' ? 'advanced' : 'simple')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: `1px solid ${mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, background: mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'all 0.25s', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.12)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.35)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.borderColor = mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'; }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#52ffac' }}>{mode === 'advanced' ? 'arrow_back' : 'settings'}</span>
+                  <span style={{ display: 'inline-block', overflow: 'hidden', height: 12, position: 'relative', width: mode === 'advanced' ? 36 : 54, transition: 'width 0.25s' }}>
+                    <AnimatePresence mode="wait">
+                      {mode === 'simple' ? (
+                        <motion.span key="adv-label"
+                          initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          style={{ position: 'absolute', fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap', lineHeight: '12px' }}>
+                          Advanced
+                        </motion.span>
+                      ) : (
+                        <motion.span key="simple-label"
+                          initial={{ y: -12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -12, opacity: 0 }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          style={{ position: 'absolute', fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap', lineHeight: '12px' }}>
+                          Simple
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </span>
                 </button>
               </div>
             </div>
@@ -2026,9 +2058,9 @@ export function WalletDashboard() {
           {wallet.isUnlocked && !selectedNonEvm && walletHistory.filter(s => s.isSaved).length > 0 && (
             <button
               onClick={() => setShowSavedVaults(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', color: '#52ffac', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'all 0.15s', width: 'fit-content' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.1)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.05)'; }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: '1px solid rgba(82,255,172,0.35)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#52ffac', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.15s', width: 'fit-content' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.07)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}>
               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>account_balance_wallet</span>
               {walletHistory.filter(s => s.isSaved).length} Saved Vault{walletHistory.filter(s => s.isSaved).length > 1 ? 's' : ''}
               <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_more</span>
@@ -2081,17 +2113,14 @@ export function WalletDashboard() {
           {/* ── Action Grid ── */}
           <div className="grid grid-cols-2 gap-3 md:gap-4">
             {[
-              { icon: 'power',        label: 'Connect',           onClick: () => { if (!selectedNonEvm) setShowWC(true); }, disabled: !!selectedNonEvm },
-              { icon: 'north_east',   label: 'Send',              onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
-              { icon: 'qr_code_2',   label: 'QR / Receive',      onClick: () => setShowQR(true) },
-              { icon: 'credit_card', label: 'Buy Crypto',         onClick: () => { if (displayAddress) setShowBuyCrypto(true); } },
-              { icon: 'swap_vert',   label: 'Swap',               onClick: () => { if (!selectedNonEvm) setShowSwap(true); }, disabled: !!selectedNonEvm },
-              { icon: 'contacts',    label: 'Address Book',       onClick: () => setShowAddressBook(true) },
-              { icon: 'add_card',    label: 'Create New Wallet',  onClick: () => setShowNewWalletWarning(true) },
-              { icon: 'usb',         label: 'Ledger',             onClick: () => setShowLedger(true) },
+              { icon: 'power',       label: 'Connect',          onClick: () => { if (!selectedNonEvm) setShowWC(true); }, disabled: !!selectedNonEvm },
+              { icon: 'north_east',  label: 'Send',             onClick: () => { if (selectedNonEvm) setShowNonEvmSend(true); else setShowSend(true); } },
+              { icon: 'qr_code_2',  label: 'QR / Receive',     onClick: () => setShowQR(true) },
+              { icon: 'add_card',   label: 'Create New Wallet', onClick: () => setShowNewWalletWarning(true) },
             ].map((item) => (
               <motion.button
                 key={item.label}
+                layout
                 onClick={item.onClick}
                 whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
                 whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
@@ -2102,15 +2131,41 @@ export function WalletDashboard() {
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
               </motion.button>
             ))}
+            <AnimatePresence>
+              {mode === 'advanced' && [
+                { icon: 'credit_card', label: 'Buy Crypto',    onClick: () => { if (displayAddress) setShowBuyCrypto(true); } },
+                { icon: 'swap_vert',  label: 'Swap',           onClick: () => { if (!selectedNonEvm) setShowSwap(true); }, disabled: !!selectedNonEvm },
+                { icon: 'contacts',  label: 'Address Book',    onClick: () => setShowAddressBook(true) },
+                { icon: 'usb',       label: 'Ledger',          onClick: () => setShowLedger(true) },
+                { icon: 'link',      label: 'Custom Chain',    onClick: () => setShowCustomChainModal(true) },
+                { icon: 'token',     label: 'Custom Token',    onClick: () => setShowCustomTokenModal(true) },
+                { icon: 'api',       label: 'Custom API',      onClick: () => setShowCustomAPIModal(true) },
+              ].map((item, i) => (
+                <motion.button
+                  key={item.label}
+                  layout
+                  initial={{ opacity: 0, y: 20, scale: 0.92 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 16, scale: 0.94 }}
+                  transition={{ ...springs.smooth, delay: i * 0.045 }}
+                  onClick={item.onClick}
+                  whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
+                  whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
+                  style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
+                  className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                  <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                  <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
+                </motion.button>
+              ))}
+            </AnimatePresence>
             {(() => {
-              // Show Transfer only when another saved wallet exists AND current wallet
-              // has a positive balance on the currently selected chain
               const hasOtherSaved = walletHistory.filter(s => s.isSaved && s.id !== currentHistoryId).length >= 1;
               const currentChainToks = allChainTokens.find(x => x.chain.id === selectedChain.id)?.toks ?? tokens;
               const hasBalance = currentChainToks.some(t => parseFloat(t.balance || '0') > 0);
               if (!hasOtherSaved || !hasBalance) return null;
               return (
                 <motion.button
+                  layout
                   onClick={() => setShowTransfer(true)}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
@@ -2158,30 +2213,44 @@ export function WalletDashboard() {
                 className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'transactions' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
                 Transactions
               </button>
-              <button
-                onClick={() => setActiveTab('nfts')}
-                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'nfts' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
-                NFTs
-              </button>
-              {!selectedNonEvm && (
-                <button
-                  onClick={() => setActiveTab('approvals')}
-                  className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'approvals' ? 'text-white border-b-2 border-red-400' : 'text-on-surface-variant hover:text-white'}`}>
-                  Approvals
-                </button>
-              )}
-              {!selectedNonEvm && (
-                <button
-                  onClick={() => setActiveTab('staking')}
-                  className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'staking' ? 'text-white border-b-2 border-yellow-400' : 'text-on-surface-variant hover:text-white'}`}>
-                  Staking
-                </button>
-              )}
-              <button
-                onClick={() => setActiveTab('lightning')}
-                className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'lightning' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
-                ⚡ Lightning
-              </button>
+              <AnimatePresence>
+                {mode === 'advanced' && (
+                  <>
+                    <motion.button key="tab-nfts"
+                      initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+                      transition={{ ...springs.smooth, delay: 0 }}
+                      onClick={() => setActiveTab('nfts')}
+                      className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'nfts' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                      NFTs
+                    </motion.button>
+                    {!selectedNonEvm && (
+                      <motion.button key="tab-approvals"
+                        initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+                        transition={{ ...springs.smooth, delay: 0.04 }}
+                        onClick={() => setActiveTab('approvals')}
+                        className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'approvals' ? 'text-white border-b-2 border-red-400' : 'text-on-surface-variant hover:text-white'}`}>
+                        Approvals
+                      </motion.button>
+                    )}
+                    {!selectedNonEvm && (
+                      <motion.button key="tab-staking"
+                        initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+                        transition={{ ...springs.smooth, delay: 0.08 }}
+                        onClick={() => setActiveTab('staking')}
+                        className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'staking' ? 'text-white border-b-2 border-yellow-400' : 'text-on-surface-variant hover:text-white'}`}>
+                        Staking
+                      </motion.button>
+                    )}
+                    <motion.button key="tab-lightning"
+                      initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
+                      transition={{ ...springs.smooth, delay: 0.12 }}
+                      onClick={() => setActiveTab('lightning')}
+                      className={`font-black uppercase tracking-widest text-xs pb-4 transition-colors whitespace-nowrap ${activeTab === 'lightning' ? 'text-white border-b-2 border-tertiary' : 'text-on-surface-variant hover:text-white'}`}>
+                      ⚡ Lightning
+                    </motion.button>
+                  </>
+                )}
+              </AnimatePresence>
               <button onClick={handleRefresh} className="ml-auto pb-4 text-on-surface-variant hover:text-white transition-colors flex-shrink-0">
                 <span className={`material-symbols-outlined text-base ${isRefreshing ? 'animate-spin' : ''}`}>refresh</span>
               </button>
@@ -2676,60 +2745,6 @@ export function WalletDashboard() {
             )}
           </div>
 
-          {/* ── Security & Trust Footer ── */}
-          {wallet.isUnlocked && (
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Security & Trust</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {[
-                  {
-                    icon: 'bug_report',
-                    label: 'Responsible Disclosure',
-                    desc: 'Found a vulnerability? Report it.',
-                    href: 'mailto:security@copewallet.com',
-                    color: '#f87171',
-                  },
-                  {
-                    icon: 'code',
-                    label: 'Open Source',
-                    desc: 'Audit the code yourself.',
-                    href: 'https://github.com/copewallet/copewallet',
-                    color: '#52ffac',
-                  },
-                  {
-                    icon: 'verified_user',
-                    label: 'Zero Backend',
-                    desc: 'Keys never leave your device.',
-                    href: null,
-                    color: '#818cf8',
-                  },
-                  {
-                    icon: 'privacy_tip',
-                    label: 'No Tracking',
-                    desc: 'No analytics, no telemetry.',
-                    href: null,
-                    color: '#facc15',
-                  },
-                ].map(item => (
-                  <div key={item.label}
-                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 10 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 15, color: item.color, flexShrink: 0, marginTop: 1 }}>{item.icon}</span>
-                    <div>
-                      <p style={{ fontSize: 10, fontWeight: 900, color: '#bbb', margin: 0, letterSpacing: '0.03em' }}>{item.label}</p>
-                      {item.href ? (
-                        <a href={item.href} target={item.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
-                          style={{ fontSize: 9, color: item.color, textDecoration: 'none', fontWeight: 700 }}>
-                          {item.desc} ↗
-                        </a>
-                      ) : (
-                        <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', margin: 0 }}>{item.desc}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
         </div>
       </section>
