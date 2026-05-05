@@ -1933,14 +1933,14 @@ export function WalletDashboard() {
         )}
       </AnimatePresence>
 
-      <section className="flex-1 pt-[64px] px-4 pb-40 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
-        <div className="max-w-3xl mx-auto w-full space-y-6 md:space-y-12">
+      <section className="flex-1 pt-[64px] px-3 pb-40 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
+        <div className="max-w-3xl mx-auto w-full space-y-4 md:space-y-12">
 
           {/* ── Session Heading with Chain Selector + Toggle ── */}
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 flex-1">
-                <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white">
+                <h2 className="text-lg md:text-5xl font-black tracking-tighter uppercase text-white">
                   {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
                 </h2>
                 <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
@@ -1991,7 +1991,7 @@ export function WalletDashboard() {
           <div className="space-y-3 md:space-y-6 fade-in">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
-              <h1 className="text-[3.5rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
+              <h1 className="text-[2.6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
                 {isLoadingTotal ? (
                   <span className="text-on-surface-variant opacity-30">...</span>
                 ) : (
@@ -2047,7 +2047,7 @@ export function WalletDashboard() {
                   <span className="text-[0.65rem] font-black uppercase tracking-widest opacity-60 mb-1">
                     {selectedNonEvm ? `${NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm} Address` : 'Active Monolith Address'}
                   </span>
-                  <span className="text-xl md:text-3xl font-black tracking-tighter font-mono truncate">{shortAddr}</span>
+                  <span className="text-base md:text-3xl font-black tracking-tighter font-mono truncate">{shortAddr}</span>
                 </div>
               </div>
               <span className="material-symbols-outlined text-3xl md:text-4xl ml-3 flex-shrink-0">{copied ? 'check' : 'content_copy'}</span>
@@ -2056,20 +2056,23 @@ export function WalletDashboard() {
 
           {/* ── Saved Vaults Switcher ── */}
           {wallet.isUnlocked && !selectedNonEvm && walletHistory.filter(s => s.isSaved).length > 0 && (
-            <button
+            <motion.button
               onClick={() => setShowSavedVaults(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: '1px solid rgba(82,255,172,0.35)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#52ffac', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', transition: 'all 0.15s', width: 'fit-content' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.07)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'none'; }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>account_balance_wallet</span>
-              {walletHistory.filter(s => s.isSaved).length} Saved Vault{walletHistory.filter(s => s.isSaved).length > 1 ? 's' : ''}
-              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_more</span>
-            </button>
+              whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+              className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-5 md:p-7 rounded-full flex justify-between items-center transition-all shadow-[0_8px_30px_rgba(82,255,172,0.15)] active:scale-[0.98]">
+              <div className="flex items-center gap-4">
+                <span className="material-symbols-outlined text-2xl">account_balance_wallet</span>
+                <span className="text-sm font-black tracking-widest uppercase">
+                  {walletHistory.filter(s => s.isSaved).length} Saved Vault{walletHistory.filter(s => s.isSaved).length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <span className="material-symbols-outlined text-xl group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            </motion.button>
           )}
 
           {/* ── Extension Connect Banner ── */}
           {extPresent && !extAttached && wallet.isUnlocked && (
-            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <p style={{ color: '#ddd', fontSize: 12, fontWeight: 700, margin: 0 }}>Cope Wallet Extension detected</p>
                 <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>Connect to use it as a browser wallet for dApps</p>
@@ -2077,7 +2080,7 @@ export function WalletDashboard() {
               <button
                 onClick={handleConnectExtension}
                 disabled={extAttaching}
-                style={{ background: '#a855f7', border: 'none', borderRadius: 8, color: '#fff', fontSize: 11, fontWeight: 700, padding: '8px 14px', cursor: extAttaching ? 'not-allowed' : 'pointer', opacity: extAttaching ? 0.6 : 1, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                style={{ background: '#a855f7', border: 'none', borderRadius: 999, color: '#fff', fontSize: 11, fontWeight: 700, padding: '8px 16px', cursor: extAttaching ? 'not-allowed' : 'pointer', opacity: extAttaching ? 0.6 : 1, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 {extAttaching ? 'Attaching…' : 'Connect Extension'}
               </button>
             </div>
@@ -2086,7 +2089,7 @@ export function WalletDashboard() {
             <p style={{ color: '#ff8888', fontSize: 11, margin: '-4px 0 4px', padding: '0 4px' }}>{extError}</p>
           )}
           {extAttached && wallet.isUnlocked && (
-            <div style={{ background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 16, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 6px rgba(82,255,172,0.6)', flexShrink: 0 }} />
               <p style={{ color: '#888', fontSize: 11, fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Extension connected — browser dApps can now use this wallet</p>
             </div>
@@ -2094,7 +2097,7 @@ export function WalletDashboard() {
 
           {/* ── Ledger Active Banner ── */}
           {activeLedger && (
-            <div style={{ background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.25)', borderRadius: 12, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.25)', borderRadius: 16, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#818cf8' }}>usb</span>
                 <div>
@@ -2104,7 +2107,7 @@ export function WalletDashboard() {
               </div>
               <button
                 onClick={() => setActiveLedger(null)}
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', color: '#888', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 999, padding: '6px 14px', cursor: 'pointer', color: '#888', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Disconnect
               </button>
             </div>
@@ -2126,7 +2129,7 @@ export function WalletDashboard() {
                 whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                 transition={springs.snappy}
                 style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                className="bg-surface-container-highest p-4 md:p-10 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                 <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
               </motion.button>
@@ -2144,17 +2147,18 @@ export function WalletDashboard() {
                 <motion.button
                   key={item.label}
                   layout
-                  initial={{ opacity: 0, y: 20, scale: 0.92 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  initial={{ opacity: 0, y: 24, scale: 0.93 }}
+                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 16, scale: 0.94 }}
-                  transition={{ ...springs.smooth, delay: i * 0.045 }}
+                  viewport={{ once: false, margin: '-40px' }}
+                  transition={{ ...springs.smooth, delay: i * 0.06 }}
                   onClick={item.onClick}
                   whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
                   whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                   style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                  className="bg-surface-container-highest p-5 md:p-10 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
-                  <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
-                  <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
+                  className="bg-surface-container-highest p-4 md:p-10 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                  <span className="material-symbols-outlined text-2xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
+                  <span className="font-black uppercase tracking-widest text-[0.55rem] md:text-[0.6rem]">{item.label}</span>
                 </motion.button>
               ))}
             </AnimatePresence>
@@ -2170,7 +2174,7 @@ export function WalletDashboard() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   transition={springs.snappy}
-                  className="bg-surface-container-highest p-5 md:p-8 rounded-xl flex flex-col items-center gap-2 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
+                  className="bg-surface-container-highest p-4 md:p-8 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
                   <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">swap_horiz</span>
                   <span className="font-black uppercase tracking-widest text-[0.6rem]">Transfer Between Wallets</span>
                 </motion.button>
@@ -2596,7 +2600,7 @@ export function WalletDashboard() {
                           <button
                             onClick={() => handleRevokeApproval(a)}
                             disabled={isRevoking}
-                            style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 8, color: '#f87171', fontSize: 10, fontWeight: 900, padding: '7px 14px', cursor: isRevoking ? 'not-allowed' : 'pointer', opacity: isRevoking ? 0.5 : 1, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, transition: 'all 0.15s' }}
+                            style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 999, color: '#f87171', fontSize: 10, fontWeight: 900, padding: '7px 16px', cursor: isRevoking ? 'not-allowed' : 'pointer', opacity: isRevoking ? 0.5 : 1, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, transition: 'all 0.15s' }}
                             onMouseEnter={e => { if (!isRevoking) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.2)'; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.1)'; }}>
                             {isRevoking ? 'Revoking…' : 'Revoke'}
@@ -2695,7 +2699,7 @@ export function WalletDashboard() {
                                   } catch { alert('Failed to save vault.'); }
                                   finally { setIsSavingVault(false); }
                                 }}
-                                style={{ background: 'none', border: '1px solid rgba(82,255,172,0.35)', borderRadius: 6, padding: '5px 10px', color: '#52ffac', cursor: isSavingVault ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: isSavingVault ? 0.5 : 1 }}>
+                                style={{ background: 'none', border: '1px solid rgba(82,255,172,0.35)', borderRadius: 999, padding: '5px 14px', color: '#52ffac', cursor: isSavingVault ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: isSavingVault ? 0.5 : 1 }}>
                                 {isSavingVault ? '…' : 'Save'}
                               </button>
                             )}
@@ -2707,7 +2711,7 @@ export function WalletDashboard() {
                                   try { await wallet.switchToSavedWallet(snap.id); }
                                   catch { alert('Vault data not found.'); }
                                 }}
-                                style={{ background: '#52ffac', border: 'none', borderRadius: 6, padding: '5px 12px', color: '#000', cursor: 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                style={{ background: '#52ffac', border: 'none', borderRadius: 999, padding: '5px 14px', color: '#000', cursor: 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                                 Switch
                               </button>
                             )}
