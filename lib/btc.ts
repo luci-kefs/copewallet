@@ -7,8 +7,17 @@ import * as ecc from 'tiny-secp256k1';
 import * as bitcoin from 'bitcoinjs-lib';
 import ECPairFactory from 'ecpair';
 
-const bip32 = BIP32Factory(ecc);
-const ECPair = ECPairFactory(ecc);
+// Lazy-init: tiny-secp256k1 is WASM and may not be ready at module parse time
+let bip32: ReturnType<typeof BIP32Factory>;
+let ECPair: ReturnType<typeof ECPairFactory>;
+let eccReady = false;
+function initEcc() {
+  if (eccReady) return;
+  bitcoin.initEccLib(ecc);
+  bip32 = BIP32Factory(ecc);
+  ECPair = ECPairFactory(ecc);
+  eccReady = true;
+}
 
 const NETWORK = bitcoin.networks.bitcoin;
 const SATOSHI = 1e8;
@@ -41,6 +50,7 @@ export interface BTCTransaction {
 }
 
 export function deriveBTCWallet(mnemonic: string): BTCWallet {
+  initEcc();
   const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
   const root = bip32.fromSeed(seed, NETWORK);
   const child = root.derivePath("m/44'/0'/0'/0/0");
@@ -114,6 +124,7 @@ export async function buildBTCTransaction(opts: {
   amountBTC: number;
   feeRate: number;
 }): Promise<{ hex: string; fee: number }> {
+  initEcc();
   const { from, to, amountBTC, feeRate } = opts;
   const utxos = await getBTCUTXOs(from.address);
   if (utxos.length === 0) throw new Error('No UTXOs available');

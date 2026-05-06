@@ -7,8 +7,16 @@ import * as ecc from 'tiny-secp256k1';
 import * as bitcoin from 'bitcoinjs-lib';
 import ECPairFactory from 'ecpair';
 
-const bip32 = BIP32Factory(ecc);
-const ECPair = ECPairFactory(ecc);
+let bip32: ReturnType<typeof BIP32Factory>;
+let ECPair: ReturnType<typeof ECPairFactory>;
+let eccReady = false;
+function initEcc() {
+  if (eccReady) return;
+  bitcoin.initEccLib(ecc);
+  bip32 = BIP32Factory(ecc);
+  ECPair = ECPairFactory(ecc);
+  eccReady = true;
+}
 
 const DOGECOIN: bitcoin.Network = {
   messagePrefix: '\x19Dogecoin Signed Message:\n',
@@ -48,6 +56,7 @@ export interface DOGETransaction {
 }
 
 export function deriveDOGEWallet(mnemonic: string): DOGEWallet {
+  initEcc();
   const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
   const root = bip32.fromSeed(seed, DOGECOIN);
   const child = root.derivePath("m/44'/3'/0'/0/0");
@@ -115,6 +124,7 @@ export async function buildDOGETransaction(opts: {
   amountDOGE: number;
   feeRate: number;
 }): Promise<{ hex: string; fee: number }> {
+  initEcc();
   const { from, to, amountDOGE, feeRate } = opts;
   const utxos = await getDOGEUTXOs(from.address);
   if (utxos.length === 0) throw new Error('No UTXOs available');

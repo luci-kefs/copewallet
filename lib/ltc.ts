@@ -7,8 +7,16 @@ import * as ecc from 'tiny-secp256k1';
 import * as bitcoin from 'bitcoinjs-lib';
 import ECPairFactory from 'ecpair';
 
-const bip32 = BIP32Factory(ecc);
-const ECPair = ECPairFactory(ecc);
+let bip32: ReturnType<typeof BIP32Factory>;
+let ECPair: ReturnType<typeof ECPairFactory>;
+let eccReady = false;
+function initEcc() {
+  if (eccReady) return;
+  bitcoin.initEccLib(ecc);
+  bip32 = BIP32Factory(ecc);
+  ECPair = ECPairFactory(ecc);
+  eccReady = true;
+}
 
 const LITECOIN: bitcoin.Network = {
   messagePrefix: '\x19Litecoin Signed Message:\n',
@@ -49,6 +57,7 @@ export interface LTCTransaction {
 }
 
 export function deriveLTCWallet(mnemonic: string): LTCWallet {
+  initEcc();
   const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
   const root = bip32.fromSeed(seed, LITECOIN);
   const child = root.derivePath("m/44'/2'/0'/0/0");
@@ -123,6 +132,7 @@ export async function buildLTCTransaction(opts: {
   amountLTC: number;
   feeRate: number;  // sat/vByte
 }): Promise<{ hex: string; fee: number }> {
+  initEcc();
   const { from, to, amountLTC, feeRate } = opts;
   const utxos = await getLTCUTXOs(from.address);
   if (utxos.length === 0) throw new Error('No UTXOs available');

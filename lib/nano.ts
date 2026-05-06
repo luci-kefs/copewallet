@@ -1,7 +1,10 @@
 // Nano — isolated from EVM system.
 // Uses nanocurrency-web for wallet derivation and signing.
+// nanocurrency-web.fromMnemonic only accepts its own mnemonic format, not BIP39.
+// We derive via BIP39 seed -> wallet.fromSeed (128-char hex).
 
 import { wallet as nanoWallet, block } from 'nanocurrency-web';
+import * as bip39Lib from 'bip39';
 
 const API = 'https://rpc.nano.to';
 
@@ -41,7 +44,10 @@ function nanoToRaw(nano: number): string {
 }
 
 export function deriveNANOWallet(mnemonic: string): NANOWallet {
-  const derived = nanoWallet.fromMnemonic(mnemonic.trim());
+  // nanocurrency-web.fromMnemonic rejects standard BIP39 mnemonics.
+  // Derive via BIP39 seed (64 bytes = 128 hex chars) passed to fromSeed.
+  const seed = bip39Lib.mnemonicToSeedSync(mnemonic.trim()).toString('hex');
+  const derived = nanoWallet.fromSeed(seed);
   const account = derived.accounts[0];
   return {
     address: account.address,

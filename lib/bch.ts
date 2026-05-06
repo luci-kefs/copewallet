@@ -7,8 +7,16 @@ import * as ecc from 'tiny-secp256k1';
 import * as bitcoin from 'bitcoinjs-lib';
 import ECPairFactory from 'ecpair';
 
-const bip32 = BIP32Factory(ecc);
-const ECPair = ECPairFactory(ecc);
+let bip32: ReturnType<typeof BIP32Factory>;
+let ECPair: ReturnType<typeof ECPairFactory>;
+let eccReady = false;
+function initEcc() {
+  if (eccReady) return;
+  bitcoin.initEccLib(ecc);
+  bip32 = BIP32Factory(ecc);
+  ECPair = ECPairFactory(ecc);
+  eccReady = true;
+}
 
 // BCH uses bitcoin mainnet params for address generation
 const NETWORK = bitcoin.networks.bitcoin;
@@ -41,6 +49,7 @@ export interface BCHTransaction {
 }
 
 export function deriveBCHWallet(mnemonic: string): BCHWallet {
+  initEcc();
   const seed = bip39.mnemonicToSeedSync(mnemonic.trim());
   const root = bip32.fromSeed(seed, NETWORK);
   const child = root.derivePath("m/44'/145'/0'/0/0");
@@ -98,6 +107,7 @@ export async function buildBCHTransaction(opts: {
   amountBCH: number;
   feeRate: number;
 }): Promise<{ hex: string; fee: number }> {
+  initEcc();
   const { from, to, amountBCH, feeRate } = opts;
   const utxos = await getBCHUTXOs(from.address);
   if (utxos.length === 0) throw new Error('No UTXOs available');
