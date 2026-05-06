@@ -115,12 +115,22 @@ export function getHistory(): WalletSnapshot[] {
 export function addToHistory(snapshot: WalletSnapshot): void {
   const history = load();
   const filtered = history.filter((s) => s.address !== snapshot.address);
-  const updated = [snapshot, ...filtered].slice(0, MAX_HISTORY);
-  // Delete blobs of unsaved entries that got pushed out
-  const droppedIds = filtered.slice(MAX_HISTORY - 1).filter(s => !s.isSaved).map(s => s.id);
-  for (const id of droppedIds) {
-    try { localStorage.removeItem(vaultKey(id)); } catch {}
+
+  // Saved wallets are never dropped — only unsaved entries are capped at MAX_HISTORY
+  const saved   = filtered.filter(s => s.isSaved);
+  const unsaved = filtered.filter(s => !s.isSaved);
+
+  // Keep at most MAX_HISTORY-1 unsaved entries so the new snapshot fits
+  const keptUnsaved  = unsaved.slice(0, MAX_HISTORY - 1);
+  const droppedUnsaved = unsaved.slice(MAX_HISTORY - 1);
+
+  // Delete vault blobs only for dropped unsaved entries
+  for (const s of droppedUnsaved) {
+    try { localStorage.removeItem(vaultKey(s.id)); } catch {}
   }
+
+  // New snapshot goes first, then saved wallets, then remaining unsaved
+  const updated = [snapshot, ...saved, ...keptUnsaved];
   save(updated);
 }
 
