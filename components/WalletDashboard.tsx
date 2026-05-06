@@ -1267,7 +1267,7 @@ function AddressBookModal({ contacts, onAdd, onDelete, onClose }: {
 function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
   vaults: WalletSnapshot[];
   currentId: string | null;
-  onSwitch: (id: string) => void;
+  onSwitch: (snap: WalletSnapshot) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }) {
@@ -1310,7 +1310,7 @@ function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
                   </p>
                 </div>
                 {!isCurrent && (
-                  <button onClick={() => onSwitch(snap.id)}
+                  <button onClick={() => onSwitch(snap)}
                     style={{ flexShrink: 0, background: '#52ffac', border: 'none', borderRadius: 999, padding: '6px 14px', color: '#000', fontSize: 11, fontWeight: 900, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Switch
                   </button>
@@ -1600,6 +1600,20 @@ export function WalletDashboard() {
     }
     setWalletHistory(getHistory());
   }, [currentHistoryId, selectedChain.id, selectedNonEvm]);
+
+  // Switch to a history snapshot — restores mnemonic AND chain selection
+  const switchToSnap = useCallback(async (snap: WalletSnapshot) => {
+    await wallet.switchToSavedWallet(snap.id);
+    if (snap.isNonEvm && snap.coinSymbol && NON_EVM_META[snap.coinSymbol]) {
+      setSelectedNonEvm(snap.coinSymbol);
+    } else {
+      setSelectedNonEvm(null);
+      if (snap.chainId) {
+        const found = CHAINS.find(c => c.id === snap.chainId);
+        if (found) setSelectedChain(found);
+      }
+    }
+  }, [wallet]);
 
   // Freeze last known address so UI doesn't blank during transient wipe
   const [frozenAddress, setFrozenAddress] = useState<string | null>(null);
@@ -1939,9 +1953,9 @@ export function WalletDashboard() {
         <SavedVaultsModal
           vaults={walletHistory}
           currentId={currentHistoryId}
-          onSwitch={async (id) => {
+          onSwitch={async (snap) => {
             try {
-              await wallet.switchToSavedWallet(id);
+              await switchToSnap(snap);
               setShowSavedVaults(false);
             } catch {
               alert('Vault data not found.');
@@ -2661,7 +2675,7 @@ export function WalletDashboard() {
                           }}
                           onClick={async () => {
                             if (isCurrent) return;
-                            try { await wallet.switchToSavedWallet(snap.id); }
+                            try { await switchToSnap(snap); }
                             catch { alert('Vault data not found.'); }
                           }}
                         >
@@ -2726,7 +2740,7 @@ export function WalletDashboard() {
                               <button
                                 onClick={async e => {
                                   e.stopPropagation();
-                                  try { await wallet.switchToSavedWallet(snap.id); }
+                                  try { await switchToSnap(snap); }
                                   catch { alert('Vault data not found.'); }
                                 }}
                                 style={{ background: '#52ffac', border: 'none', borderRadius: 999, padding: '5px 14px', color: '#000', cursor: 'pointer', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
