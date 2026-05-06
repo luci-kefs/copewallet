@@ -2126,7 +2126,7 @@ export function WalletDashboard() {
                 whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                 transition={springs.snappy}
                 style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                className="bg-surface-container-highest p-4 md:p-8 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                 <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
               </motion.button>
@@ -2153,7 +2153,7 @@ export function WalletDashboard() {
                   whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
                   whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                   style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                  className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                  className="bg-surface-container-highest p-4 md:p-8 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                   <span className="material-symbols-outlined text-2xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                   <span className="font-black uppercase tracking-widest text-[0.55rem] md:text-[0.6rem]">{item.label}</span>
                 </motion.button>
