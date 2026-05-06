@@ -1242,7 +1242,7 @@ function AddressBookModal({ contacts, onAdd, onDelete, onClose }: {
             <p style={{ color: '#444', fontSize: 12, textAlign: 'center', margin: '12px 0' }}>No contacts yet.</p>
           ) : (
             contacts.map(c => (
-              <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(82,255,172,0.08)', border: '1px solid rgba(82,255,172,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span style={{ color: '#52ffac', fontSize: 14, fontWeight: 900 }}>{c.name.slice(0, 1).toUpperCase()}</span>
                 </div>
@@ -1251,7 +1251,7 @@ function AddressBookModal({ contacts, onAdd, onDelete, onClose }: {
                   <p style={{ color: '#555', fontSize: 10, fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.address}</p>
                   {c.note && <p style={{ color: '#444', fontSize: 10, margin: '2px 0 0' }}>{c.note}</p>}
                 </div>
-                <button onClick={() => onDelete(c.id)} style={{ background: 'rgba(255,100,100,0.07)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 7, padding: '5px 7px', cursor: 'pointer', color: '#ff8888', display: 'flex', flexShrink: 0 }}>
+                <button onClick={() => onDelete(c.id)} style={{ background: 'rgba(255,100,100,0.07)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 999, padding: '5px 7px', cursor: 'pointer', color: '#ff8888', display: 'flex', flexShrink: 0 }}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -1294,7 +1294,7 @@ function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
             const isCurrent = snap.id === currentId;
             return (
               <div key={snap.id}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, background: isCurrent ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 12, background: isCurrent ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 24, padding: '12px 14px' }}>
                 <div style={{ width: 36, height: 36, borderRadius: '50%', background: isCurrent ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? '#52ffac' : '#666' }}>account_balance_wallet</span>
                 </div>
@@ -1307,12 +1307,12 @@ function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
                 </div>
                 {!isCurrent && (
                   <button onClick={() => onSwitch(snap.id)}
-                    style={{ flexShrink: 0, background: '#52ffac', border: 'none', borderRadius: 8, padding: '6px 14px', color: '#000', fontSize: 11, fontWeight: 900, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    style={{ flexShrink: 0, background: '#52ffac', border: 'none', borderRadius: 999, padding: '6px 14px', color: '#000', fontSize: 11, fontWeight: 900, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Switch
                   </button>
                 )}
                 <button onClick={() => onDelete(snap.id)}
-                  style={{ flexShrink: 0, background: 'rgba(255,100,100,0.07)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 7, padding: '6px 8px', cursor: 'pointer', color: '#ff8888', display: 'flex' }}>
+                  style={{ flexShrink: 0, background: 'rgba(255,100,100,0.07)', border: '1px solid rgba(255,100,100,0.15)', borderRadius: 999, padding: '6px 8px', cursor: 'pointer', color: '#ff8888', display: 'flex' }}>
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -1937,53 +1937,52 @@ export function WalletDashboard() {
         <div className="max-w-3xl mx-auto w-full space-y-4 md:space-y-12">
 
           {/* ── Session Heading with Chain Selector + Toggle ── */}
-          <div className="space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1 flex-1">
-                <h2 className="text-lg md:text-5xl font-black tracking-tighter uppercase text-white">
-                  {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
-                </h2>
-                <p className="text-tertiary font-black tracking-[0.2em] uppercase text-xs opacity-80">
-                  {frozenMode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
-                </p>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                <button
-                  onClick={() => setShowNetworks(true)}
-                  className="bg-surface-container-high px-5 py-2.5 rounded-full flex items-center gap-3 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
-                  <div className="w-2.5 h-2.5 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
-                  <span className="text-[0.65rem] font-black tracking-[0.2em] uppercase text-white">
-                    {selectedNonEvm ? (NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm) : manualChain ? manualChain.name : 'Network'}
-                  </span>
-                  <span className="material-symbols-outlined text-on-surface-variant scale-75">expand_more</span>
-                </button>
-                <button
-                  onClick={() => setMode(m => m === 'simple' ? 'advanced' : 'simple')}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: `1px solid ${mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, background: mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'all 0.25s', flexShrink: 0, overflow: 'hidden', position: 'relative' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.12)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.35)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.borderColor = mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'; }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#52ffac' }}>{mode === 'advanced' ? 'arrow_back' : 'settings'}</span>
-                  <span style={{ display: 'inline-block', overflow: 'hidden', height: 12, position: 'relative', width: mode === 'advanced' ? 36 : 54, transition: 'width 0.25s' }}>
-                    <AnimatePresence mode="wait">
-                      {mode === 'simple' ? (
-                        <motion.span key="adv-label"
-                          initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 12, opacity: 0 }}
-                          transition={{ duration: 0.18, ease: 'easeOut' }}
-                          style={{ position: 'absolute', fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap', lineHeight: '12px' }}>
-                          Advanced
-                        </motion.span>
-                      ) : (
-                        <motion.span key="simple-label"
-                          initial={{ y: -12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -12, opacity: 0 }}
-                          transition={{ duration: 0.18, ease: 'easeOut' }}
-                          style={{ position: 'absolute', fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap', lineHeight: '12px' }}>
-                          Simple
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </span>
-                </button>
-              </div>
+          <div className="space-y-2">
+            {/* Buttons row — always on top, full width on mobile */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowNetworks(true)}
+                className="bg-surface-container-high px-4 py-2 rounded-full flex items-center gap-2 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
+                <div className="w-2 h-2 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
+                <span className="text-[0.6rem] font-black tracking-[0.15em] uppercase text-white truncate max-w-[80px] md:max-w-none">
+                  {selectedNonEvm ? (NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm) : manualChain ? manualChain.name : 'Network'}
+                </span>
+                <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 16 }}>expand_more</span>
+              </button>
+              <motion.button
+                onClick={() => setMode(m => m === 'simple' ? 'advanced' : 'simple')}
+                whileTap={{ scale: 0.95 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: `1px solid ${mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, background: mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'border-color 0.25s, background 0.25s', flexShrink: 0 }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.12)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.35)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.borderColor = mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'; }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#52ffac' }}>{mode === 'advanced' ? 'arrow_back' : 'settings'}</span>
+                <AnimatePresence mode="wait">
+                  {mode === 'simple' ? (
+                    <motion.span key="adv-label"
+                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.15 }}
+                      style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+                      Advanced
+                    </motion.span>
+                  ) : (
+                    <motion.span key="simple-label"
+                      initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.15 }}
+                      style={{ fontSize: 9, fontWeight: 900, color: '#52ffac', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+                      Simple
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            </div>
+            {/* Heading below buttons */}
+            <div className="space-y-0.5">
+              <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white leading-tight">
+                {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
+              </h2>
+              <p className="text-tertiary font-black tracking-[0.15em] uppercase text-[0.6rem] opacity-80">
+                {frozenMode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
+              </p>
             </div>
           </div>
 
@@ -2034,7 +2033,7 @@ export function WalletDashboard() {
 
             {/* ── Address Card ── */}
             <div
-              className="bg-white text-black p-5 md:p-8 rounded-xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
+              className="bg-white text-black p-5 md:p-7 rounded-2xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
               onClick={handleCopy}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 {selectedNonEvm ? (() => {
@@ -2129,7 +2128,7 @@ export function WalletDashboard() {
                 whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                 transition={springs.snappy}
                 style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                className="bg-surface-container-highest p-4 md:p-10 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                 <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
               </motion.button>
@@ -2156,7 +2155,7 @@ export function WalletDashboard() {
                   whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
                   whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                   style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                  className="bg-surface-container-highest p-4 md:p-10 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                  className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                   <span className="material-symbols-outlined text-2xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                   <span className="font-black uppercase tracking-widest text-[0.55rem] md:text-[0.6rem]">{item.label}</span>
                 </motion.button>
@@ -2174,7 +2173,7 @@ export function WalletDashboard() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   transition={springs.snappy}
-                  className="bg-surface-container-highest p-4 md:p-8 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
+                  className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group active:scale-95 border border-white/5 col-span-2 cursor-pointer">
                   <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">swap_horiz</span>
                   <span className="font-black uppercase tracking-widest text-[0.6rem]">Transfer Between Wallets</span>
                 </motion.button>
@@ -2647,7 +2646,7 @@ export function WalletDashboard() {
                             padding: '12px 16px',
                             background: isCurrent ? 'rgba(82,255,172,0.06)' : '#111',
                             border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                            borderRadius: '0.75rem',
+                            borderRadius: '1.5rem',
                             cursor: isCurrent ? 'default' : 'pointer',
                             transition: 'border-color 0.15s, background 0.15s',
                           }}
@@ -2669,12 +2668,12 @@ export function WalletDashboard() {
                                 {snap.shortAddress}
                               </span>
                               {isCurrent && (
-                                <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.12)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
+                                <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.12)', padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
                                   Active
                                 </span>
                               )}
                               {snap.isSaved && (
-                                <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.08)', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
+                                <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.08)', padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
                                   Saved
                                 </span>
                               )}
