@@ -1939,7 +1939,7 @@ export function WalletDashboard() {
           <div className="flex items-start justify-between gap-3">
             {/* Heading */}
             <div className="space-y-0.5">
-              <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white leading-tight">
+              <h2 className="text-xl md:text-5xl font-black tracking-tighter uppercase text-white leading-tight whitespace-nowrap">
                 {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
               </h2>
               <p className="text-tertiary font-black tracking-[0.15em] uppercase text-[0.6rem] opacity-80">
@@ -1952,7 +1952,7 @@ export function WalletDashboard() {
                 onClick={() => setShowNetworks(true)}
                 className="bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/5 hover:border-white/10 transition-colors">
                 <div className="w-2 h-2 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
-                <span className="text-[0.6rem] font-black tracking-[0.15em] uppercase text-white truncate max-w-[60px] md:max-w-none">
+                <span className="text-[0.6rem] font-black tracking-[0.15em] uppercase text-white truncate max-w-[50px] md:max-w-none">
                   {selectedNonEvm ? (NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm) : manualChain ? manualChain.name : 'Network'}
                 </span>
                 <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 14 }}>expand_more</span>
