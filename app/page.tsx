@@ -308,7 +308,7 @@ export default function CopePage() {
               <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs">Your private key guardian</p>
 
               {/* Permanent Zone Alert */}
-              <div className="bg-error-container p-8 rounded-xl flex items-start gap-6 border border-white/5 mt-4">
+              <div className="bg-error-container p-8 rounded-3xl flex items-start gap-6 border border-white/5 mt-4">
                 <span className="material-symbols-outlined text-on-error-container text-3xl">warning</span>
                 <div>
                   <p className="font-black text-on-error-container uppercase tracking-[0.2em] text-[0.65rem] mb-2">Permanent Zone Alert</p>
@@ -323,7 +323,7 @@ export default function CopePage() {
             <motion.div className="space-y-5" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}>
               <motion.button
                 onClick={() => { setPersistError(''); setPassphrase(''); setPassphraseConfirm(''); setRightPanel('persist_confirm'); }}
-                className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-10 rounded-xl flex justify-between items-center transition-all shadow-[0_20px_50px_rgba(82,255,172,0.1)] active:scale-[0.98]"
+                className="w-full group bg-tertiary hover:bg-tertiary-container text-on-tertiary p-10 rounded-full flex justify-between items-center transition-all shadow-[0_20px_50px_rgba(82,255,172,0.1)] active:scale-[0.98]"
                 whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                 <div className="flex items-center gap-8">
                   <span className="material-symbols-outlined text-5xl">verified_user</span>
@@ -333,19 +333,19 @@ export default function CopePage() {
               </motion.button>
 
               <motion.button
-                onClick={handleInitNewVault}
-                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]"
+                onClick={() => { /* forum page — coming soon */ }}
+                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-full flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]"
                 whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                 <div className="flex items-center gap-8">
-                  <span className="material-symbols-outlined text-5xl">add_moderator</span>
-                  <span className="text-3xl font-black tracking-tighter uppercase text-left">Initialize New Vault</span>
+                  <span className="material-symbols-outlined text-5xl">forum</span>
+                  <span className="text-3xl font-black tracking-tighter uppercase text-left">Forum</span>
                 </div>
                 <span className="material-symbols-outlined text-4xl group-hover:translate-x-3 transition-transform">arrow_forward</span>
               </motion.button>
 
               <motion.button
                 onClick={() => { setAccessError(''); setPassphrase(''); setRightPanel('access_vault'); }}
-                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-xl flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]"
+                className="w-full group bg-surface-container-high hover:bg-white hover:text-black text-white p-10 rounded-full flex justify-between items-center transition-all border border-white/10 active:scale-[0.98]"
                 whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
                 <div className="flex items-center gap-8">
                   <span className="material-symbols-outlined text-5xl">key</span>
@@ -360,7 +360,7 @@ export default function CopePage() {
                 <motion.div
                   initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.25 }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '1rem', overflow: 'hidden' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 9999, overflow: 'hidden' }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 8px rgba(82,255,172,0.6)', flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.15em', margin: 0 }}>Active Session</p>
@@ -368,7 +368,7 @@ export default function CopePage() {
                       {wallet.activeAddress ? `${wallet.activeAddress.slice(0, 8)}…${wallet.activeAddress.slice(-6)}` : '—'}
                     </p>
                   </div>
-                  <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 8px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, background: wallet.mode === 'PERSISTENT' ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', color: wallet.mode === 'PERSISTENT' ? '#52ffac' : 'rgba(255,255,255,0.4)', border: wallet.mode === 'PERSISTENT' ? '1px solid rgba(82,255,172,0.2)' : '1px solid rgba(255,255,255,0.08)' }}>
+                  <span style={{ fontSize: 9, fontWeight: 900, padding: '3px 8px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.08em', flexShrink: 0, background: wallet.mode === 'PERSISTENT' ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', color: wallet.mode === 'PERSISTENT' ? '#52ffac' : 'rgba(255,255,255,0.4)', border: wallet.mode === 'PERSISTENT' ? '1px solid rgba(82,255,172,0.2)' : '1px solid rgba(255,255,255,0.08)' }}>
                     {wallet.mode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'}
                   </span>
                 </motion.div>
@@ -459,7 +459,7 @@ export default function CopePage() {
                   Set a passphrase. A Favicon Key PNG will be downloaded to your device.
                 </p>
               </div>
-              <div className="bg-white rounded-xl p-6 space-y-4">
+              <div className="bg-white rounded-3xl p-6 space-y-4">
                 <div className="bg-neutral-100 rounded-lg px-4 py-3">
                   <input
                     type="password"
@@ -485,7 +485,7 @@ export default function CopePage() {
               <button
                 onClick={handlePersistSession}
                 disabled={isProcessing}
-                className={`w-full p-8 rounded-xl font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
+                className={`w-full p-8 rounded-full font-black uppercase tracking-[0.1em] text-sm transition-all active:scale-[0.98] flex items-center justify-between ${isProcessing ? 'bg-surface-container-high text-on-surface-variant cursor-not-allowed opacity-50' : 'bg-tertiary text-on-tertiary hover:bg-tertiary-container shadow-[0_20px_50px_rgba(82,255,172,0.1)]'}`}>
                 <span>{isProcessing ? 'Processing...' : 'Forge Vault & Download Key'}</span>
                 {!isProcessing && <span className="material-symbols-outlined text-2xl">download</span>}
               </button>
@@ -512,7 +512,7 @@ export default function CopePage() {
                 <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">Access Vault</h3>
                 <p className="text-on-surface-variant text-sm leading-relaxed">Enter your passphrase and drop the Favicon Key PNG.</p>
               </div>
-              <div className="bg-white rounded-xl p-6 space-y-4">
+              <div className="bg-white rounded-3xl p-6 space-y-4">
                 <div className="bg-neutral-100 rounded-lg px-4 py-3">
                   <input
                     type="password"
@@ -529,7 +529,7 @@ export default function CopePage() {
                   onDragLeave={() => setDragOver(false)}
                   onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileDrop(f); }}
                   onClick={() => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/png'; i.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleFileDrop(f); }; i.click(); }}
-                  className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-all ${dragOver ? 'border-tertiary bg-tertiary/5' : 'border-neutral-300'}`}>
+                  className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-all ${dragOver ? 'border-tertiary bg-tertiary/5' : 'border-neutral-300'}`}>
                   <Upload size={24} className="text-neutral-400" />
                   <p className="font-black text-neutral-800 text-sm uppercase tracking-widest">Drop Favicon Key PNG</p>
                   <p className="text-neutral-400 text-xs">or click to browse</p>
@@ -555,7 +555,7 @@ export default function CopePage() {
               </p>
             </div>
             <button onClick={() => setRightPanel('idle')}
-              className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-xl active:scale-[0.98] transition-transform">
+              className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-full active:scale-[0.98] transition-transform">
               ← Return
             </button>
           </motion.div>
@@ -575,7 +575,7 @@ export default function CopePage() {
               </p>
             </div>
             <button onClick={() => setRightPanel('idle')}
-              className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-xl active:scale-[0.98] transition-transform">
+              className="bg-tertiary text-on-tertiary font-black uppercase tracking-[0.1em] text-sm px-10 py-5 rounded-full active:scale-[0.98] transition-transform">
               ← Return
             </button>
           </motion.div>
@@ -668,12 +668,12 @@ function VaultCard({ iconName, title, sub, onClick, disabled = false }: {
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       style={{
-        background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 14,
+        background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 9999,
         padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
         width: '100%', cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.4 : 1, textAlign: 'left', transition: 'border-color 0.15s',
       }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1a1a1a', border: '1px solid #353535', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9999, background: '#1a1a1a', border: '1px solid #353535', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#52ffac' }}>{iconName}</span>
       </div>
       <div>

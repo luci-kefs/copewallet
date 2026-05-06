@@ -1663,9 +1663,6 @@ export function WalletDashboard() {
   // Session-scoped TX history cache — key: `${address}:${chainId}`, value: { data, fetchedAt }
   const txCacheRef = useRef<Map<string, { data: TxRecord[]; fetchedAt: number }>>(new Map());
   const TX_CACHE_TTL = 90_000; // 90 seconds
-  const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
-    Promise.race([p, new Promise<T>(res => setTimeout(() => res(fallback), ms))]);
-
   // Compute all-chains total + auto-select highest-balance chain on first unlock
   const autoSelectedRef = useRef(false);
   useEffect(() => {
@@ -1683,18 +1680,17 @@ export function WalletDashboard() {
       const results = await Promise.allSettled(nonEvmCoins.map(async m => {
         let bal = 0;
         try {
-          const timeout = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms));
-          if (m.coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   bal = (await Promise.race([getBTCBalance(w.address), timeout(8000)])).total; }
-          else if (m.coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  bal = (await Promise.race([getDOGEBalance(w.address), timeout(8000)])).total; }
-          else if (m.coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   bal = (await Promise.race([getBCHBalance(w.address), timeout(8000)])).total; }
-          else if (m.coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   bal = (await Promise.race([getSOLBalance(w.address), timeout(8000)])).sol; }
-          else if (m.coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   bal = (await Promise.race([getXRPBalance(w.address), timeout(8000)])).xrp; }
-          else if (m.coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   bal = (await Promise.race([getXLMBalance(w.address), timeout(8000)])).xlm; }
-          else if (m.coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  bal = (await Promise.race([getNANOBalance(w.address), timeout(8000)])).nano; }
-          else if (m.coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  bal = (await Promise.race([getHBARBalance(w.evmAddress), timeout(8000)])).hbar; }
-          else if (m.coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   bal = (await Promise.race([getSUIBalance(w.address), timeout(8000)])).sui; }
-          else if (m.coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); bal = (await Promise.race([getAPTOSBalance(w.address), timeout(8000)])).apt; }
-          else if (m.coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   bal = (await Promise.race([getLTCBalance(w.address), timeout(8000)])).total; }
+          if (m.coin === 'BTC')        { const w = deriveBTCWallet(mnemonic);   bal = (await getBTCBalance(w.address)).total; }
+          else if (m.coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  bal = (await getDOGEBalance(w.address)).total; }
+          else if (m.coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   bal = (await getBCHBalance(w.address)).total; }
+          else if (m.coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   bal = (await getSOLBalance(w.address)).sol; }
+          else if (m.coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   bal = (await getXRPBalance(w.address)).xrp; }
+          else if (m.coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   bal = (await getXLMBalance(w.address)).xlm; }
+          else if (m.coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  bal = (await getNANOBalance(w.address)).nano; }
+          else if (m.coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  bal = (await getHBARBalance(w.evmAddress)).hbar; }
+          else if (m.coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   bal = (await getSUIBalance(w.address)).sui; }
+          else if (m.coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); bal = (await getAPTOSBalance(w.address)).apt; }
+          else if (m.coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   bal = (await getLTCBalance(w.address)).total; }
         } catch { bal = 0; }
         return bal * (prices[m.coingeckoId] ?? 0);
       }));
@@ -1705,7 +1701,7 @@ export function WalletDashboard() {
       Promise.all(
         alchemyChains.map(async c => {
           try {
-            const toks = await withTimeout(fetchTokenBalances(address, c.id), 10000, []);
+            const toks = await fetchTokenBalances(address, c.id);
             const cgIds = [...new Set([c.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
             const p = await getPrices(cgIds);
             const usd = toks.reduce((s, t) => {
@@ -1936,26 +1932,35 @@ export function WalletDashboard() {
         )}
       </AnimatePresence>
 
-      <section className="flex-1 pt-[64px] px-3 pb-40 md:p-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
-        <div className="max-w-3xl mx-auto w-full space-y-4 md:space-y-12">
+      <section className="flex-1 pt-[64px] px-3 pb-40 md:pt-8 md:px-16 md:pb-16 bg-surface flex flex-col justify-between overflow-y-auto overflow-x-hidden">
+        <div className="max-w-3xl mx-auto w-full space-y-4 md:space-y-10">
 
           {/* ── Session Heading with Chain Selector + Toggle ── */}
-          <div className="space-y-2">
-            {/* Buttons row — always on top, full width on mobile */}
-            <div className="flex items-center gap-2">
+          <div className="flex items-start justify-between gap-3">
+            {/* Heading */}
+            <div className="space-y-0.5">
+              <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white leading-tight">
+                {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
+              </h2>
+              <p className="text-tertiary font-black tracking-[0.15em] uppercase text-[0.6rem] opacity-80">
+                {frozenMode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
+              </p>
+            </div>
+            {/* Buttons — right-aligned, same row as heading */}
+            <div className="flex items-center gap-2 flex-shrink-0 mt-1">
               <button
                 onClick={() => setShowNetworks(true)}
-                className="bg-surface-container-high px-4 py-2 rounded-full flex items-center gap-2 border border-white/5 hover:border-white/10 transition-colors flex-shrink-0">
+                className="bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/5 hover:border-white/10 transition-colors">
                 <div className="w-2 h-2 bg-tertiary rounded-full animate-pulse shadow-[0_0_12px_rgba(82,255,172,0.8)]"></div>
-                <span className="text-[0.6rem] font-black tracking-[0.15em] uppercase text-white truncate max-w-[80px] md:max-w-none">
+                <span className="text-[0.6rem] font-black tracking-[0.15em] uppercase text-white truncate max-w-[60px] md:max-w-none">
                   {selectedNonEvm ? (NON_EVM_META[selectedNonEvm]?.name ?? selectedNonEvm) : manualChain ? manualChain.name : 'Network'}
                 </span>
-                <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 16 }}>expand_more</span>
+                <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 14 }}>expand_more</span>
               </button>
               <motion.button
                 onClick={() => setMode(m => m === 'simple' ? 'advanced' : 'simple')}
                 whileTap={{ scale: 0.95 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 20, border: `1px solid ${mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, background: mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'border-color 0.25s, background 0.25s', flexShrink: 0 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 9999, border: `1px solid ${mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'}`, background: mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'border-color 0.25s, background 0.25s' }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(82,255,172,0.12)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(82,255,172,0.35)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = mode === 'advanced' ? 'rgba(82,255,172,0.08)' : 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.borderColor = mode === 'advanced' ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.1)'; }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#52ffac' }}>{mode === 'advanced' ? 'arrow_back' : 'settings'}</span>
@@ -1978,19 +1983,10 @@ export function WalletDashboard() {
                 </AnimatePresence>
               </motion.button>
             </div>
-            {/* Heading below buttons */}
-            <div className="space-y-0.5">
-              <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase text-white leading-tight">
-                {frozenMode === 'PERSISTENT' ? 'Persistent Session' : 'New Session'}
-              </h2>
-              <p className="text-tertiary font-black tracking-[0.15em] uppercase text-[0.6rem] opacity-80">
-                {frozenMode === 'PERSISTENT' ? 'Encrypted · Device-Bound' : 'Volatile wallet — RAM only'}
-              </p>
-            </div>
           </div>
 
           {/* ── Balance Section ── */}
-          <div className="space-y-3 md:space-y-6 fade-in">
+          <div className="space-y-3 md:space-y-6">
             <p className="text-on-surface-variant font-black tracking-[0.2em] uppercase text-xs opacity-60">Total Curated Value</p>
             <div className="flex items-end gap-4">
               <h1 className="text-[2.6rem] md:text-[9rem] font-black tracking-tighter leading-none text-white">
@@ -2011,7 +2007,6 @@ export function WalletDashboard() {
                           to={Math.floor(countTo)}
                           separator=","
                           duration={2.5}
-                          startWhen={!isLoadingTokens}
                         />
                         <span style={{ color: 'rgba(255,255,255,0.5)' }}>.</span>
                         <span style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -2036,7 +2031,7 @@ export function WalletDashboard() {
 
             {/* ── Address Card ── */}
             <div
-              className="bg-white text-black p-5 md:p-7 rounded-2xl flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
+              className="bg-white text-black p-5 md:p-7 rounded-full flex justify-between items-center group cursor-pointer hover:bg-neutral-200 transition-all"
               onClick={handleCopy}>
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 {selectedNonEvm ? (() => {
@@ -2074,7 +2069,7 @@ export function WalletDashboard() {
 
           {/* ── Extension Connect Banner ── */}
           {extPresent && !extAttached && wallet.isUnlocked && (
-            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: 9999, padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <p style={{ color: '#ddd', fontSize: 12, fontWeight: 700, margin: 0 }}>Cope Wallet Extension detected</p>
                 <p style={{ color: '#666', fontSize: 11, margin: '2px 0 0' }}>Connect to use it as a browser wallet for dApps</p>
@@ -2091,7 +2086,7 @@ export function WalletDashboard() {
             <p style={{ color: '#ff8888', fontSize: 11, margin: '-4px 0 4px', padding: '0 4px' }}>{extError}</p>
           )}
           {extAttached && wallet.isUnlocked && (
-            <div style={{ background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 16, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ background: 'rgba(82,255,172,0.05)', border: '1px solid rgba(82,255,172,0.15)', borderRadius: 9999, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#52ffac', boxShadow: '0 0 6px rgba(82,255,172,0.6)', flexShrink: 0 }} />
               <p style={{ color: '#888', fontSize: 11, fontWeight: 700, margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Extension connected — browser dApps can now use this wallet</p>
             </div>
@@ -2099,7 +2094,7 @@ export function WalletDashboard() {
 
           {/* ── Ledger Active Banner ── */}
           {activeLedger && (
-            <div style={{ background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.25)', borderRadius: 16, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ background: 'rgba(79,70,229,0.08)', border: '1px solid rgba(79,70,229,0.25)', borderRadius: 9999, padding: '12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#818cf8' }}>usb</span>
                 <div>
@@ -2131,7 +2126,7 @@ export function WalletDashboard() {
                 whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                 transition={springs.snappy}
                 style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                className="bg-surface-container-highest p-4 md:p-8 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                 <span className="material-symbols-outlined text-3xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                 <span className="font-black uppercase tracking-widest text-[0.6rem]">{item.label}</span>
               </motion.button>
@@ -2152,13 +2147,13 @@ export function WalletDashboard() {
                   initial={{ opacity: 0, y: 24, scale: 0.93 }}
                   whileInView={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 16, scale: 0.94 }}
-                  viewport={{ once: false, margin: '-40px' }}
+                  viewport={{ once: true, margin: '-40px' }}
                   transition={{ ...springs.smooth, delay: i * 0.06 }}
                   onClick={item.onClick}
                   whileHover={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 1.03, rotateX: 3, rotateY: -3 }}
                   whileTap={{ scale: (item as { disabled?: boolean }).disabled ? 1 : 0.96 }}
                   style={{ transformStyle: 'preserve-3d', perspective: 800, opacity: (item as { disabled?: boolean }).disabled ? 0.35 : 1 }}
-                  className="bg-surface-container-highest p-4 md:p-8 rounded-xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
+                  className="bg-surface-container-highest p-4 md:p-8 rounded-3xl flex flex-col items-center gap-1.5 md:gap-4 hover:bg-white hover:text-black transition-colors group border border-white/5 cursor-pointer">
                   <span className="material-symbols-outlined text-2xl md:text-5xl group-hover:scale-110 transition-transform">{item.icon}</span>
                   <span className="font-black uppercase tracking-widest text-[0.55rem] md:text-[0.6rem]">{item.label}</span>
                 </motion.button>
@@ -2628,7 +2623,7 @@ export function WalletDashboard() {
                             padding: '12px 16px',
                             background: isCurrent ? 'rgba(82,255,172,0.06)' : '#111',
                             border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                            borderRadius: 3,
+                            borderRadius: 9999,
                             cursor: isCurrent ? 'default' : 'pointer',
                             transition: 'border-color 0.15s, background 0.15s',
                           }}
