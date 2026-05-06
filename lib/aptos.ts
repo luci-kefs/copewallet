@@ -8,6 +8,8 @@ import { derivePath } from 'ed25519-hd-key';
 const config = new AptosConfig({ network: Network.MAINNET });
 const aptos = new Aptos(config);
 
+const APTOS_REST = 'https://api.mainnet.aptoslabs.com/v1';
+
 const OCTA_PER_APT = 100_000_000;
 
 export interface APTOSWallet {
@@ -41,11 +43,13 @@ export function deriveAPTOSWallet(mnemonic: string): APTOSWallet {
 
 export async function getAPTOSBalance(address: string): Promise<APTOSBalance> {
   try {
-    const resources = await aptos.getAccountResource({
-      accountAddress: address,
-      resourceType: '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>',
-    });
-    const octa = (resources as { coin?: { value?: string } })?.coin?.value ?? '0';
+    // Use raw fetch to avoid SDK logging 404s for unfunded accounts
+    const res = await fetch(
+      `${APTOS_REST}/accounts/${address}/resource/0x1::coin::CoinStore%3C0x1::aptos_coin::AptosCoin%3E`
+    );
+    if (!res.ok) return { apt: 0, octa: 0 };
+    const data = await res.json() as { data?: { coin?: { value?: string } } };
+    const octa = data?.data?.coin?.value ?? '0';
     return { apt: parseInt(octa) / OCTA_PER_APT, octa: parseInt(octa) };
   } catch {
     return { apt: 0, octa: 0 };
@@ -66,8 +70,10 @@ export async function sendAPTOS(from: APTOSWallet, to: string, amountAPT: number
 
 export async function getAPTOSTransactions(address: string, limit = 20): Promise<APTOSTransaction[]> {
   try {
-    const txs = await aptos.getAccountTransactions({ accountAddress: address, options: { limit } });
-    return txs.map((tx: Record<string, unknown>) => ({
+    const res = await fetch(`${APTOS_REST}/accounts/${address}/transactions?limit=${limit}`);
+    if (!res.ok) return [];
+    const txs = await res.json() as Record<string, unknown>[];
+    return txs.map((tx) => ({
       txid: (tx.hash as string) ?? '',
       amount: 0,
       timestamp: typeof tx.timestamp === 'string' ? parseInt(tx.timestamp) / 1_000_000 : 0,

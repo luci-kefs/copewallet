@@ -36,17 +36,18 @@ export function deriveXLMWallet(mnemonic: string): XLMWallet {
 
 export async function getXLMBalance(address: string): Promise<XLMBalance> {
   try {
-    const account = await server.loadAccount(address);
-    const xlmBalance = account.balances.find((b: { asset_type: string }) => b.asset_type === 'native');
+    // Raw fetch to avoid Horizon SDK logging 404s for unfunded accounts
+    const res = await fetch(`https://horizon.stellar.org/accounts/${address}`);
+    if (res.status === 404) return { xlm: 0, isActivated: false };
+    if (!res.ok) return { xlm: 0, isActivated: false };
+    const data = await res.json() as { balances?: { asset_type: string; balance: string }[] };
+    const xlmBalance = data.balances?.find(b => b.asset_type === 'native');
     return {
-      xlm: xlmBalance ? parseFloat((xlmBalance as { balance: string }).balance) : 0,
+      xlm: xlmBalance ? parseFloat(xlmBalance.balance) : 0,
       isActivated: true,
     };
-  } catch (e: unknown) {
-    if (e && typeof e === 'object' && 'response' in e && (e as { response?: { status?: number } }).response?.status === 404) {
-      return { xlm: 0, isActivated: false };
-    }
-    throw e;
+  } catch {
+    return { xlm: 0, isActivated: false };
   }
 }
 
@@ -75,14 +76,13 @@ export async function sendXLM(from: XLMWallet, to: string, amountXLM: number): P
 
 export async function getXLMTransactions(address: string, limit = 20): Promise<XLMTransaction[]> {
   try {
-    const payments = await server
-      .payments()
-      .forAccount(address)
-      .limit(limit)
-      .order('desc')
-      .call();
-
-    return (payments.records as unknown as Record<string, unknown>[])
+    const res = await fetch(
+      `https://horizon.stellar.org/accounts/${address}/payments?limit=${limit}&order=desc`
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as { _embedded?: { records?: Record<string, unknown>[] } };
+    const records = data._embedded?.records ?? [];
+    return records
       .filter((p) => p['type'] === 'payment' && p['asset_type'] === 'native')
       .map((p) => ({
         txid: p['transaction_hash'] as string ?? '',
