@@ -2184,27 +2184,6 @@ export function WalletDashboard() {
             })()}
           </div>
 
-          {/* ── Gas Tracker Widget ── */}
-          {!selectedNonEvm && wallet.isUnlocked && gasPrices && gasPrices.medium > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 14px', overflow: 'hidden' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14, color: '#facc15', flexShrink: 0 }}>local_gas_station</span>
-              <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.12em', flexShrink: 0 }}>Gas</span>
-              {[
-                { label: 'Slow',   value: gasPrices.slow,   color: '#4ade80' },
-                { label: 'Med',    value: gasPrices.medium, color: '#facc15' },
-                { label: 'Fast',   value: gasPrices.fast,   color: '#f87171' },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
-                  <span style={{ fontSize: 11, fontWeight: 900, color }}>{value < 0.1 ? '<0.1' : value.toFixed(1)}</span>
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontWeight: 700 }}>Gwei</span>
-                </div>
-              ))}
-              {gasPrices.baseFee > 0 && (
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', marginLeft: 'auto', flexShrink: 0 }}>Base {gasPrices.baseFee.toFixed(1)}</span>
-              )}
-            </div>
-          )}
 
           {/* ── Tabs & List ── */}
           <div className="pt-2 md:pt-8">
@@ -2649,7 +2628,7 @@ export function WalletDashboard() {
                             padding: '12px 16px',
                             background: isCurrent ? 'rgba(82,255,172,0.06)' : '#111',
                             border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                            borderRadius: '0.75rem',
+                            borderRadius: 3,
                             cursor: isCurrent ? 'default' : 'pointer',
                             transition: 'border-color 0.15s, background 0.15s',
                           }}
