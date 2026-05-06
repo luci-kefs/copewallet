@@ -1264,12 +1264,14 @@ function AddressBookModal({ contacts, onAdd, onDelete, onClose }: {
 }
 
 // ─── Saved Vaults Modal ───────────────────────────────────────────────────────
-function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
+function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose, liveNonEvm, liveChain }: {
   vaults: WalletSnapshot[];
   currentId: string | null;
   onSwitch: (snap: WalletSnapshot) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  liveNonEvm: NonEvmMeta | null;
+  liveChain: Chain;
 }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -1292,19 +1294,22 @@ function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
             <p style={{ color: '#555', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No saved vaults yet.<br/>Use Save on a wallet in the history section.</p>
           ) : saved.map(snap => {
             const isCurrent = snap.id === currentId;
+            const dispColor  = isCurrent ? (liveNonEvm?.color ?? liveChain.color ?? snap.chainColor) : snap.chainColor;
+            const dispLogo   = isCurrent ? (liveNonEvm?.logoUrl ?? liveChain.logoUrl ?? snap.chainLogo) : snap.chainLogo;
+            const dispName   = isCurrent ? (liveNonEvm?.name ?? liveChain.name ?? snap.chainName ?? '') : (snap.chainName ?? '');
             return (
               <div key={snap.id}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, background: isCurrent ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 24, padding: '12px 14px' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: snap.chainColor ? `${snap.chainColor}22` : (isCurrent ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)'), border: `1px solid ${snap.chainColor ? `${snap.chainColor}44` : (isCurrent ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.08)')}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                  {snap.chainLogo
-                    ? <img src={snap.chainLogo} alt={snap.chainName ?? ''} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
-                    : <span className="material-symbols-outlined" style={{ fontSize: 16, color: snap.chainColor ?? (isCurrent ? '#52ffac' : '#666') }}>account_balance_wallet</span>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: dispColor ? `${dispColor}22` : (isCurrent ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)'), border: `1px solid ${dispColor ? `${dispColor}44` : (isCurrent ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.08)')}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  {dispLogo
+                    ? <img src={dispLogo} alt={dispName} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                    : <span className="material-symbols-outlined" style={{ fontSize: 16, color: dispColor ?? (isCurrent ? '#52ffac' : '#666') }}>account_balance_wallet</span>
                   }
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ color: isCurrent ? '#52ffac' : '#fff', fontSize: 12, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{snap.shortAddress}</p>
                   <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {snap.chainName && <span style={{ color: snap.chainColor ?? '#666', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.08em' }}>{snap.chainName}</span>}
+                    {dispName && <span style={{ color: dispColor ?? '#666', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.08em' }}>{dispName}</span>}
                     <span>{snap.vaultMode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'}</span>
                     {isCurrent && <span style={{ color: '#52ffac', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.1em' }}>· Active</span>}
                   </p>
@@ -1615,21 +1620,23 @@ export function WalletDashboard() {
     try {
       await wallet.switchToSavedWallet(snap.id);
       if (snap.isNonEvm && snap.coinSymbol && NON_EVM_META[snap.coinSymbol]) {
+        const m = NON_EVM_META[snap.coinSymbol];
+        // Write snap's own chain info back (in case it was overwritten by a race)
+        updateSnapshotChain(snap.id, { chainName: m.name, chainColor: m.color, chainLogo: m.logoUrl, coinSymbol: m.symbol, isNonEvm: true, chainId: undefined });
         setSelectedNonEvm(snap.coinSymbol);
         setManualChain(null);
       } else {
-        setSelectedNonEvm(null);
         const found = snap.chainId ? CHAINS.find(c => c.id === snap.chainId) : null;
         const chain = found ?? CHAINS[0];
+        // Write snap's own chain info back
+        updateSnapshotChain(snap.id, { chainId: chain.id, chainName: chain.name, chainColor: chain.color, chainLogo: chain.logoUrl, coinSymbol: chain.symbol, isNonEvm: false });
+        setSelectedNonEvm(null);
         setSelectedChain(chain);
         setManualChain(chain);
       }
+      setWalletHistory(getHistory());
     } finally {
-      // Clear switching flag then trigger chain-update effect via tick
-      setTimeout(() => {
-        isSwitchingRef.current = false;
-        setChainUpdateTick(t => t + 1);
-      }, 350);
+      setTimeout(() => { isSwitchingRef.current = false; }, 100);
     }
   }, [wallet]);
 
@@ -1971,6 +1978,8 @@ export function WalletDashboard() {
         <SavedVaultsModal
           vaults={walletHistory}
           currentId={currentHistoryId}
+          liveNonEvm={selectedNonEvm ? (NON_EVM_META[selectedNonEvm] ?? null) : null}
+          liveChain={selectedChain}
           onSwitch={async (snap) => {
             try {
               await switchToSnap(snap);
@@ -2755,6 +2764,15 @@ export function WalletDashboard() {
                                   e.stopPropagation();
                                   setIsSavingVault(true);
                                   try {
+                                    // Write current chain info into snapshot before saving
+                                    if (isCurrent) {
+                                      if (selectedNonEvm && NON_EVM_META[selectedNonEvm]) {
+                                        const m = NON_EVM_META[selectedNonEvm];
+                                        updateSnapshotChain(snap.id, { chainName: m.name, chainColor: m.color, chainLogo: m.logoUrl, coinSymbol: m.symbol, isNonEvm: true, chainId: undefined });
+                                      } else {
+                                        updateSnapshotChain(snap.id, { chainId: selectedChain.id, chainName: selectedChain.name, chainColor: selectedChain.color, chainLogo: selectedChain.logoUrl, coinSymbol: selectedChain.symbol, isNonEvm: false });
+                                      }
+                                    }
                                     await wallet.persistCurrentWallet(snap.id);
                                     setWalletHistory(getHistory());
                                   } catch { alert('Failed to save vault.'); }
