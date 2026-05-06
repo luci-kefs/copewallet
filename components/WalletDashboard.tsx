@@ -2084,7 +2084,7 @@ export function WalletDashboard() {
           </div>
 
           {/* ── Saved Vaults Switcher ── */}
-          {wallet.isUnlocked && !selectedNonEvm && walletHistory.filter(s => s.isSaved).length > 0 && (
+          {wallet.isUnlocked && walletHistory.filter(s => s.isSaved).length > 0 && (
             <motion.button
               onClick={() => setShowSavedVaults(true)}
               whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
@@ -2633,7 +2633,7 @@ export function WalletDashboard() {
             {!selectedNonEvm && activeTab === 'lightning' && <LightningTab />}
 
             {/* Wallet History */}
-            {!selectedNonEvm && activeTab === 'balance' && walletHistory.length > 0 && (
+            {activeTab === 'balance' && walletHistory.length > 0 && (
               <div style={{ paddingTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Wallet History</span>
@@ -2755,7 +2755,7 @@ export function WalletDashboard() {
             )}
 
             {/* Advanced Mode hint */}
-            {!selectedNonEvm && activeTab === 'balance' && (
+            {activeTab === 'balance' && (
               <div style={{ paddingTop: 8, textAlign: 'center' }}>
                 <button onClick={() => setMode('advanced')}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', transition: 'color 0.2s' }}
