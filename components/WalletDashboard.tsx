@@ -1663,6 +1663,8 @@ export function WalletDashboard() {
   // Session-scoped TX history cache — key: `${address}:${chainId}`, value: { data, fetchedAt }
   const txCacheRef = useRef<Map<string, { data: TxRecord[]; fetchedAt: number }>>(new Map());
   const TX_CACHE_TTL = 90_000; // 90 seconds
+  const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([p, new Promise<T>(res => setTimeout(() => res(fallback), ms))]);
 
   // Compute all-chains total + auto-select highest-balance chain on first unlock
   const autoSelectedRef = useRef(false);
@@ -1681,17 +1683,18 @@ export function WalletDashboard() {
       const results = await Promise.allSettled(nonEvmCoins.map(async m => {
         let bal = 0;
         try {
-          if (m.coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   bal = (await getBTCBalance(w.address)).total; }
-          else if (m.coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  bal = (await getDOGEBalance(w.address)).total; }
-          else if (m.coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   bal = (await getBCHBalance(w.address)).total; }
-          else if (m.coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   bal = (await getSOLBalance(w.address)).sol; }
-          else if (m.coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   bal = (await getXRPBalance(w.address)).xrp; }
-          else if (m.coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   bal = (await getXLMBalance(w.address)).xlm; }
-          else if (m.coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  bal = (await getNANOBalance(w.address)).nano; }
-          else if (m.coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  bal = (await getHBARBalance(w.evmAddress)).hbar; }
-          else if (m.coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   bal = (await getSUIBalance(w.address)).sui; }
-          else if (m.coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); bal = (await getAPTOSBalance(w.address)).apt; }
-          else if (m.coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   bal = (await getLTCBalance(w.address)).total; }
+          const timeout = (ms: number) => new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), ms));
+          if (m.coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   bal = (await Promise.race([getBTCBalance(w.address), timeout(8000)])).total; }
+          else if (m.coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  bal = (await Promise.race([getDOGEBalance(w.address), timeout(8000)])).total; }
+          else if (m.coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   bal = (await Promise.race([getBCHBalance(w.address), timeout(8000)])).total; }
+          else if (m.coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   bal = (await Promise.race([getSOLBalance(w.address), timeout(8000)])).sol; }
+          else if (m.coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   bal = (await Promise.race([getXRPBalance(w.address), timeout(8000)])).xrp; }
+          else if (m.coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   bal = (await Promise.race([getXLMBalance(w.address), timeout(8000)])).xlm; }
+          else if (m.coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  bal = (await Promise.race([getNANOBalance(w.address), timeout(8000)])).nano; }
+          else if (m.coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  bal = (await Promise.race([getHBARBalance(w.evmAddress), timeout(8000)])).hbar; }
+          else if (m.coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   bal = (await Promise.race([getSUIBalance(w.address), timeout(8000)])).sui; }
+          else if (m.coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); bal = (await Promise.race([getAPTOSBalance(w.address), timeout(8000)])).apt; }
+          else if (m.coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   bal = (await Promise.race([getLTCBalance(w.address), timeout(8000)])).total; }
         } catch { bal = 0; }
         return bal * (prices[m.coingeckoId] ?? 0);
       }));
@@ -1702,7 +1705,7 @@ export function WalletDashboard() {
       Promise.all(
         alchemyChains.map(async c => {
           try {
-            const toks = await fetchTokenBalances(address, c.id);
+            const toks = await withTimeout(fetchTokenBalances(address, c.id), 10000, []);
             const cgIds = [...new Set([c.coingeckoId, ...toks.map(t => t.coingeckoId).filter(Boolean) as string[]])];
             const p = await getPrices(cgIds);
             const usd = toks.reduce((s, t) => {
@@ -2646,7 +2649,7 @@ export function WalletDashboard() {
                             padding: '12px 16px',
                             background: isCurrent ? 'rgba(82,255,172,0.06)' : '#111',
                             border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.2)' : 'rgba(255,255,255,0.07)'}`,
-                            borderRadius: '1.5rem',
+                            borderRadius: '0.75rem',
                             cursor: isCurrent ? 'default' : 'pointer',
                             transition: 'border-color 0.15s, background 0.15s',
                           }}
