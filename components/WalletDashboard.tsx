@@ -33,7 +33,7 @@ import { deriveAPTOSWallet, getAPTOSBalance, getAPTOSTransactions, sendAPTOS } f
 import { deriveLTCWallet, getLTCBalance, getLTCTransactions, buildLTCTransaction, broadcastLTC, estimateLTCFee } from '@/lib/ltc';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springs, variants } from '@/lib/animations';
-import { getHistory, addToHistory, makeSnapshot, removeFromHistory, deleteSavedVault, updateSnapshotChain, WalletSnapshot } from '@/lib/wallet-history';
+import { getHistory, addToHistory, makeSnapshot, removeFromHistory, deleteSavedVault, updateSnapshotChain, storeVaultBlob, WalletSnapshot } from '@/lib/wallet-history';
 import { WarningBanner } from '@/components/WarningBanner';
 import { TransferModal } from '@/components/TransferModal';
 import { loadContacts, addContact, deleteContact, Contact } from '@/lib/address-book';
@@ -1407,6 +1407,8 @@ export function WalletDashboard() {
   // Wallet history
   const [walletHistory, setWalletHistory] = useState<WalletSnapshot[]>([]);
   const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
+  const isSwitchingRef = useRef(false);
+  const [chainUpdateTick, setChainUpdateTick] = useState(0);
   const [showWipeWarning, setShowWipeWarning] = useState(false);
   const [showNewWalletWarning, setShowNewWalletWarning] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
@@ -1566,11 +1568,15 @@ export function WalletDashboard() {
     if (existing) {
       setCurrentHistoryId(existing.id);
       setWalletHistory(history);
+      // Backfill blob if missing (e.g. older sessions without auto-store)
+      wallet.getMnemonicForExport().then(m => { if (m) storeVaultBlob(existing.id, m); }).catch(() => {});
     } else {
       const snap = makeSnapshot(wallet.activeAddress, wallet.mode as 'EPHEMERAL' | 'PERSISTENT', chainInfo);
       addToHistory(snap);
       setCurrentHistoryId(snap.id);
       setWalletHistory(getHistory());
+      // Store mnemonic blob so this wallet can be restored from history
+      wallet.getMnemonicForExport().then(m => { if (m) storeVaultBlob(snap.id, m); }).catch(() => {});
     }
   }, [wallet.isUnlocked, wallet.activeAddress]);
 
@@ -1581,9 +1587,11 @@ export function WalletDashboard() {
     return () => window.removeEventListener('cw:history:updated', handler);
   }, []);
 
-  // Update chain info in history when user switches network
+  // Update chain info in history when user switches network (skip during wallet switch to avoid race)
   useEffect(() => {
     if (!currentHistoryId) return;
+    if (isSwitchingRef.current) return;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     if (selectedNonEvm) {
       const m = NON_EVM_META[selectedNonEvm];
       if (!m) return;
@@ -1599,19 +1607,29 @@ export function WalletDashboard() {
       });
     }
     setWalletHistory(getHistory());
-  }, [currentHistoryId, selectedChain.id, selectedNonEvm]);
+  }, [currentHistoryId, selectedChain.id, selectedNonEvm, chainUpdateTick]);
 
   // Switch to a history snapshot — restores mnemonic AND chain selection
   const switchToSnap = useCallback(async (snap: WalletSnapshot) => {
-    await wallet.switchToSavedWallet(snap.id);
-    if (snap.isNonEvm && snap.coinSymbol && NON_EVM_META[snap.coinSymbol]) {
-      setSelectedNonEvm(snap.coinSymbol);
-    } else {
-      setSelectedNonEvm(null);
-      if (snap.chainId) {
-        const found = CHAINS.find(c => c.id === snap.chainId);
-        if (found) setSelectedChain(found);
+    isSwitchingRef.current = true;
+    try {
+      await wallet.switchToSavedWallet(snap.id);
+      if (snap.isNonEvm && snap.coinSymbol && NON_EVM_META[snap.coinSymbol]) {
+        setSelectedNonEvm(snap.coinSymbol);
+        setManualChain(null);
+      } else {
+        setSelectedNonEvm(null);
+        const found = snap.chainId ? CHAINS.find(c => c.id === snap.chainId) : null;
+        const chain = found ?? CHAINS[0];
+        setSelectedChain(chain);
+        setManualChain(chain);
       }
+    } finally {
+      // Clear switching flag then trigger chain-update effect via tick
+      setTimeout(() => {
+        isSwitchingRef.current = false;
+        setChainUpdateTick(t => t + 1);
+      }, 350);
     }
   }, [wallet]);
 
@@ -2679,19 +2697,27 @@ export function WalletDashboard() {
                             catch { alert('Vault data not found.'); }
                           }}
                         >
-                          {/* Chain Icon */}
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: snap.chainColor ? `${snap.chainColor}22` : (isCurrent ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)'), border: `1px solid ${snap.chainColor ? `${snap.chainColor}44` : (isCurrent ? 'rgba(82,255,172,0.25)' : 'rgba(255,255,255,0.08)')}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
-                            {snap.chainLogo
-                              ? <img src={snap.chainLogo} alt={snap.chainName ?? ''} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
-                              : <span className="material-symbols-outlined" style={{ fontSize: 16, color: snap.chainColor ?? (isCurrent ? '#52ffac' : '#555') }}>account_balance_wallet</span>
-                            }
-                          </div>
+                          {/* Chain Icon — for active item use live state, for others use stored snap */}
+                          {(() => {
+                            const liveNonEvm = isCurrent && selectedNonEvm ? NON_EVM_META[selectedNonEvm] : null;
+                            const liveChain  = isCurrent && !selectedNonEvm ? selectedChain : null;
+                            const dispColor  = liveNonEvm?.color ?? liveChain?.color ?? snap.chainColor;
+                            const dispLogo   = liveNonEvm?.logoUrl ?? liveChain?.logoUrl ?? snap.chainLogo;
+                            const dispName   = liveNonEvm?.name ?? liveChain?.name ?? snap.chainName ?? '';
+                            return (
+                              <>
+                                <div style={{ width: 36, height: 36, borderRadius: '50%', background: dispColor ? `${dispColor}22` : (isCurrent ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)'), border: `1px solid ${dispColor ? `${dispColor}44` : (isCurrent ? 'rgba(82,255,172,0.25)' : 'rgba(255,255,255,0.08)')}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                                  {dispLogo
+                                    ? <img src={dispLogo} alt={dispName} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                                    : <span className="material-symbols-outlined" style={{ fontSize: 16, color: dispColor ?? (isCurrent ? '#52ffac' : '#555') }}>account_balance_wallet</span>
+                                  }
+                                </div>
 
-                          {/* Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                              <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 700, color: isCurrent ? '#52ffac' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {snap.shortAddress}
+                                {/* Info */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                    <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 700, color: isCurrent ? '#52ffac' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {snap.shortAddress}
                               </span>
                               {isCurrent && (
                                 <span style={{ fontSize: 8, fontWeight: 900, color: '#52ffac', background: 'rgba(82,255,172,0.12)', padding: '2px 8px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.1em', flexShrink: 0 }}>
@@ -2704,17 +2730,20 @@ export function WalletDashboard() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              {snap.chainName && (
-                                <span style={{ fontSize: 9, fontWeight: 900, color: snap.chainColor ?? '#666', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                                  {snap.chainName}
-                                </span>
-                              )}
-                              <span style={{ fontSize: 9, color: '#333', fontWeight: 600 }}>
-                                {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    {dispName && (
+                                      <span style={{ fontSize: 9, fontWeight: 900, color: dispColor ?? '#666', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                        {dispName}
+                                      </span>
+                                    )}
+                                    <span style={{ fontSize: 9, color: '#333', fontWeight: 600 }}>
+                                      {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
 
                           {/* Actions */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
