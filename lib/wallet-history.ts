@@ -17,6 +17,12 @@ export interface WalletSnapshot {
   label?: string;
   isSaved: boolean;
   vaultMode: 'EPHEMERAL' | 'PERSISTENT';
+  chainId?: number;
+  chainName?: string;
+  chainColor?: string;
+  chainLogo?: string;
+  coinSymbol?: string;
+  isNonEvm?: boolean;
 }
 
 // ── AES-GCM helpers (app-level key, convenience storage — not passphrase-gated) ─
@@ -141,12 +147,22 @@ export function updateLabel(id: string, label: string): void {
   save(updated);
 }
 
+export function updateSnapshotChain(id: string, chain: { chainId?: number; chainName?: string; chainColor?: string; chainLogo?: string; coinSymbol?: string; isNonEvm?: boolean }): void {
+  const history = load();
+  const updated = history.map((s) => s.id === id ? { ...s, ...chain } : s);
+  save(updated);
+}
+
 export function clearHistory(): void {
   if (typeof window === 'undefined') return;
   try { localStorage.removeItem(HISTORY_KEY); } catch {}
 }
 
-export function makeSnapshot(address: string, mode: 'EPHEMERAL' | 'PERSISTENT'): WalletSnapshot {
+export function makeSnapshot(
+  address: string,
+  mode: 'EPHEMERAL' | 'PERSISTENT',
+  chain?: { chainId?: number; chainName?: string; chainColor?: string; chainLogo?: string; coinSymbol?: string; isNonEvm?: boolean }
+): WalletSnapshot {
   return {
     id: crypto.randomUUID(),
     address,
@@ -154,6 +170,12 @@ export function makeSnapshot(address: string, mode: 'EPHEMERAL' | 'PERSISTENT'):
     createdAt: Date.now(),
     isSaved: false,
     vaultMode: mode,
+    chainId: chain?.chainId,
+    chainName: chain?.chainName,
+    chainColor: chain?.chainColor,
+    chainLogo: chain?.chainLogo,
+    coinSymbol: chain?.coinSymbol,
+    isNonEvm: chain?.isNonEvm,
   };
 }
 

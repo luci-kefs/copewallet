@@ -33,7 +33,7 @@ import { deriveAPTOSWallet, getAPTOSBalance, getAPTOSTransactions, sendAPTOS } f
 import { deriveLTCWallet, getLTCBalance, getLTCTransactions, buildLTCTransaction, broadcastLTC, estimateLTCFee } from '@/lib/ltc';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springs, variants } from '@/lib/animations';
-import { getHistory, addToHistory, makeSnapshot, removeFromHistory, deleteSavedVault, WalletSnapshot } from '@/lib/wallet-history';
+import { getHistory, addToHistory, makeSnapshot, removeFromHistory, deleteSavedVault, updateSnapshotChain, WalletSnapshot } from '@/lib/wallet-history';
 import { WarningBanner } from '@/components/WarningBanner';
 import { TransferModal } from '@/components/TransferModal';
 import { loadContacts, addContact, deleteContact, Contact } from '@/lib/address-book';
@@ -1295,14 +1295,18 @@ function SavedVaultsModal({ vaults, currentId, onSwitch, onDelete, onClose }: {
             return (
               <div key={snap.id}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, background: isCurrent ? 'rgba(82,255,172,0.07)' : 'rgba(255,255,255,0.03)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 24, padding: '12px 14px' }}>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: isCurrent ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)', border: isCurrent ? '1.5px solid rgba(82,255,172,0.3)' : '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? '#52ffac' : '#666' }}>account_balance_wallet</span>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: snap.chainColor ? `${snap.chainColor}22` : (isCurrent ? 'rgba(82,255,172,0.12)' : 'rgba(255,255,255,0.06)'), border: `1px solid ${snap.chainColor ? `${snap.chainColor}44` : (isCurrent ? 'rgba(82,255,172,0.3)' : 'rgba(255,255,255,0.08)')}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                  {snap.chainLogo
+                    ? <img src={snap.chainLogo} alt={snap.chainName ?? ''} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                    : <span className="material-symbols-outlined" style={{ fontSize: 16, color: snap.chainColor ?? (isCurrent ? '#52ffac' : '#666') }}>account_balance_wallet</span>
+                  }
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ color: isCurrent ? '#52ffac' : '#fff', fontSize: 13, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{snap.shortAddress}</p>
-                  <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0' }}>
-                    {snap.vaultMode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'} · {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    {isCurrent && <span style={{ marginLeft: 6, color: '#52ffac', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.1em' }}>Active</span>}
+                  <p style={{ color: isCurrent ? '#52ffac' : '#fff', fontSize: 12, fontWeight: 700, margin: 0, fontFamily: 'monospace' }}>{snap.shortAddress}</p>
+                  <p style={{ color: '#555', fontSize: 10, margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {snap.chainName && <span style={{ color: snap.chainColor ?? '#666', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.08em' }}>{snap.chainName}</span>}
+                    <span>{snap.vaultMode === 'PERSISTENT' ? 'Persistent' : 'Ephemeral'}</span>
+                    {isCurrent && <span style={{ color: '#52ffac', fontWeight: 900, textTransform: 'uppercase', fontSize: 8, letterSpacing: '0.1em' }}>· Active</span>}
                   </p>
                 </div>
                 {!isCurrent && (
@@ -1551,11 +1555,19 @@ export function WalletDashboard() {
     if (!wallet.isUnlocked || !wallet.activeAddress) return;
     const history = getHistory();
     const existing = history.find(s => s.address === wallet.activeAddress);
+    const chainInfo = {
+      chainId: selectedChain.id,
+      chainName: selectedChain.name,
+      chainColor: selectedChain.color,
+      chainLogo: selectedChain.logoUrl,
+      coinSymbol: selectedChain.symbol,
+      isNonEvm: false,
+    };
     if (existing) {
       setCurrentHistoryId(existing.id);
       setWalletHistory(history);
     } else {
-      const snap = makeSnapshot(wallet.activeAddress, wallet.mode as 'EPHEMERAL' | 'PERSISTENT');
+      const snap = makeSnapshot(wallet.activeAddress, wallet.mode as 'EPHEMERAL' | 'PERSISTENT', chainInfo);
       addToHistory(snap);
       setCurrentHistoryId(snap.id);
       setWalletHistory(getHistory());
@@ -1568,6 +1580,26 @@ export function WalletDashboard() {
     window.addEventListener('cw:history:updated', handler);
     return () => window.removeEventListener('cw:history:updated', handler);
   }, []);
+
+  // Update chain info in history when user switches network
+  useEffect(() => {
+    if (!currentHistoryId) return;
+    if (selectedNonEvm) {
+      const m = NON_EVM_META[selectedNonEvm];
+      if (!m) return;
+      updateSnapshotChain(currentHistoryId, {
+        chainName: m.name, chainColor: m.color, chainLogo: m.logoUrl,
+        coinSymbol: m.symbol, isNonEvm: true, chainId: undefined,
+      });
+    } else {
+      updateSnapshotChain(currentHistoryId, {
+        chainId: selectedChain.id, chainName: selectedChain.name,
+        chainColor: selectedChain.color, chainLogo: selectedChain.logoUrl,
+        coinSymbol: selectedChain.symbol, isNonEvm: false,
+      });
+    }
+    setWalletHistory(getHistory());
+  }, [currentHistoryId, selectedChain.id, selectedNonEvm]);
 
   // Freeze last known address so UI doesn't blank during transient wipe
   const [frozenAddress, setFrozenAddress] = useState<string | null>(null);
@@ -2633,15 +2665,18 @@ export function WalletDashboard() {
                             catch { alert('Vault data not found.'); }
                           }}
                         >
-                          {/* Icon */}
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: isCurrent ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isCurrent ? 'rgba(82,255,172,0.25)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 16, color: isCurrent ? '#52ffac' : '#555' }}>account_balance_wallet</span>
+                          {/* Chain Icon */}
+                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: snap.chainColor ? `${snap.chainColor}22` : (isCurrent ? 'rgba(82,255,172,0.1)' : 'rgba(255,255,255,0.05)'), border: `1px solid ${snap.chainColor ? `${snap.chainColor}44` : (isCurrent ? 'rgba(82,255,172,0.25)' : 'rgba(255,255,255,0.08)')}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                            {snap.chainLogo
+                              ? <img src={snap.chainLogo} alt={snap.chainName ?? ''} style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
+                              : <span className="material-symbols-outlined" style={{ fontSize: 16, color: snap.chainColor ?? (isCurrent ? '#52ffac' : '#555') }}>account_balance_wallet</span>
+                            }
                           </div>
 
                           {/* Info */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                              <span style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: isCurrent ? '#52ffac' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 700, color: isCurrent ? '#52ffac' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {snap.shortAddress}
                               </span>
                               {isCurrent && (
@@ -2655,8 +2690,15 @@ export function WalletDashboard() {
                                 </span>
                               )}
                             </div>
-                            <div style={{ fontSize: 10, color: '#444', fontWeight: 600 }}>
-                              {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {snap.chainName && (
+                                <span style={{ fontSize: 9, fontWeight: 900, color: snap.chainColor ?? '#666', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                  {snap.chainName}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 9, color: '#333', fontWeight: 600 }}>
+                                {new Date(snap.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
                           </div>
 
