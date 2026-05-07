@@ -1463,19 +1463,33 @@ export function WalletDashboard() {
       const mnemonic = await wallet.getMnemonicForExport();
       if (!mnemonic) return;
       let addr = '';
-      let bal = 0;
-      if (coin === 'BTC')   { const w = deriveBTCWallet(mnemonic);   addr = w.address;     bal = (await getBTCBalance(addr)).total; }
-      else if (coin === 'DOGE')  { const w = deriveDOGEWallet(mnemonic);  addr = w.address;     bal = (await getDOGEBalance(addr)).total; }
-      else if (coin === 'BCH')   { const w = deriveBCHWallet(mnemonic);   addr = w.address;     bal = (await getBCHBalance(addr)).total; }
-      else if (coin === 'SOL')   { const w = deriveSOLWallet(mnemonic);   addr = w.address;     bal = (await getSOLBalance(addr)).sol; }
-      else if (coin === 'XRP')   { const w = deriveXRPWallet(mnemonic);   addr = w.address;     bal = (await getXRPBalance(addr)).xrp; }
-      else if (coin === 'XLM')   { const w = deriveXLMWallet(mnemonic);   addr = w.address;     bal = (await getXLMBalance(addr)).xlm; }
-      else if (coin === 'NANO')  { const w = deriveNANOWallet(mnemonic);  addr = w.address;     bal = (await getNANOBalance(addr)).nano; }
-      else if (coin === 'HBAR')  { const w = deriveHBARWallet(mnemonic);  addr = w.evmAddress;  bal = (await getHBARBalance(addr)).hbar; }
-      else if (coin === 'SUI')   { const w = deriveSUIWallet(mnemonic);   addr = w.address;     bal = (await getSUIBalance(addr)).sui; }
-      else if (coin === 'APTOS') { const w = deriveAPTOSWallet(mnemonic); addr = w.address;     bal = (await getAPTOSBalance(addr)).apt; }
-      else if (coin === 'LTC')   { const w = deriveLTCWallet(mnemonic);   addr = w.address;     bal = (await getLTCBalance(addr)).total; }
+      if (coin === 'BTC')        { addr = deriveBTCWallet(mnemonic).address; }
+      else if (coin === 'DOGE')  { addr = deriveDOGEWallet(mnemonic).address; }
+      else if (coin === 'BCH')   { addr = deriveBCHWallet(mnemonic).address; }
+      else if (coin === 'SOL')   { addr = deriveSOLWallet(mnemonic).address; }
+      else if (coin === 'XRP')   { addr = deriveXRPWallet(mnemonic).address; }
+      else if (coin === 'XLM')   { addr = deriveXLMWallet(mnemonic).address; }
+      else if (coin === 'NANO')  { addr = deriveNANOWallet(mnemonic).address; }
+      else if (coin === 'HBAR')  { addr = deriveHBARWallet(mnemonic).evmAddress; }
+      else if (coin === 'SUI')   { addr = deriveSUIWallet(mnemonic).address; }
+      else if (coin === 'APTOS') { addr = deriveAPTOSWallet(mnemonic).address; }
+      else if (coin === 'LTC')   { addr = deriveLTCWallet(mnemonic).address; }
+      // Set address immediately so it displays even if balance fetch fails
       setNonEvmAddr(addr);
+      let bal = 0;
+      try {
+        if (coin === 'BTC')        { bal = (await getBTCBalance(addr)).total; }
+        else if (coin === 'DOGE')  { bal = (await getDOGEBalance(addr)).total; }
+        else if (coin === 'BCH')   { bal = (await getBCHBalance(addr)).total; }
+        else if (coin === 'SOL')   { bal = (await getSOLBalance(addr)).sol; }
+        else if (coin === 'XRP')   { bal = (await getXRPBalance(addr)).xrp; }
+        else if (coin === 'XLM')   { bal = (await getXLMBalance(addr)).xlm; }
+        else if (coin === 'NANO')  { bal = (await getNANOBalance(addr)).nano; }
+        else if (coin === 'HBAR')  { bal = (await getHBARBalance(addr)).hbar; }
+        else if (coin === 'SUI')   { bal = (await getSUIBalance(addr)).sui; }
+        else if (coin === 'APTOS') { bal = (await getAPTOSBalance(addr)).apt; }
+        else if (coin === 'LTC')   { bal = (await getLTCBalance(addr)).total; }
+      } catch { bal = 0; }
       setNonEvmBal(bal);
       const meta = NON_EVM_META[coin];
       if (meta?.coingeckoId) {
